@@ -4,6 +4,6 @@
 [linux-arm64] rpi-imager-cli-aarch64.AppImage => /usr/bin/rpi-imager-cli
 [linux-armhf] rpi-imager-cli-armhf.AppImage => /usr/bin/rpi-imager-cli
 
-src/linux/icon/rpi-imager.svg /usr/share/icons/hicolor/scalable/apps/
+src/linux/icon/laerdal-simserver-imager.svg /usr/share/icons/hicolor/scalable/apps/
 
 debian/com.raspberrypi.rpi-imager-cli.desktop /usr/share/applications/

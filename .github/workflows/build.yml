@@ -93,21 +93,65 @@ jobs:
           if-no-files-found: error
 
   # ============================================================================
-  # Linux Debian Package
+  # Linux Debian Packages
   # ============================================================================
   build-debian:
     name: Debian Package (${{ matrix.profile }})
     runs-on: ubuntu-24.04
+    needs: build-linux
     strategy:
       fail-fast: false
       matrix:
-        profile: [desktop, cli]
+        include:
+          - profile: desktop
+            appimage_arch: x86_64
+          - profile: cli
+            appimage_arch: x86_64
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage-${{ matrix.appimage_arch }}
+          path: .
+
+      - name: Prepare AppImage for packaging
+        run: |
+          # List downloaded files
+          ls -la *.AppImage
+
+          # The debian packaging expects specific filenames
+          # For desktop profile: rpi-imager-x86_64.AppImage
+          # For cli profile: rpi-imager-cli-x86_64.AppImage
+
+          if [ "${{ matrix.profile }}" = "desktop" ]; then
+            # Rename to expected format (symlink already created by create-appimage.sh)
+            for f in *desktop*.AppImage Raspberry_Pi_Imager*.AppImage; do
+              if [ -f "$f" ]; then
+                cp "$f" "rpi-imager-${{ matrix.appimage_arch }}.AppImage"
+                break
+              fi
+            done
+          elif [ "${{ matrix.profile }}" = "cli" ]; then
+            # For CLI, we need to build the CLI AppImage separately
+            # For now, skip if CLI AppImage doesn't exist
+            if ls *cli*.AppImage 1>/dev/null 2>&1; then
+              for f in *cli*.AppImage; do
+                cp "$f" "rpi-imager-cli-${{ matrix.appimage_arch }}.AppImage"
+                break
+              done
+            else
+              echo "CLI AppImage not found, skipping..."
+              exit 0
+            fi
+          fi
+
+          ls -la *.AppImage
 
       - name: Install build dependencies
         run: |
@@ -117,20 +161,12 @@ jobs:
             devscripts \
             debhelper \
             dh-exec \
-            cmake \
-            libgnutls28-dev
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          arch: linux_gcc_64
-          cache: true
+            fakeroot
 
       - name: Build Debian package
         run: |
-          export Qt6_ROOT="${QT_ROOT_DIR}"
-          dpkg-buildpackage -uc -us -P${{ matrix.profile }}
+          # Build the debian package
+          dpkg-buildpackage -uc -us -b -P${{ matrix.profile }}
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
@@ -138,7 +174,6 @@ jobs:
           name: debian-${{ matrix.profile }}
           path: |
             ../*.deb
-            ../*.changes
           if-no-files-found: error
 
   # ============================================================================
@@ -231,13 +266,14 @@ jobs:
       - name: Create DMG
         run: |
           cd build
-          # Deploy Qt frameworks
-          macdeployqt "Laerdal SimServer Imager.app" -qmldir=../src
+          # Deploy Qt frameworks to the app bundle
+          # The CMake creates laerdal-simserver-imager.app
+          macdeployqt laerdal-simserver-imager.app -qmldir=../src
 
           # Create DMG
           VERSION=$(git describe --tags --always)
           hdiutil create -volname "Laerdal SimServer Imager" \
-            -srcfolder "Laerdal SimServer Imager.app" \
+            -srcfolder laerdal-simserver-imager.app \
             -ov -format UDZO \
             "laerdal-simserver-imager-${VERSION}-macos-${{ matrix.arch }}.dmg"
 
@@ -253,7 +289,7 @@ jobs:
   # ============================================================================
   release:
     name: Create Release
-    needs: [build-linux, build-windows, build-macos]
+    needs: [build-linux, build-debian, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -276,6 +312,6 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/**/*.AppImage
+            artifacts/**/*.deb
             artifacts/**/*.zip
             artifacts/**/*.dmg
-            artifacts/**/*.deb

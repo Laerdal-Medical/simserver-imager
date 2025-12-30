@@ -8,7 +8,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ICON_DIR="${SCRIPT_DIR}/icon"
-OUTPUT_ICO="${SCRIPT_DIR}/../icons/rpi-imager.ico"
+OUTPUT_ICO="${SCRIPT_DIR}/../icons/laerdal-simserver-imager.ico"
 
 # Check for ImageMagick
 if command -v magick &> /dev/null; then

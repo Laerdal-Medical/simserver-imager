@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Laerdal SimServer Imager App Icon -->
+<!-- Copyright (C) 2025 Laerdal Medical -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Laerdal brand colors -->
+    <linearGradient id="laerdalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5fa8c4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2e7fa1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="laerdalDarkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2e7fa1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a5a73;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#laerdalGradient)" />
+
+  <!-- SD Card shape - main body -->
+  <path d="M80 56 L176 56 L176 200 L80 200 L80 80 L56 56 L80 56 Z"
+        fill="#ffffff"
+        stroke="none"/>
+
+  <!-- SD Card notch (top-left corner cut) -->
+  <path d="M80 56 L80 80 L56 80 Z"
+        fill="url(#laerdalDarkGradient)" />
+
+  <!-- SD Card contacts/pins -->
+  <rect x="92" y="68" width="8" height="24" rx="1" fill="url(#laerdalDarkGradient)" />
+  <rect x="108" y="68" width="8" height="24" rx="1" fill="url(#laerdalDarkGradient)" />
+  <rect x="124" y="68" width="8" height="24" rx="1" fill="url(#laerdalDarkGradient)" />
+  <rect x="140" y="68" width="8" height="24" rx="1" fill="url(#laerdalDarkGradient)" />
+  <rect x="156" y="68" width="8" height="24" rx="1" fill="url(#laerdalDarkGradient)" />
+
+  <!-- Download/Write arrow -->
+  <g transform="translate(128, 148)">
+    <!-- Arrow body -->
+    <rect x="-12" y="-32" width="24" height="40" rx="2" fill="url(#laerdalDarkGradient)" />
+    <!-- Arrow head -->
+    <polygon points="-28,8 0,40 28,8" fill="url(#laerdalDarkGradient)" />
+  </g>
+</svg>

@@ -3,7 +3,7 @@
 # Set up icon resources
 # We use the .icon file from Icon Composer for dark mode support (macOS Tahoe+)
 # Plus .icns as fallback for older macOS versions
-set_source_files_properties("icons/rpi-imager.icns" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+set_source_files_properties("icons/laerdal-simserver-imager.icns" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
 # Check for Icon Composer .icon file (supports dark mode on macOS Tahoe+)
 set(ICON_COMPOSER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/icons/app_icon_macos.icon")
@@ -64,7 +64,7 @@ else()
 endif()
 
 # Include .icns for fallback
-set(DEPENDENCIES icons/rpi-imager.icns)
+set(DEPENDENCIES icons/laerdal-simserver-imager.icns)
 
 enable_language(OBJC C)
 
