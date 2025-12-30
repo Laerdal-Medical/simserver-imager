@@ -8,10 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
 #include <sys/param.h>
 #include <sys/types.h>
-#endif
 
 #ifdef __APPLE__
 #include <machine/endian.h>
@@ -21,12 +19,6 @@
 #define __BYTE_ORDER __LITTLE_ENDIAN
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
-/* MSVC compatibility for GCC extensions */
-#include <malloc.h>  /* for alloca on Windows */
-#define alloca _alloca
-#define __alignof__(x) __alignof(x)
-#define __attribute__(x)  /* MSVC doesn't support GCC attributes */
 
 char *stpncpy(char *dest, const char *src, size_t n)
 {
@@ -456,7 +448,7 @@ sha256_crypt_r (const char *key, const char *salt, char *buffer, int buflen)
   /* Create byte sequence P.  */
   cp = p_bytes = alloca (key_len);
   for (cnt = key_len; cnt >= 32; cnt -= 32)
-    cp = (char *) memcpy (cp, temp_result, 32) + 32;
+    cp = memcpy (cp, temp_result, 32) + 32;
   memcpy (cp, temp_result, cnt);
 
   /* Start computation of S byte sequence.  */
@@ -472,7 +464,7 @@ sha256_crypt_r (const char *key, const char *salt, char *buffer, int buflen)
   /* Create byte sequence S.  */
   cp = s_bytes = alloca (salt_len);
   for (cnt = salt_len; cnt >= 32; cnt -= 32)
-    cp = (char *) memcpy (cp, temp_result, 32) + 32;
+    cp = memcpy (cp, temp_result, 32) + 32;
   memcpy (cp, temp_result, cnt);
 
   /* Repeatedly run the collected hash value through SHA256 to burn

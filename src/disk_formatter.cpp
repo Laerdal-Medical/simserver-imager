@@ -205,9 +205,9 @@ Result<void> DiskFormatter::WriteMbr(
   std::uint32_t end_head = (end_lba / 63) % 255;
   std::uint32_t end_sect = (end_lba % 63) + 1;
   
-  partition.last_cylinder = (std::min)(end_cyl, 1023U) & 0xFF;
+  partition.last_cylinder = std::min(end_cyl, 1023U) & 0xFF;
   partition.last_head = end_head;
-  partition.last_sector = (((std::min)(end_cyl, 1023U) >> 2) & 0xC0) | (end_sect & 0x3F);
+  partition.last_sector = ((std::min(end_cyl, 1023U) >> 2) & 0xC0) | (end_sect & 0x3F);
 
   // Copy partition entry to MBR
   std::memcpy(mbr_sector.data() + 446, &partition, sizeof(partition));
@@ -272,7 +272,7 @@ Result<void> DiskFormatter::WriteBootSector(
   
   // OEM name
   std::string oem = "mkfs.fat";
-  std::copy_n(oem.begin(), (std::min)(oem.size(), boot_sector.oem_name.size()),
+  std::copy_n(oem.begin(), std::min(oem.size(), boot_sector.oem_name.size()),
               boot_sector.oem_name.begin());
 
   // BIOS Parameter Block
@@ -307,7 +307,7 @@ Result<void> DiskFormatter::WriteBootSector(
   std::array<char, 11> padded_label{};
   std::fill(padded_label.begin(), padded_label.end(), ' ');
   std::copy_n(config.volume_label.begin(),
-              (std::min)(config.volume_label.size(), padded_label.size()),
+              std::min(config.volume_label.size(), padded_label.size()),
               padded_label.begin());
   boot_sector.volume_label = padded_label;
 

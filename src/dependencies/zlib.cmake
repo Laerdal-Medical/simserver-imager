@@ -24,11 +24,8 @@ unset(SKIP_INSTALL_ALL)
 # Set zlib variables that libarchive's CMake will use
 set(ZLIB_USE_STATIC_LIBS ON CACHE BOOL "" FORCE) # Prefer static
 set(ZLIB_ROOT ${zlib_SOURCE_DIR} CACHE PATH "" FORCE)
-# Platform-specific library naming
-if(MSVC)
-    set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/zlibstatic.lib CACHE FILEPATH "" FORCE)
-    set(ZLIB_LIBRARIES ${zlib_BINARY_DIR}/zlibstatic.lib CACHE STRING "" FORCE)
-elseif(WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
+# Mingw vs others library naming
+if (WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/libzsd.a CACHE FILEPATH "" FORCE)
         set(ZLIB_LIBRARIES ${zlib_BINARY_DIR}/libzsd.a CACHE STRING "" FORCE)

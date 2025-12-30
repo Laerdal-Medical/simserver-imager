@@ -155,7 +155,7 @@ jobs:
           if-no-files-found: error
 
   # ============================================================================
-  # Windows Build
+  # Windows Build (MinGW)
   # ============================================================================
   build-windows:
     name: Windows
@@ -172,8 +172,14 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           host: windows
-          arch: win64_msvc2022_64
+          arch: win64_mingw
           cache: true
+
+      - name: Install MinGW
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+          version: 13.1.0
 
       - name: Install Inno Setup
         run: |
@@ -183,15 +189,16 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build -S src `
+            -G "MinGW Makefiles" `
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
             -DQt6_ROOT="$env:QT_ROOT_DIR" `
             -DENABLE_INNO_INSTALLER=ON
 
       - name: Build
-        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+        run: cmake --build build --parallel
 
       - name: Build Inno Setup installer
-        run: cmake --build build --config ${{ env.BUILD_TYPE }} --target inno_installer
+        run: cmake --build build --target inno_installer
 
       - name: Create ZIP archive
         run: |
