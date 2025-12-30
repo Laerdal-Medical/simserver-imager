@@ -75,7 +75,7 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DCMAKE_INSTALL_PREFIX=/usr \
-            -DQt6_ROOT=${{ env.Qt6_DIR }}
+            -DQt6_ROOT="${Qt6_DIR}"
 
       - name: Build
         run: cmake --build build --parallel
@@ -83,7 +83,7 @@ jobs:
       - name: Create AppImage
         run: |
           chmod +x create-appimage.sh
-          ./create-appimage.sh --arch=${{ matrix.arch }} --qt-root=${{ env.Qt6_DIR }} --no-clean
+          ./create-appimage.sh --arch=${{ matrix.arch }} --qt-root="${Qt6_DIR}" --no-clean
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
@@ -129,7 +129,7 @@ jobs:
 
       - name: Build Debian package
         run: |
-          export Qt6_ROOT=${{ env.Qt6_DIR }}
+          export Qt6_ROOT="${Qt6_DIR}"
           dpkg-buildpackage -uc -us --profile=${{ matrix.profile }}
 
       - name: Upload Debian package
@@ -222,7 +222,7 @@ jobs:
         run: |
           cmake -B build -S src \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DQt6_ROOT=${{ env.Qt6_DIR }} \
+            -DQt6_ROOT="${Qt6_DIR}" \
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
 
       - name: Build
