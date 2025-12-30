@@ -89,7 +89,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-appimage-${{ matrix.arch }}
-          path: '*.AppImage'
+          # Only upload the versioned AppImage, not the symlinks
+          path: 'Laerdal_SimServer_Imager-*-desktop-${{ matrix.arch }}.AppImage'
           if-no-files-found: error
 
   # ============================================================================
@@ -143,13 +144,14 @@ jobs:
         run: |
           # Build the debian package with desktop profile
           dpkg-buildpackage -uc -us -b -Pdesktop
+          # Copy deb files to workspace (upload-artifact doesn't allow ../)
+          cp ../*.deb .
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
           name: debian-desktop
-          path: |
-            ../*.deb
+          path: '*.deb'
           if-no-files-found: error
 
   # ============================================================================
