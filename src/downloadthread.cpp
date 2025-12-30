@@ -14,13 +14,16 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <regex>
+#include <errno.h>
+
+#ifndef Q_OS_WIN
 #include <utime.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <regex>
+#endif
 #include <future>
 #include <chrono>
 #include <QDebug>

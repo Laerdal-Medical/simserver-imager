@@ -11,6 +11,15 @@
 #include <condition_variable>
 #include <memory>
 
+// Forward declaration for libarchive
+struct archive;
+
+// ssize_t is not defined on Windows
+#ifdef _WIN32
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
 class _extractThreadClass;
 
 class DownloadExtractThread : public DownloadThread

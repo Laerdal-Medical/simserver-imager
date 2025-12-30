@@ -167,7 +167,7 @@ QML_SOURCES_PATH="$PWD/src/qmlcomponents/"
 
 # Location of AppDir and output file
 APPDIR="$PWD/AppDir-$ARCH"
-OUTPUT_FILE="$PWD/Raspberry_Pi_Imager-${GIT_VERSION}-desktop-${ARCH}.AppImage"
+OUTPUT_FILE="$PWD/Laerdal_SimServer_Imager-${GIT_VERSION}-desktop-${ARCH}.AppImage"
 
 # Tools directory for downloaded binaries
 TOOLS_DIR="$PWD/appimage-tools"
@@ -225,7 +225,7 @@ fi
 mkdir -p "$APPDIR"
 mkdir -p "$BUILD_DIR"
 
-echo "Building rpi-imager for $ARCH..."
+echo "Building laerdal-simserver-imager for $ARCH..."
 # Configure and build with CMake
 cd "$BUILD_DIR"
 
@@ -251,11 +251,11 @@ make DESTDIR="$APPDIR" install
 cd ..
 
 # Copy the desktop file from debian directory
-if [ ! -f "$APPDIR/usr/share/applications/com.raspberrypi.rpi-imager.desktop" ]; then
+if [ ! -f "$APPDIR/usr/share/applications/com.laerdal.simserver-imager.desktop" ]; then
     mkdir -p "$APPDIR/usr/share/applications"
-    cp "debian/com.raspberrypi.rpi-imager.desktop" "$APPDIR/usr/share/applications/"
+    cp "debian/com.laerdal.simserver-imager.desktop" "$APPDIR/usr/share/applications/"
     # Update the Exec line to match the AppImage requirements (preserve %F for file arguments)
-    sed -i 's|Exec=.*|Exec=rpi-imager %F|' "$APPDIR/usr/share/applications/com.raspberrypi.rpi-imager.desktop"
+    sed -i 's|Exec=.*|Exec=laerdal-simserver-imager %F|' "$APPDIR/usr/share/applications/com.laerdal.simserver-imager.desktop"
 fi
 
 # Create the AppRun file if not created by the install process
@@ -315,7 +315,7 @@ if [ "$(id -u)" = "0" ]; then
 fi
 
 # The binary handles privilege elevation internally via pkexec if needed
-exec "${HERE}/usr/bin/rpi-imager" "$@"
+exec "${HERE}/usr/bin/laerdal-simserver-imager" "$@"
 EOF
     chmod +x "$APPDIR/AppRun"
 fi
@@ -377,20 +377,20 @@ rm -f "$APPDIR/usr/lib/libQt6QuickControls2WindowsStyleImpl.so"*
 # Create the AppImage
 echo "Creating AppImage..."
 # Remove old symlinks for this variant only
-rm -f "$PWD/rpi-imager-desktop-$ARCH.AppImage"
-rm -f "$PWD/rpi-imager-$ARCH.AppImage"  # Legacy symlink name
+rm -f "$PWD/laerdal-simserver-imager-desktop-$ARCH.AppImage"
+rm -f "$PWD/laerdal-simserver-imager-$ARCH.AppImage"
 
 # Ensure LD_LIBRARY_PATH is still set for this call too
 export LD_LIBRARY_PATH="$QT_DIR/lib:$LD_LIBRARY_PATH"
 # Explicitly specify the desktop file to ensure correct naming
 "$LINUXDEPLOY" --appdir="$APPDIR" \
-    --desktop-file="$APPDIR/usr/share/applications/com.raspberrypi.rpi-imager.desktop" \
+    --desktop-file="$APPDIR/usr/share/applications/com.laerdal.simserver-imager.desktop" \
     --output=appimage \
     --verbosity=0
 
 # Rename the output file from linuxdeploy's default name to our versioned name
-# linuxdeploy creates: Raspberry_Pi_Imager-${ARCH}.AppImage (based on Name= in desktop file)
-LINUXDEPLOY_OUTPUT="Raspberry_Pi_Imager-${ARCH}.AppImage"
+# linuxdeploy creates: Laerdal_SimServer_Imager-${ARCH}.AppImage (based on Name= in desktop file)
+LINUXDEPLOY_OUTPUT="Laerdal_SimServer_Imager-${ARCH}.AppImage"
 if [ -f "$LINUXDEPLOY_OUTPUT" ]; then
     echo "Renaming '$LINUXDEPLOY_OUTPUT' to '$(basename "$OUTPUT_FILE")'"
     mv "$LINUXDEPLOY_OUTPUT" "$OUTPUT_FILE"
@@ -405,8 +405,8 @@ fi
 echo "AppImage created at $OUTPUT_FILE"
 
 # Create symlinks for debian packaging and user convenience
-# Primary symlink matches debian/rpi-imager.install expectations
-DEBIAN_SYMLINK="$PWD/rpi-imager-$ARCH.AppImage"
+# Primary symlink matches debian/laerdal-simserver-imager.install expectations
+DEBIAN_SYMLINK="$PWD/laerdal-simserver-imager-$ARCH.AppImage"
 if [ -L "$DEBIAN_SYMLINK" ] || [ -f "$DEBIAN_SYMLINK" ]; then
     rm -f "$DEBIAN_SYMLINK"
 fi
@@ -414,7 +414,7 @@ ln -s "$(basename "$OUTPUT_FILE")" "$DEBIAN_SYMLINK"
 echo "Created symlink: $DEBIAN_SYMLINK -> $(basename "$OUTPUT_FILE")"
 
 # Additional descriptive symlink for clarity when multiple variants exist
-DESCRIPTIVE_SYMLINK="$PWD/rpi-imager-desktop-$ARCH.AppImage"
+DESCRIPTIVE_SYMLINK="$PWD/laerdal-simserver-imager-desktop-$ARCH.AppImage"
 if [ -L "$DESCRIPTIVE_SYMLINK" ] || [ -f "$DESCRIPTIVE_SYMLINK" ]; then
     rm -f "$DESCRIPTIVE_SYMLINK"
 fi

@@ -126,14 +126,14 @@ jobs:
           ls -la *.AppImage
 
           # The debian packaging expects specific filenames
-          # For desktop profile: rpi-imager-x86_64.AppImage
-          # For cli profile: rpi-imager-cli-x86_64.AppImage
+          # For desktop profile: laerdal-simserver-imager-x86_64.AppImage
+          # For cli profile: laerdal-simserver-imager-cli-x86_64.AppImage
 
           if [ "${{ matrix.profile }}" = "desktop" ]; then
             # Rename to expected format (symlink already created by create-appimage.sh)
-            for f in *desktop*.AppImage Raspberry_Pi_Imager*.AppImage; do
+            for f in *desktop*.AppImage Laerdal_SimServer_Imager*.AppImage; do
               if [ -f "$f" ]; then
-                cp "$f" "rpi-imager-${{ matrix.appimage_arch }}.AppImage"
+                cp "$f" "laerdal-simserver-imager-${{ matrix.appimage_arch }}.AppImage"
                 break
               fi
             done
@@ -142,7 +142,7 @@ jobs:
             # For now, skip if CLI AppImage doesn't exist
             if ls *cli*.AppImage 1>/dev/null 2>&1; then
               for f in *cli*.AppImage; do
-                cp "$f" "rpi-imager-cli-${{ matrix.appimage_arch }}.AppImage"
+                cp "$f" "laerdal-simserver-imager-cli-${{ matrix.appimage_arch }}.AppImage"
                 break
               done
             else

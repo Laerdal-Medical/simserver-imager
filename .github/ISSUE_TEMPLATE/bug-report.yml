@@ -18,25 +18,12 @@ body:
       value: "A bug happened!"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: version
     attributes:
       label: Version
-      description: What version of our software are you running?
-      options:
-        - 2.0.2 (Default)
-        - 2.0.0
-        - 1.9.6
-        - 1.9.5
-        - 1.9.4
-        - 1.9.0
-        - 1.8.5
-        - 1.8.4
-        - 1.8.3
-        - 1.8.2
-        - 1.8.1
-        - < 1.8.0
-      default: 0
+      description: What version of Laerdal SimServer Imager are you running? (Run with --version to check)
+      placeholder: ex 1.0.0
     validations:
       required: true
   - type: dropdown
@@ -65,22 +52,21 @@ body:
     attributes:
       label: Selected OS
       description: Which OS did you select to write? (For custom images, just write 'Custom')
-      placeholder: ex Raspberry Pi OS Bookworm 64-bit, Ubuntu 23.10, LibreELEC 
+      placeholder: ex SimServer OS, Custom Image
     validations:
       required: true
   - type: dropdown
-    id: raspberry-pi-device
+    id: laerdal-device
     attributes:
-      label: Which Raspberry Pi Device are you using?
+      label: Which Laerdal Device are you using?
       multiple: false
       options:
-        - Raspberry Pi 5, 500, and Compute Modules 5
-        - Raspberry Pi 4B, 400, and Compute Modules 4, 4S
-        - Raspberry Pi Zero 2 W
-        - Raspberry Pi 3B, 3A+, 3B+, and Compute Module 3, 3+
-        - Raspberry Pi 2B
-        - Raspberry Pi Zero, Zero W, Zero WH
-        - Raspberry Pi A, B, A+, B+, and Compute Module 1
+        - SimPad PLUS
+        - SimMan 3G
+        - SimMan Essential
+        - SimMan ALS
+        - Other Laerdal Device
+        - N/A (Testing only)
     validations:
       required: true
   - type: dropdown
@@ -92,8 +78,6 @@ body:
         - microSD Card in an internal reader
         - microSD Card in a USB reader
         - Integrated eMMC
-        - NVMe SSD via Raspberry Pi M.2 HAT+
-        - NVMe SSD via Third-party PCIe attachment
         - USB Pen Drive
         - USB SSD
         - Other

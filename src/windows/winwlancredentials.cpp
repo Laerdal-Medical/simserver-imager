@@ -19,7 +19,7 @@ static HINSTANCE hWlanApi = NULL;
 
 /* Called by dlltool generated delaylib code that is used for lazy loading
    wlanapi.dll */
-FARPROC WINAPI dllDelayNotifyHook(unsigned dliNotify, PDelayLoadInfo)
+static FARPROC WINAPI dllDelayNotifyHook(unsigned dliNotify, PDelayLoadInfo)
 {
     if (dliNotify == dliNotePreLoadLibrary)
     {
@@ -29,7 +29,15 @@ FARPROC WINAPI dllDelayNotifyHook(unsigned dliNotify, PDelayLoadInfo)
     return NULL;
 }
 
+// Hook for delay-loaded DLL notification
+// In newer MSVC, __pfnDliNotifyHook2 is already declared in delayimp.h
+// We just need to provide a definition that will be linked
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+// MSVC 2015+ already declares this in delayimp.h, we provide our implementation
+extern "C" const PfnDliHook __pfnDliNotifyHook2 = dllDelayNotifyHook;
+#else
 PfnDliHook __pfnDliNotifyHook2 = dllDelayNotifyHook;
+#endif
 
 inline QString unescapeXml(QString str)
 {

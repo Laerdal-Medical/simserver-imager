@@ -10,17 +10,17 @@ obj-**
 .zed
 
 # Debian packaging
-debian/rpi-imager/**
-debian/rpi-imager-amd64/**
-debian/rpi-imager-embedded/**
-debian/rpi-imager-cli/**
+debian/laerdal-simserver-imager/**
+debian/laerdal-simserver-imager-amd64/**
+debian/laerdal-simserver-imager-embedded/**
+debian/laerdal-simserver-imager-cli/**
 debian/.debhelper**
 debian/*.debhelper**
 debian/files
 debian/*.substvars
 debian/debhelper**
 debian/tmp
-debian/com.raspberrypi.rpi-imager.metainfo.xml
+debian/com.laerdal.simserver-imager.metainfo.xml
 
 # macOS
 .DS_Store

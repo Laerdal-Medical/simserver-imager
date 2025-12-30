@@ -474,15 +474,15 @@ int main(int argc, char *argv[])
             QDBusInterface interface("org.freedesktop.DBus", "/org/freedesktop/DBus",
                                     "org.freedesktop.DBus", bus);
             QDBusReply<QStringList> reply = interface.call("ListNames");
-            if (reply.isValid() && reply.value().contains("com.raspberrypi.rpi-imager"))
+            if (reply.isValid() && reply.value().contains("com.laerdal.simserver-imager"))
             {
                 // Another instance is running - send callback URL to it via D-Bus
-                QDBusInterface iface("com.raspberrypi.rpi-imager", "/com/raspberrypi/rpi-imager",
-                                   "com.raspberrypi.rpi-imager", bus);
+                QDBusInterface iface("com.laerdal.simserver-imager", "/com/laerdal/simserver-imager",
+                                   "com.laerdal.simserver-imager", bus);
                 QDBusMessage msg = QDBusMessage::createMethodCall(
-                    "com.raspberrypi.rpi-imager",
-                    "/com/raspberrypi/rpi-imager",
-                    "com.raspberrypi.rpi-imager",
+                    "com.laerdal.simserver-imager",
+                    "/com/laerdal/simserver-imager",
+                    "com.laerdal.simserver-imager",
                     "HandleUrl");
                 msg << callbackUrl.toString();
                 QDBusReply<void> callReply = bus.call(msg);
@@ -529,9 +529,9 @@ int main(int argc, char *argv[])
     {
         QObject *dbusObject = new QObject(&app);
         UriHandlerAdaptor *adaptor = new UriHandlerAdaptor(&imageWriter, dbusObject);
-        if (bus.registerObject("/com/raspberrypi/rpi-imager", dbusObject))
+        if (bus.registerObject("/com/laerdal/simserver-imager", dbusObject))
         {
-            if (bus.registerService("com.raspberrypi.rpi-imager"))
+            if (bus.registerService("com.laerdal.simserver-imager"))
             {
                 qDebug() << "Registered D-Bus service for URI callbacks";
             }

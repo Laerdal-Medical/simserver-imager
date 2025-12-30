@@ -77,7 +77,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # One place to define the Windows callback IPC port
-set(IMAGER_CALLBACK_PORT "49629" CACHE STRING "TCP port for rpi-imager callback relay on Windows")
+set(IMAGER_CALLBACK_PORT "49629" CACHE STRING "TCP port for callback relay on Windows")
 
 # Apply optimization flags globally to all targets (including bundled dependencies)
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")

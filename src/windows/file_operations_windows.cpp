@@ -3,10 +3,16 @@
  * Copyright (C) 2025 Raspberry Pi Ltd
  */
 
+// Prevent Windows min/max macros from conflicting with std::min/std::max
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "file_operations_windows.h"
 
 #include <winioctl.h>
 #include <sstream>
+#include <algorithm>
 
 namespace rpi_imager {
 
