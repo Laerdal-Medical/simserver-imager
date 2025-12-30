@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Full history for version detection
 
@@ -103,7 +103,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -163,9 +163,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -175,29 +185,26 @@ jobs:
           arch: win64_mingw
           cache: true
 
-      - name: Install MinGW
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
-          version: 13.1.0
-
       - name: Install Inno Setup
         run: |
           choco install innosetup -y
           echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Configure CMake
+        shell: msys2 {0}
         run: |
-          cmake -B build -S src `
-            -G "MinGW Makefiles" `
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-            -DQt6_ROOT="$env:QT_ROOT_DIR" `
+          cmake -B build -S src \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DQt6_ROOT="$QT_ROOT_DIR" \
             -DENABLE_INNO_INSTALLER=ON
 
       - name: Build
+        shell: msys2 {0}
         run: cmake --build build --parallel
 
       - name: Build Inno Setup installer
+        shell: msys2 {0}
         run: cmake --build build --target inno_installer
 
       - name: Create ZIP archive
@@ -236,7 +243,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
