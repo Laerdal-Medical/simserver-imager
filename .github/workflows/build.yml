@@ -93,20 +93,12 @@ jobs:
           if-no-files-found: error
 
   # ============================================================================
-  # Linux Debian Packages
+  # Linux Debian Packages (Desktop only - CLI requires separate AppImage build)
   # ============================================================================
   build-debian:
-    name: Debian Package (${{ matrix.profile }})
+    name: Debian Package (desktop)
     runs-on: ubuntu-24.04
     needs: build-linux
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: desktop
-            appimage_arch: x86_64
-          - profile: cli
-            appimage_arch: x86_64
 
     steps:
       - name: Checkout
@@ -117,7 +109,7 @@ jobs:
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
         with:
-          name: linux-appimage-${{ matrix.appimage_arch }}
+          name: linux-appimage-x86_64
           path: .
 
       - name: Prepare AppImage for packaging
@@ -125,31 +117,13 @@ jobs:
           # List downloaded files
           ls -la *.AppImage
 
-          # The debian packaging expects specific filenames
-          # For desktop profile: laerdal-simserver-imager-x86_64.AppImage
-          # For cli profile: laerdal-simserver-imager-cli-x86_64.AppImage
-
-          if [ "${{ matrix.profile }}" = "desktop" ]; then
-            # Rename to expected format (symlink already created by create-appimage.sh)
-            for f in *desktop*.AppImage Laerdal_SimServer_Imager*.AppImage; do
-              if [ -f "$f" ]; then
-                cp "$f" "laerdal-simserver-imager-${{ matrix.appimage_arch }}.AppImage"
-                break
-              fi
-            done
-          elif [ "${{ matrix.profile }}" = "cli" ]; then
-            # For CLI, we need to build the CLI AppImage separately
-            # For now, skip if CLI AppImage doesn't exist
-            if ls *cli*.AppImage 1>/dev/null 2>&1; then
-              for f in *cli*.AppImage; do
-                cp "$f" "laerdal-simserver-imager-cli-${{ matrix.appimage_arch }}.AppImage"
-                break
-              done
-            else
-              echo "CLI AppImage not found, skipping..."
-              exit 0
+          # The debian packaging expects: laerdal-simserver-imager-x86_64.AppImage
+          for f in *desktop*.AppImage Laerdal_SimServer_Imager*.AppImage; do
+            if [ -f "$f" ]; then
+              cp "$f" "laerdal-simserver-imager-x86_64.AppImage"
+              break
             fi
-          fi
+          done
 
           ls -la *.AppImage
 
@@ -167,13 +141,13 @@ jobs:
 
       - name: Build Debian package
         run: |
-          # Build the debian package
-          dpkg-buildpackage -uc -us -b -P${{ matrix.profile }}
+          # Build the debian package with desktop profile
+          dpkg-buildpackage -uc -us -b -Pdesktop
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
-          name: debian-${{ matrix.profile }}
+          name: debian-desktop
           path: |
             ../*.deb
           if-no-files-found: error
