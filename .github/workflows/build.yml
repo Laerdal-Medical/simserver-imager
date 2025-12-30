@@ -67,7 +67,6 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: ${{ matrix.qt_host || 'linux' }}
           arch: ${{ matrix.qt_arch }}
-          modules: 'qtsvg'
           cache: true
 
       - name: Configure CMake
@@ -126,7 +125,6 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: linux_gcc_64
-          modules: 'qtsvg'
           cache: true
 
       - name: Build Debian package
@@ -162,7 +160,6 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: windows
           arch: win64_mingw
-          modules: 'qtsvg'
           tools: 'tools_mingw1120'
           cache: true
 
@@ -229,7 +226,6 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: mac
           arch: clang_64
-          modules: 'qtsvg'
           cache: true
 
       - name: Configure CMake
