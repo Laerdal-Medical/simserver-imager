@@ -13,6 +13,10 @@
 #include <iostream>
 
 #ifdef _WIN32
+// Prevent Windows min/max macros from conflicting with std::min/std::max
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 

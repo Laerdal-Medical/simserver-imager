@@ -491,7 +491,7 @@ void ImageWriter::setSrc(const QUrl &url, quint64 downloadLen, quint64 extrLen, 
     _multipleFilesInZip = multifilesinzip;
     _parentCategory = parentcategory;
     _osName = osname;
-    _initFormat = (initFormat == "none") ? "" : initFormat;
+    _initFormat = (initFormat == "none") ? QByteArray() : initFormat;
     _osReleaseDate = releaseDate;
     // Clear artifact source flag when setting regular source
     _isArtifactSource = false;

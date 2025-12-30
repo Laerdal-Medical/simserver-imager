@@ -75,7 +75,7 @@ void CurlNetworkConfig::setProxy(const QByteArray &proxy)
     QMutexLocker locker(&_mutex);
     if (_proxy != proxy) {
         _proxy = proxy;
-        qDebug() << "CurlNetworkConfig: proxy set to" << (proxy.isEmpty() ? "(none)" : proxy);
+        qDebug() << "CurlNetworkConfig: proxy set to" << (proxy.isEmpty() ? QByteArray("(none)") : proxy);
     }
 }
 

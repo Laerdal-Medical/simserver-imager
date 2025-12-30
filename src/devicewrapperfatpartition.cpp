@@ -2,6 +2,9 @@
 #include "devicewrapperstructs.h"
 #include <QDebug>
 #include <QStringList>
+#include <cstdint>
+#include <stdexcept>
+#include <vector>
 
 /*
  * SPDX-License-Identifier: Apache-2.0
@@ -87,12 +90,13 @@ DeviceWrapperFatPartition::DeviceWrapperFatPartition(DeviceWrapper *dw, quint64 
 
 uint32_t DeviceWrapperFatPartition::allocateCluster()
 {
-    char sector[_bytesPerSector];
+    std::vector<char> sectorBuf(_bytesPerSector);
+    char *sector = sectorBuf.data();
     int bytesPerEntry = (_type == FAT16 ? 2 : 4);
     int entriesPerSector = _bytesPerSector/bytesPerEntry;
     uint32_t cluster;
-    uint16_t *f16 = (uint16_t *) &sector;
-    uint32_t *f32 = (uint32_t *) &sector;
+    uint16_t *f16 = (uint16_t *) sector;
+    uint32_t *f32 = (uint32_t *) sector;
 
     seek(_firstFatStartOffset);
 

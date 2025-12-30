@@ -729,7 +729,11 @@ void DownloadThread::run()
         {
             qDebug() << "Sleeping 5 seconds";
             sleepMs = 5000;
+#ifdef Q_OS_WIN
+            Sleep(5000);
+#else
             ::sleep(5);
+#endif
         }
         
         // Emit network retry event for performance tracking
