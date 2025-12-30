@@ -22,6 +22,12 @@
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
+/* MSVC compatibility for GCC extensions */
+#include <malloc.h>  /* for alloca on Windows */
+#define alloca _alloca
+#define __alignof__(x) __alignof(x)
+#define __attribute__(x)  /* MSVC doesn't support GCC attributes */
+
 char *stpncpy(char *dest, const char *src, size_t n)
 {
     size_t size = strnlen(src, n);
