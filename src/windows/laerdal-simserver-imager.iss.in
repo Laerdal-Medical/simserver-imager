@@ -1,10 +1,10 @@
-#define MyAppName "Raspberry Pi Imager"
+#define MyAppName "Laerdal SimServer Imager"
 #define MyAppVersion "@IMAGER_VERSION_STR@"
-#define MyAppPublisher "Raspberry Pi Ltd"
-#define RaspberryPiSoftwareURL "https://www.raspberrypi.com/software"
-#define ImagerRepoRootURL "https://github.com/raspberrypi/rpi-imager"
-#define ImagerRepoIssuesURL "https://github.com/raspberrypi/rpi-imager/issues"
-#define MyAppExeName "rpi-imager.exe"
+#define MyAppPublisher "Laerdal Medical"
+#define LaerdalSoftwareURL "https://www.laerdal.com"
+#define ImagerRepoRootURL "https://github.com/laerdal/simserver-imager"
+#define ImagerRepoIssuesURL "https://github.com/laerdal/simserver-imager/issues"
+#define MyAppExeName "laerdal-simserver-imager.exe"
 
 [Setup]
 AppId={{46C75BF3-E267-4834-AE1D-BEB77E05BFA1}
@@ -12,15 +12,15 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL={#RaspberryPiSoftwareURL}
+AppPublisherURL={#LaerdalSoftwareURL}
 AppSupportURL={#ImagerRepoIssuesURL}
 AppUpdatesURL={#ImagerRepoRootURL}
 DefaultDirName={autopf}\{#MyAppPublisher}\Imager
-DefaultGroupName=Raspberry Pi
+DefaultGroupName=Laerdal Medical
 AllowNoIcons=yes
 LicenseFile=@CMAKE_BINARY_DIR@\deploy\license.txt
 OutputDir=@CMAKE_BINARY_DIR@\installer
-OutputBaseFilename=imager-{#MyAppVersion}
+OutputBaseFilename=laerdal-simserver-imager-{#MyAppVersion}
 SetupIconFile=@CMAKE_SOURCE_DIR@\icons\laerdal-simserver-imager.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -53,36 +53,36 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Registry]
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\.zip\OpenWithProgIds"; ValueType: string; ValueName: "RPI_IMAGINGUTILITY"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "Software\Classes\.gz\OpenWithProgIds"; ValueType: string; ValueName: "RPI_IMAGINGUTILITY"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "Software\Classes\.xz\OpenWithProgIds"; ValueType: string; ValueName: "RPI_IMAGINGUTILITY"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "Software\Classes\.img\OpenWithProgIds"; ValueType: string; ValueName: "RPI_IMAGINGUTILITY"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "Software\Classes\.wic\OpenWithProgIds"; ValueType: string; ValueName: "RPI_IMAGINGUTILITY"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "Software\Classes\.zstd\OpenWithProgIds"; ValueType: string; ValueName: "RPI_IMAGINGUTILITY"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "Software\Classes\RPI_IMAGINGUTILITY\shell\open"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\RPI_IMAGINGUTILITY\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\.zip\OpenWithProgIds"; ValueType: string; ValueName: "LAERDAL_SIMSERVER_IMAGER"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Classes\.gz\OpenWithProgIds"; ValueType: string; ValueName: "LAERDAL_SIMSERVER_IMAGER"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Classes\.xz\OpenWithProgIds"; ValueType: string; ValueName: "LAERDAL_SIMSERVER_IMAGER"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Classes\.img\OpenWithProgIds"; ValueType: string; ValueName: "LAERDAL_SIMSERVER_IMAGER"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Classes\.wic\OpenWithProgIds"; ValueType: string; ValueName: "LAERDAL_SIMSERVER_IMAGER"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Classes\.zstd\OpenWithProgIds"; ValueType: string; ValueName: "LAERDAL_SIMSERVER_IMAGER"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Classes\LAERDAL_SIMSERVER_IMAGER\shell\open"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\LAERDAL_SIMSERVER_IMAGER\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
 
-; Register .rpi-imager-manifest file type (repository manifest files)
+; Register .laerdal-imager-manifest file type (repository manifest files)
 ; Extension defined in src/config.h (MANIFEST_EXTENSION)
-Root: HKLM; Subkey: "Software\Classes\.rpi-imager-manifest"; ValueType: string; ValueName: ""; ValueData: "RPI_IMAGER_MANIFEST"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\.rpi-imager-manifest"; ValueType: string; ValueName: "Content Type"; ValueData: "application/vnd.raspberrypi.imager-manifest+json"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\RPI_IMAGER_MANIFEST"; ValueType: string; ValueName: ""; ValueData: "Raspberry Pi Imager Manifest"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\RPI_IMAGER_MANIFEST\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\RPI_IMAGER_MANIFEST\shell\open"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\RPI_IMAGER_MANIFEST\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\.laerdal-imager-manifest"; ValueType: string; ValueName: ""; ValueData: "LAERDAL_IMAGER_MANIFEST"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\.laerdal-imager-manifest"; ValueType: string; ValueName: "Content Type"; ValueData: "application/vnd.laerdal.imager-manifest+json"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\LAERDAL_IMAGER_MANIFEST"; ValueType: string; ValueName: ""; ValueData: "Laerdal SimServer Imager Manifest"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\LAERDAL_IMAGER_MANIFEST\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\LAERDAL_IMAGER_MANIFEST\shell\open"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\LAERDAL_IMAGER_MANIFEST\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
 
-; Register rpi-imager:// URL protocol handler
-Root: HKCR; Subkey: "rpi-imager"; ValueType: string; ValueName: ""; ValueData: "URL:Raspberry Pi Imager"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "rpi-imager"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletekey
-Root: HKCR; Subkey: "rpi-imager\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "rpi-imager\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\rpi-imager-callback-relay.exe"" ""%1"""; Flags: uninsdeletekey
+; Register laerdal-imager:// URL protocol handler
+Root: HKCR; Subkey: "laerdal-imager"; ValueType: string; ValueName: ""; ValueData: "URL:Laerdal SimServer Imager"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "laerdal-imager"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCR; Subkey: "laerdal-imager\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "laerdal-imager\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\laerdal-imager-callback-relay.exe"" ""%1"""; Flags: uninsdeletekey
 
 [Files]
 ; Main program files
 Source: "@CMAKE_BINARY_DIR@\deploy\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion signonce
 
-Source: "@CMAKE_BINARY_DIR@\deploy\rpi-imager-cli.cmd"; DestDir: "{app}"; Flags: ignoreversion
-Source: "@CMAKE_BINARY_DIR@\deploy\rpi-imager-callback-relay.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "@CMAKE_BINARY_DIR@\deploy\laerdal-imager-cli.cmd"; DestDir: "{app}"; Flags: ignoreversion
+Source: "@CMAKE_BINARY_DIR@\deploy\laerdal-imager-callback-relay.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "@CMAKE_BINARY_DIR@\deploy\license.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Core DLLs
@@ -116,17 +116,17 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 
 [UninstallDelete]
 ; Clean up user cache files (current user only)
-; Cache location: QStandardPaths::CacheLocation = {localappdata}\Raspberry Pi Imager\cache
-Type: filesandordirs; Name: "{localappdata}\Raspberry Pi Imager"
+; Cache location: QStandardPaths::CacheLocation = {localappdata}\Laerdal Medical\Laerdal SimServer Imager\cache
+Type: filesandordirs; Name: "{localappdata}\Laerdal Medical\Laerdal SimServer Imager"
 
 [InstallDelete]
-; 64-bit Windows – old NSIS path lives in Program Files (x86)
-Type: filesandordirs; Name: "{commonpf32}\Raspberry Pi Imager\qml"; Check: IsWin64
-Type: dirifempty;      Name: "{commonpf32}\Raspberry Pi Imager";   Check: IsWin64
+; 64-bit Windows – old installation paths
+Type: filesandordirs; Name: "{commonpf32}\Laerdal SimServer Imager\qml"; Check: IsWin64
+Type: dirifempty;      Name: "{commonpf32}\Laerdal SimServer Imager";   Check: IsWin64
 
-; 32-bit Windows – old NSIS path lives in Program Files
-Type: filesandordirs; Name: "{commonpf}\Raspberry Pi Imager\qml";  Check: not IsWin64
-Type: dirifempty;      Name: "{commonpf}\Raspberry Pi Imager";     Check: not IsWin64
+; 32-bit Windows – old installation paths
+Type: filesandordirs; Name: "{commonpf}\Laerdal SimServer Imager\qml";  Check: not IsWin64
+Type: dirifempty;      Name: "{commonpf}\Laerdal SimServer Imager";     Check: not IsWin64
 
 [Code]
 
@@ -226,31 +226,31 @@ begin
   Result := (Version.Major >= 10);
 end; 
 
-// Function to check if a program is installed by the NSIS installer
-function IsNSISVersionInstalled: Boolean;
+// Function to check if a program is installed by a previous installer
+function IsPreviousVersionInstalled: Boolean;
 var
-  NSISUninstallString: String;
+  UninstallString: String;
 begin
   Result := False;
-  
-  // Check for NSIS registry entry in HKCU
-  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Raspberry Pi Imager',
-                          'UninstallString', NSISUninstallString) then
+
+  // Check for registry entry in HKCU
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Laerdal SimServer Imager',
+                          'UninstallString', UninstallString) then
   begin
     Result := True;
   end;
-  
+
   // Also check in HKLM
-  if not Result and RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Raspberry Pi Imager',
-                                       'UninstallString', NSISUninstallString) then
+  if not Result and RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Laerdal SimServer Imager',
+                                       'UninstallString', UninstallString) then
   begin
     Result := True;
   end;
 end;
 
 const
-  NsisKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Raspberry Pi Imager';
-  OldInnoAppIdPart = '{6D809377-6AF0-444B-8957-A3773F02200E}'; // old Inno AppId part (no _is1)
+  OldInstallerKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Laerdal SimServer Imager';
+  OldInnoAppIdPart = '{46C75BF3-E267-4834-AE1D-BEB77E05BFA1}'; // old Inno AppId part (no _is1)
 
 function SplitExeAndArgs(const Line: string; var Exe, Params: string): Boolean;
 var
@@ -332,8 +332,8 @@ begin
   end;
 end;
 
-// Old NSIS (name-based key)
-function TryGetOldNsisUninstall(var Cmd, Args: string): Boolean;
+// Old installer (name-based key)
+function TryGetOldInstallerUninstall(var Cmd, Args: string): Boolean;
 var
   Roots: array[0..5] of Integer;
   r: Integer;
@@ -344,8 +344,8 @@ begin
   Roots[3] := HKCU;   Roots[4] := HKCU32; Roots[5] := HKCU64;
 
   for r := 0 to 5 do begin
-    if RegQueryStringValue(Roots[r], NsisKey, 'QuietUninstallString', QUS) or
-       RegQueryStringValue(Roots[r], NsisKey, 'UninstallString', US) then
+    if RegQueryStringValue(Roots[r], OldInstallerKey, 'QuietUninstallString', QUS) or
+       RegQueryStringValue(Roots[r], OldInstallerKey, 'UninstallString', US) then
     begin
       if (QUS <> '') and SplitExeAndArgs(QUS, Cmd, Args) then begin
         Result := True; Exit;
@@ -361,17 +361,17 @@ end;
 
 // Forcibly remove old installation directories
 // Known locations from previous installers:
-//   - NSIS (32-bit): {commonpf32}\Raspberry Pi Imager
-//   - NSIS (64-bit): {commonpf}\Raspberry Pi Imager  
-//   - Old Inno:      {autopf}\Raspberry Pi Ltd\Imager
+//   - Old (32-bit): {commonpf32}\Laerdal SimServer Imager
+//   - Old (64-bit): {commonpf}\Laerdal SimServer Imager
+//   - Old Inno:     {autopf}\Laerdal Medical\Imager
 procedure CleanupOldInstallDirs();
 var
   OldDirs: array[0..2] of string;
   i: Integer;
 begin
-  OldDirs[0] := ExpandConstant('{commonpf32}\Raspberry Pi Imager');
-  OldDirs[1] := ExpandConstant('{commonpf}\Raspberry Pi Imager');
-  OldDirs[2] := ExpandConstant('{autopf}\Raspberry Pi Ltd\Imager');
+  OldDirs[0] := ExpandConstant('{commonpf32}\Laerdal SimServer Imager');
+  OldDirs[1] := ExpandConstant('{commonpf}\Laerdal SimServer Imager');
+  OldDirs[2] := ExpandConstant('{autopf}\Laerdal Medical\Imager');
 
   for i := 0 to 2 do begin
     if DirExists(OldDirs[i]) then begin
@@ -379,10 +379,10 @@ begin
       DelTree(OldDirs[i], True, True, True);
     end;
   end;
-  
+
   // Also clean up the parent directory if empty
-  if DirExists(ExpandConstant('{autopf}\Raspberry Pi Ltd')) then begin
-    RemoveDir(ExpandConstant('{autopf}\Raspberry Pi Ltd')); // only removes if empty
+  if DirExists(ExpandConstant('{autopf}\Laerdal Medical')) then begin
+    RemoveDir(ExpandConstant('{autopf}\Laerdal Medical')); // only removes if empty
   end;
 end;
 
@@ -398,10 +398,10 @@ begin
   Roots[3] := HKCU;   Roots[4] := HKCU32; Roots[5] := HKCU64;
 
   for r := 0 to 5 do begin
-    // Remove NSIS registry key
-    if RegKeyExists(Roots[r], NsisKey) then begin
-      Log('Removing old NSIS registry key');
-      RegDeleteKeyIncludingSubkeys(Roots[r], NsisKey);
+    // Remove old installer registry key
+    if RegKeyExists(Roots[r], OldInstallerKey) then begin
+      Log('Removing old installer registry key');
+      RegDeleteKeyIncludingSubkeys(Roots[r], OldInstallerKey);
     end;
 
     // Remove old Inno registry keys (by old AppId)
@@ -429,7 +429,7 @@ begin
 
   // Old Inno (by old AppId)
   if TryGetOldInnoUninstall(Cmd, Args) then begin
-    if MsgBox('A previous Raspberry Pi Imager installation was detected. It will be removed before continuing. Proceed?',
+    if MsgBox('A previous Laerdal SimServer Imager installation was detected. It will be removed before continuing. Proceed?',
               mbConfirmation, MB_YESNO) <> IDYES then
     begin Result := False; Exit; end;
 
@@ -438,16 +438,16 @@ begin
     // Ignore return code - we'll clean up manually regardless
     Log('Old Inno uninstaller returned: ' + IntToStr(RC));
   end
-  // Old NSIS (name-based)
-  else if TryGetOldNsisUninstall(Cmd, Args) then begin
-    if MsgBox('A previous Raspberry Pi Imager installation was detected. It will be removed before continuing. Proceed?',
+  // Old installer (name-based)
+  else if TryGetOldInstallerUninstall(Cmd, Args) then begin
+    if MsgBox('A previous Laerdal SimServer Imager installation was detected. It will be removed before continuing. Proceed?',
               mbConfirmation, MB_YESNO) <> IDYES then
     begin Result := False; Exit; end;
 
     UninstallAttempted := True;
     Exec(Cmd, Args, '', SW_HIDE, ewWaitUntilTerminated, RC);
-    // Ignore return code - we'll clean up manually regardless  
-    Log('Old NSIS uninstaller returned: ' + IntToStr(RC));
+    // Ignore return code - we'll clean up manually regardless
+    Log('Old installer uninstaller returned: ' + IntToStr(RC));
   end;
 
   // Clean up any leftovers regardless of whether uninstall succeeded
@@ -464,14 +464,14 @@ begin
   if CurUninstallStep = usPostUninstall then begin
     // Remove QSettings registry key for current user
     // QSettings path: HKCU\Software\<Organization>\<AppName>
-    // Organization: "Raspberry Pi", AppName: "Raspberry Pi Imager"
-    if RegKeyExists(HKCU, 'Software\Raspberry Pi\Raspberry Pi Imager') then begin
+    // Organization: "Laerdal Medical", AppName: "Laerdal SimServer Imager"
+    if RegKeyExists(HKCU, 'Software\Laerdal Medical\Laerdal SimServer Imager') then begin
       Log('Removing user settings from registry');
-      RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Raspberry Pi\Raspberry Pi Imager');
+      RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Laerdal Medical\Laerdal SimServer Imager');
     end;
-    
+
     // Clean up parent key if empty
-    RegDeleteKeyIfEmpty(HKCU, 'Software\Raspberry Pi');
+    RegDeleteKeyIfEmpty(HKCU, 'Software\Laerdal Medical');
   end;
 end;
 
@@ -482,18 +482,18 @@ var
   pid: Integer;
 begin
   // make sure app not running
-  running := FindProcess('rpi-imager.exe', pid);
+  running := FindProcess('laerdal-simserver-imager.exe', pid);
   if running then begin
-    if MsgBox('Raspberry Pi Imager is running and needs to be closed before continuing. Close it now?',
+    if MsgBox('Laerdal SimServer Imager is running and needs to be closed before continuing. Close it now?',
               mbConfirmation, MB_YESNO) <> IDYES then
     begin Result := False; Exit; end;
-    
-    ShellExec('', 'taskkill.exe', '/IM rpi-imager.exe /F', '', SW_HIDE, ewWaitUntilTerminated, rc);
+
+    ShellExec('', 'taskkill.exe', '/IM laerdal-simserver-imager.exe /F', '', SW_HIDE, ewWaitUntilTerminated, rc);
     // taskkill may fail if process exited between detection and kill attempt (race condition)
     // Re-check if process is actually still running
     Sleep(500); // Give process time to fully terminate
-    if FindProcess('rpi-imager.exe', pid) then begin
-      MsgBox('Failed to close Raspberry Pi Imager. Please close it manually and try again.', mbError, MB_OK);
+    if FindProcess('laerdal-simserver-imager.exe', pid) then begin
+      MsgBox('Failed to close Laerdal SimServer Imager. Please close it manually and try again.', mbError, MB_OK);
       Result := False; Exit;
     end;
   end;

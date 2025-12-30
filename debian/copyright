@@ -1,13 +1,14 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: rpi-imager
-Source: 
+Upstream-Name: laerdal-simserver-imager
+Source: https://github.com/laerdal/simserver-imager
 
 Files: *
-Copyright: 2020 Raspberry Pi Ltd
+Copyright: 2024 Laerdal Medical
+           2020 Raspberry Pi Ltd
 License: Apache-2.0
 
 Files: src/dependencies/mountutils/* src/dependencies/drivelist/*
-Copyright: 2017 Balena.io 
+Copyright: 2017 Balena.io
 License: Apache-2.0
 
 Files: src/dependencies/sha256crypt/*
@@ -15,7 +16,7 @@ Copyright: Released into the Public Domain by Ulrich Drepper
 License: public-domain
 
 Files-Excluded: src/dependencies/cmcurl/* src/dependencies/cmliblzma/* src/dependencies/fat32format/* src/dependencies/libarchive-3.4.1/* src/dependencies/zlib-1.2.11/*
-Comment: Not used in Linux build (depending on the official packages instead) 
+Comment: Not used in Linux build (depending on the official packages instead)
 
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License");

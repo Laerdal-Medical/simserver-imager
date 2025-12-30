@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Tiny Windows callback URL relay for rpi-imager
+// Tiny Windows callback URL relay for Laerdal SimServer Imager
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -7,17 +7,23 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <strsafe.h>
+#include <stdlib.h>
 #pragma comment(lib, "ws2_32.lib")
 
-#ifndef RPI_IMAGER_PORT
-#define RPI_IMAGER_PORT 49629
+// _countof is defined in stdlib.h on MSVC, but provide fallback just in case
+#ifndef _countof
+#define _countof(arr) (sizeof(arr) / sizeof((arr)[0]))
 #endif
-#ifndef RPI_IMAGER_EXE_NAME
-#define RPI_IMAGER_EXE_NAME L"rpi-imager.exe"
+
+#ifndef LAERDAL_IMAGER_PORT
+#define LAERDAL_IMAGER_PORT 49629
+#endif
+#ifndef LAERDAL_IMAGER_EXE_NAME
+#define LAERDAL_IMAGER_EXE_NAME L"laerdal-simserver-imager.exe"
 #endif
 // If nonzero: on IPC failure, start Imager with the URL as positional arg.
-#ifndef RPI_IMAGER_START_ON_FAIL
-#define RPI_IMAGER_START_ON_FAIL 1
+#ifndef LAERDAL_IMAGER_START_ON_FAIL
+#define LAERDAL_IMAGER_START_ON_FAIL 1
 #endif
 
 static int send_url_over_tcp_utf8(const wchar_t* urlW)
@@ -35,7 +41,7 @@ static int send_url_over_tcp_utf8(const wchar_t* urlW)
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(RPI_IMAGER_PORT);
+    addr.sin_port = htons(LAERDAL_IMAGER_PORT);
     inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
 
     int c = connect(s, (sockaddr*)&addr, sizeof(addr));
@@ -87,22 +93,22 @@ static int send_url_over_tcp_utf8(const wchar_t* urlW)
 
 static void start_imager_with_url(const wchar_t* urlW)
 {
-    // Launch {app}\rpi-imager.exe "<url>"
+    // Launch {app}\laerdal-simserver-imager.exe "<url>"
     // Working dir = directory containing this relay
     wchar_t exePath[MAX_PATH];
     DWORD pathLen = GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-    
+
     // Check for errors and truncation
     if (pathLen == 0 || pathLen >= MAX_PATH) {
         return; // Failed or path too long
     }
-    
+
     wchar_t* lastSlash = wcsrchr(exePath, L'\\');
     if (!lastSlash) return;
     *lastSlash = L'\0'; // strip exe name, leave folder
-    
+
     wchar_t imagerExe[MAX_PATH];
-    HRESULT hr = StringCchPrintfW(imagerExe, _countof(imagerExe), L"%s\\%s", exePath, RPI_IMAGER_EXE_NAME);
+    HRESULT hr = StringCchPrintfW(imagerExe, _countof(imagerExe), L"%s\\%s", exePath, LAERDAL_IMAGER_EXE_NAME);
     if (FAILED(hr)) {
         return; // Path construction failed (too long)
     }
@@ -113,8 +119,8 @@ static void start_imager_with_url(const wchar_t* urlW)
         return; // File doesn't exist or is a directory
     }
 
-    // Build command line: "rpi-imager.exe" "<url>"
-    // Use ShellExecuteEx to respect UAC manifest of rpi-imager.exe
+    // Build command line: "laerdal-simserver-imager.exe" "<url>"
+    // Use ShellExecuteEx to respect UAC manifest of laerdal-simserver-imager.exe
     SHELLEXECUTEINFOW sei{};
     sei.cbSize = sizeof(sei);
     sei.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI; // No error UI on failure
@@ -178,14 +184,14 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR cmdLine, int)
         urlW = urlBuf;
     }
 
-    // Validate: must start with rpi-imager://
-    if (wcsncmp(urlW, L"rpi-imager://", 13) != 0) {
+    // Validate: must start with laerdal-imager://
+    if (wcsncmp(urlW, L"laerdal-imager://", 17) != 0) {
         return 0;
     }
 
     // Additional validation: check for reasonable URL length (after protocol)
     size_t totalLen = wcslen(urlW);
-    if (totalLen < 14 || totalLen > 2000) { // min: rpi-imager://x, max: reasonable limit
+    if (totalLen < 18 || totalLen > 2000) { // min: laerdal-imager://x, max: reasonable limit
         return 0;
     }
 
@@ -200,7 +206,7 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR cmdLine, int)
     }
 
     int r = send_url_over_tcp_utf8(urlW);
-#if RPI_IMAGER_START_ON_FAIL
+#if LAERDAL_IMAGER_START_ON_FAIL
     if (r != 0) {
         start_imager_with_url(urlW);
         return 0;

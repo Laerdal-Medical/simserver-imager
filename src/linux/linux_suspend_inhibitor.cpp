@@ -76,7 +76,7 @@ ProcessScopedSuspendInhibitor::ProcessScopedSuspendInhibitor(const char *fileNam
     // unblocks the inhibitor.
 
     // Generate and claim a unique filename for the FIFO in /run (runtime directory).
-    snprintf(_fifoName, sizeof(_fifoName), "/run/rpi-imager-suspend_XXXXXX");
+    snprintf(_fifoName, sizeof(_fifoName), "/run/laerdal-imager-suspend_XXXXXX");
 
     int fd = mkstemp(_fifoName);
 

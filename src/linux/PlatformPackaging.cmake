@@ -15,8 +15,8 @@ endif()
 # Generate metainfo.xml with current version
 # Output to debian/ directory for dpkg-buildpackage
 configure_file(
-    "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.raspberrypi.rpi-imager.metainfo.xml.in"
-    "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.raspberrypi.rpi-imager.metainfo.xml"
+    "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.laerdal.simserver-imager.metainfo.xml.in"
+    "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.laerdal.simserver-imager.metainfo.xml"
     @ONLY)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
@@ -25,12 +25,12 @@ if(BUILD_CLI_ONLY)
     # CLI-only build: install CLI-specific desktop file (marked as NoDisplay)
     # Icon is still required for AppImage tooling (linuxdeploy) even though NoDisplay=true
     install(FILES "${CMAKE_CURRENT_LIST_DIR}/icon/laerdal-simserver-imager.svg" DESTINATION share/icons/hicolor/scalable/apps)
-    install(FILES "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.raspberrypi.rpi-imager-cli.desktop" DESTINATION share/applications)
+    install(FILES "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.laerdal.simserver-imager-cli.desktop" DESTINATION share/applications)
 else()
     # GUI build: install full desktop integration
     install(FILES "${CMAKE_CURRENT_LIST_DIR}/icon/laerdal-simserver-imager.svg" DESTINATION share/icons/hicolor/scalable/apps)
-    install(FILES "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.raspberrypi.rpi-imager.desktop" DESTINATION share/applications)
-    install(FILES "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.raspberrypi.rpi-imager.metainfo.xml" DESTINATION share/metainfo)
+    install(FILES "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.laerdal.simserver-imager.desktop" DESTINATION share/applications)
+    install(FILES "${CMAKE_CURRENT_LIST_DIR}/../../debian/com.laerdal.simserver-imager.metainfo.xml" DESTINATION share/metainfo)
 endif()
 
 

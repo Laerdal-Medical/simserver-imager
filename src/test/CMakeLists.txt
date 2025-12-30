@@ -127,7 +127,7 @@ target_compile_options(fat_partition_test PRIVATE
 catch_discover_tests(fat_partition_test)
 
 # Custom target for manual running with mount path argument
-# Usage: FAT_TEST_MOUNT_PATH="/Volumes/bootfs 1" cmake --build . --target test_fat_partition
+# Usage: FAT_TEST_MOUNT_PATH="/Volumes/bootfs 1" cmake --build . --target test_fat_partition --parallel
 add_custom_target(test_fat_partition
     COMMAND echo "Set FAT_TEST_MOUNT_PATH environment variable and run: ./test/fat_partition_test"
     COMMAND echo "Example: FAT_TEST_MOUNT_PATH=\"/Volumes/bootfs 1\" ./test/fat_partition_test"

@@ -1,7 +1,7 @@
 #include <windows.h>
 
 IDI_ICON1 ICON DISCARDABLE "../src/icons/laerdal-simserver-imager.ico"
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "rpi-imager.manifest"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "laerdal-simserver-imager.manifest"
 
 1 VERSIONINFO
 FILEVERSION @IMAGER_VERSION_MAJOR@,@IMAGER_VERSION_MINOR@,@IMAGER_VERSION_PATCH@,0
@@ -11,8 +11,8 @@ PRODUCTVERSION @IMAGER_VERSION_MAJOR@,@IMAGER_VERSION_MINOR@,@IMAGER_VERSION_PAT
     {
         BLOCK "040904b0"
         {
-            VALUE "CompanyName",     "Raspberry Pi Ltd"
-            VALUE "FileDescription", "Raspberry Pi Imager"
+            VALUE "CompanyName",     "Laerdal Medical"
+            VALUE "FileDescription", "Laerdal SimServer Imager"
             VALUE "FileVersion",     "@IMAGER_VERSION_STR@"
             VALUE "ProductVersion",  "@IMAGER_VERSION_STR@"
         }

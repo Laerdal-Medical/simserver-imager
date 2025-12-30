@@ -53,7 +53,7 @@ if (IMAGER_SIGNED_APP)
 
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND "${SIGNTOOL}" sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a
-                "${CMAKE_BINARY_DIR}/rpi-imager-callback-relay.exe")
+                "${CMAKE_BINARY_DIR}/laerdal-imager-callback-relay.exe")
 endif()
 
 # windeployqt
@@ -69,13 +69,13 @@ add_custom_command(TARGET ${PROJECT_NAME}
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.exe"
         "${CMAKE_SOURCE_DIR}/../license.txt"
-        "${CMAKE_SOURCE_DIR}/windows/rpi-imager-cli.cmd"
-        "${CMAKE_BINARY_DIR}/rpi-imager-callback-relay.exe"
+        "${CMAKE_SOURCE_DIR}/windows/laerdal-imager-cli.cmd"
+        "${CMAKE_BINARY_DIR}/laerdal-imager-callback-relay.exe"
         "${CMAKE_BINARY_DIR}/deploy")
 
 add_custom_command(TARGET ${PROJECT_NAME}
     POST_BUILD
-    COMMAND "${WINDEPLOYQT}" --no-translations --no-widgets --skip-plugin-types qmltooling --exclude-plugins qtiff,qwebp,qgif --no-quickcontrols2fusion --no-quickcontrols2fusionstyleimpl --no-quickcontrols2universal --no-quickcontrols2universalstyleimpl --no-quickcontrols2imagine --no-quickcontrols2imaginestyleimpl --no-quickcontrols2fluentwinui3styleimpl --no-quickcontrols2windowsstyleimpl --verbose 2 --qmldir "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/deploy/rpi-imager.exe")
+    COMMAND "${WINDEPLOYQT}" --no-translations --no-widgets --skip-plugin-types qmltooling --exclude-plugins qtiff,qwebp,qgif --no-quickcontrols2fusion --no-quickcontrols2fusionstyleimpl --no-quickcontrols2universal --no-quickcontrols2universalstyleimpl --no-quickcontrols2imagine --no-quickcontrols2imaginestyleimpl --no-quickcontrols2fluentwinui3styleimpl --no-quickcontrols2windowsstyleimpl --verbose 2 --qmldir "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/deploy/${PROJECT_NAME}.exe")
 
 # NSIS or Inno Setup configuration
 option(ENABLE_INNO_INSTALLER "Build Inno Setup installer instead of NSIS" OFF)
@@ -83,8 +83,8 @@ option(ENABLE_INNO_INSTALLER "Build Inno Setup installer instead of NSIS" OFF)
 if(ENABLE_INNO_INSTALLER)
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/installer")
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/windows/rpi-imager.iss.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.iss"
+        "${CMAKE_CURRENT_SOURCE_DIR}/windows/laerdal-simserver-imager.iss.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.iss"
         @ONLY)
 
     find_program(INNO_COMPILER NAMES iscc ISCC "iscc.exe" PATHS
@@ -95,13 +95,13 @@ if(ENABLE_INNO_INSTALLER)
     if(INNO_COMPILER)
         if(IMAGER_SIGNED_APP)
             add_custom_target(inno_installer
-                COMMAND "${INNO_COMPILER}" "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.iss" "/DSIGNING_ENABLED" "/Ssign=${SIGNTOOL} sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a $p"
+                COMMAND "${INNO_COMPILER}" "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.iss" "/DSIGNING_ENABLED" "/Ssign=${SIGNTOOL} sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a $p"
                 DEPENDS ${PROJECT_NAME}
                 COMMENT "Building Inno Setup installer"
                 VERBATIM)
         else()
             add_custom_target(inno_installer
-                COMMAND "${INNO_COMPILER}" "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.iss"
+                COMMAND "${INNO_COMPILER}" "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.iss"
                 DEPENDS ${PROJECT_NAME}
                 COMMENT "Building Inno Setup installer"
                 VERBATIM)
@@ -111,10 +111,10 @@ if(ENABLE_INNO_INSTALLER)
         message(WARNING "Inno Setup compiler not found. Install Inno Setup from https://jrsoftware.org/isinfo.php")
     endif()
 else()
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/windows/rpi-imager.nsi.in")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/windows/laerdal-simserver-imager.nsi.in")
         configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/windows/rpi-imager.nsi.in"
-            "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.nsi"
+            "${CMAKE_CURRENT_SOURCE_DIR}/windows/laerdal-simserver-imager.nsi.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.nsi"
             @ONLY)
     else()
         message(STATUS "NSIS template not found; skipping NSIS installer configuration")
@@ -123,22 +123,22 @@ endif()
 
 # Resource file generation (contains version info)
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/windows/rpi-imager.rc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/windows/laerdal-simserver-imager.rc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.rc"
     @ONLY)
 
 # Manifest generation and copying
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/windows/rpi-imager.manifest.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.manifest"
+    "${CMAKE_CURRENT_SOURCE_DIR}/windows/laerdal-simserver-imager.manifest.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.manifest"
     @ONLY)
 
 add_custom_command(TARGET ${PROJECT_NAME}
     PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.manifest"
-        "${CMAKE_CURRENT_SOURCE_DIR}/windows/rpi-imager.manifest"
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/rpi-imager.manifest"
+        "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.manifest"
+        "${CMAKE_CURRENT_SOURCE_DIR}/windows/laerdal-simserver-imager.manifest"
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.manifest"
     COMMENT "Copying generated manifest for resource compilation")
 
 add_custom_command(TARGET ${PROJECT_NAME}

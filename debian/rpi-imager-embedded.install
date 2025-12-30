@@ -1,9 +1,0 @@
-#!/usr/bin/dh-exec
-
-rpi-imager-embedded.AppImage => /usr/bin/rpi-imager-embedded
-
-debian/embedded-imager.service        lib/systemd/system/
-
-src/linux/icon/laerdal-simserver-imager.svg /usr/share/icons/hicolor/scalable/apps/
-
-debian/com.raspberrypi.rpi-imager-embedded.desktop /usr/share/applications/ 

@@ -85,7 +85,7 @@ MacOSFileOperations::~MacOSFileOperations() {
 
 void MacOSFileOperations::InitAsyncIO() {
   if (async_queue_ == nullptr && async_queue_depth_ > 1) {
-    async_queue_ = dispatch_queue_create("com.raspberrypi.imager.asyncio", DISPATCH_QUEUE_SERIAL);
+    async_queue_ = dispatch_queue_create("com.laerdal.simserver-imager.asyncio", DISPATCH_QUEUE_SERIAL);
     queue_semaphore_ = dispatch_semaphore_create(async_queue_depth_);
     async_write_offset_ = 0;
     pending_writes_.store(0);

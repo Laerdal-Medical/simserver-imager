@@ -22,7 +22,7 @@ jobs:
             cmake_generator: Ninja
           - os: windows-latest
             cmake_generator: ''  # Use default (Visual Studio)
-          - os: macos-14
+          - os: macos-15
             cmake_generator: Unix Makefiles
 
     steps:

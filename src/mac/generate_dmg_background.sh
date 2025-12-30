@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to generate DMG background image for Raspberry Pi Imager
+# Script to generate DMG background image for Laerdal SimServer Imager
 # This script will create a background image or provide instructions
 
 set -e
@@ -69,7 +69,7 @@ try:
     
     # Create a simple HTML file that we can screenshot
     # Include version in title if provided
-    title_text = "Raspberry Pi Imager"
+    title_text = "Laerdal SimServer Imager"
     if len(sys.argv) > 2 and sys.argv[2]:
         title_text += f" {sys.argv[2]}"
     
@@ -98,7 +98,7 @@ try:
                 font-kerning: normal;
             }}
             .title {{
-                color: #C51A4A;
+                color: #0066CC;
                 font-size: 32px;
                 font-weight: 600;
                 margin-bottom: 20px;
@@ -126,7 +126,7 @@ try:
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                color: #C51A4A;
+                color: #0066CC;
                 font-size: 32px;
                 font-weight: bold;
             }}
@@ -182,7 +182,7 @@ echo "1. Install Python 3 and Pillow: pip3 install Pillow"
 echo "2. Run: python3 $SCRIPT_DIR/create_dmg_background.py $OUTPUT_PATH"
 echo ""
 echo "Or create a 600x400 PNG image manually with:"
-echo "- Title: 'Raspberry Pi Imager'"
+echo "- Title: 'Laerdal SimServer Imager'"
 echo "- Instruction: 'Drag the app to Applications to install'"
 echo "- Visual guides for app and Applications folder positions"
 echo ""

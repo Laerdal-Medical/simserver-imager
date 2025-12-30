@@ -1,9 +1,9 @@
 [Unit]
-Description=Start Raspberry Pi Embedded Imager on bootup
+Description=Start Laerdal SimServer Embedded Imager on bootup
 
 [Service]
 Type=oneshot
-ExecStart=/bin/rpi-imager-embedded
+ExecStart=/bin/laerdal-simserver-imager-embedded
 StandardOutput=append:/embedded-imager.log
 StandardError=inherit
 

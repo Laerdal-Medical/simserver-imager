@@ -41,19 +41,19 @@
     // Only invoke once, and only when authorized (to handle late permission grants)
     if (isAuth && _callback && !_callbackInvoked) {
         _callbackInvoked = YES;
-        NSLog(@"rpi-imager location: Permission granted, invoking callback");
+        NSLog(@"laerdal-imager location: Permission granted, invoking callback");
         _callback(1, _callbackContext);
     }
 }
 
 - (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager API_AVAILABLE(macos(11.0)) {
     CLAuthorizationStatus st = manager.authorizationStatus;
-    NSLog(@"rpi-imager location: Authorization changed to %d", (int)st);
+    NSLog(@"laerdal-imager location: Authorization changed to %d", (int)st);
     [self handleAuthorizationStatus:st];
 }
 
 - (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
-    NSLog(@"rpi-imager location: Authorization status changed to %d", (int)status);
+    NSLog(@"laerdal-imager location: Authorization status changed to %d", (int)status);
     [self handleAuthorizationStatus:status];
 }
 @end
@@ -126,7 +126,7 @@ int rpiimager_request_location_permission_async(rpiimager_location_callback call
         g_persistentDelegate.authorized = NO;
         
         // Request permission
-        NSLog(@"rpi-imager location: Requesting when-in-use authorization");
+        NSLog(@"laerdal-imager location: Requesting when-in-use authorization");
         [g_persistentManager requestWhenInUseAuthorization];
         
         // Wait up to 5 seconds for immediate response
@@ -136,13 +136,13 @@ int rpiimager_request_location_permission_async(rpiimager_location_callback call
         }
         
         if (g_persistentDelegate.authorized) {
-            NSLog(@"rpi-imager location: Permission granted within timeout");
+            NSLog(@"laerdal-imager location: Permission granted within timeout");
             return 1;
         }
         
         // Not authorized yet - but the persistent manager will continue to listen
         // and will invoke the callback if permission is granted later
-        NSLog(@"rpi-imager location: Permission not granted within timeout, will callback if granted later");
+        NSLog(@"laerdal-imager location: Permission not granted within timeout, will callback if granted later");
         return 0;
     }
 }

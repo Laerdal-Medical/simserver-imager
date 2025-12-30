@@ -1,4 +1,4 @@
-# Inno Setup Installer for Raspberry Pi Imager
+# Inno Setup Installer for Laerdal SimServer Imager
 
 This directory contains the necessary files to build a Windows installer using Inno Setup, which is a widely-used, free installer system for Windows applications.
 
@@ -24,7 +24,7 @@ The Inno Setup installer is integrated with the CMake build system. After config
 cmake -DENABLE_INNO_INSTALLER=ON ..
 
 # Build the application and installer
-cmake --build . --target inno_installer
+cmake --build . --target inno_installer --parallel
 ```
 
 This will:
@@ -52,7 +52,7 @@ Inno Setup offers several advantages over NSIS:
 
 To modify the installer:
 
-- Edit `rpi-imager.iss.in` to change settings, add files, or modify behavior
+- Edit `laerdal-simserver-imager.iss.in` to change settings, add files, or modify behavior
 - The script uses CMake variables like `@CMAKE_BINARY_DIR@` which are replaced during configuration
 
 ## Testing

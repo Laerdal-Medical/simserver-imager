@@ -469,9 +469,9 @@ static bool generatePolkitPolicyFilename(const char* appImagePath, char* buffer,
     QByteArray pathBytes(appImagePath);
     QByteArray hash = QCryptographicHash::hash(pathBytes, QCryptographicHash::Md5).toHex();
     
-    // Create filename: com.raspberrypi.rpi-imager.appimage-HASH.policy
-    int written = std::snprintf(buffer, bufferSize, 
-        "com.raspberrypi.rpi-imager.appimage-%s.policy",
+    // Create filename: com.laerdal.simserver-imager.appimage-HASH.policy
+    int written = std::snprintf(buffer, bufferSize,
+        "com.laerdal.simserver-imager.appimage-%s.policy",
         hash.left(12).constData());  // Use first 12 chars of hash
     
     return written > 0 && static_cast<size_t>(written) < bufferSize;
@@ -546,7 +546,7 @@ static bool installPolkitPolicyForPath(const char* appImagePath) {
     // Generate unique action ID based on path hash
     QByteArray pathBytes(appImagePath);
     QByteArray hash = QCryptographicHash::hash(pathBytes, QCryptographicHash::Md5).toHex();
-    QString actionId = QString("com.raspberrypi.rpi-imager.appimage.%1").arg(QString::fromUtf8(hash.left(12)));
+    QString actionId = QString("com.laerdal.simserver-imager.appimage.%1").arg(QString::fromUtf8(hash.left(12)));
     
     // Create policy XML
     QString policyContent = QString(

@@ -158,6 +158,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
+            cmake \
+            libgnutls28-dev \
             devscripts \
             debhelper \
             dh-exec \
@@ -197,31 +199,41 @@ jobs:
           arch: win64_msvc2022_64
           cache: true
 
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Configure CMake
         run: |
           cmake -B build -S src `
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-            -DQt6_ROOT="$env:QT_ROOT_DIR"
+            -DQt6_ROOT="$env:QT_ROOT_DIR" `
+            -DENABLE_INNO_INSTALLER=ON
 
       - name: Build
         run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
 
-      - name: Deploy Qt
-        run: |
-          New-Item -ItemType Directory -Force -Path dist
-          Copy-Item "build\${{ env.BUILD_TYPE }}\laerdal-simserver-imager.exe" dist\
-          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --qmldir src --release dist\laerdal-simserver-imager.exe
+      - name: Build Inno Setup installer
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --target inno_installer
 
       - name: Create ZIP archive
         run: |
           $version = git describe --tags --always
-          Compress-Archive -Path dist\* -DestinationPath "laerdal-simserver-imager-$version-windows-x64.zip"
+          Compress-Archive -Path build\deploy\* -DestinationPath "laerdal-simserver-imager-$version-windows-x64.zip"
 
-      - name: Upload Windows build
+      - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: windows-x64
+          name: windows-x64-zip
           path: '*.zip'
+          if-no-files-found: error
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-installer
+          path: build/installer/*.exe
           if-no-files-found: error
 
   # ============================================================================
@@ -235,9 +247,9 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: macos-13
+            runner: macos-15
           - arch: arm64
-            runner: macos-14
+            runner: macos-15
 
     steps:
       - name: Checkout
@@ -314,4 +326,5 @@ jobs:
             artifacts/**/*.AppImage
             artifacts/**/*.deb
             artifacts/**/*.zip
+            artifacts/**/*.exe
             artifacts/**/*.dmg

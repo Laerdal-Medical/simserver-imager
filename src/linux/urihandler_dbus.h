@@ -16,7 +16,7 @@ class ImageWriter;
 class UriHandlerAdaptor : public QDBusAbstractAdaptor
 {
     Q_OBJECT
-    Q_CLASSINFO("D-Bus Interface", "com.raspberrypi.rpi-imager")
+    Q_CLASSINFO("D-Bus Interface", "com.laerdal.simserver-imager")
 
 public:
     explicit UriHandlerAdaptor(ImageWriter *imageWriter, QObject *parent = nullptr);

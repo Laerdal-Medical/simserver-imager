@@ -40,10 +40,10 @@
   <array>
     <dict>
       <key>CFBundleURLName</key>
-      <string>Raspberry Pi Imager URL</string>
+      <string>Laerdal SimServer Imager URL</string>
       <key>CFBundleURLSchemes</key>
       <array>
-        <string>rpi-imager</string>
+        <string>laerdal-imager</string>
       </array>
     </dict>
   </array>
@@ -52,14 +52,14 @@
   <array>
     <dict>
       <key>CFBundleTypeName</key>
-      <string>Raspberry Pi Imager Manifest</string>
+      <string>Laerdal SimServer Imager Manifest</string>
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
       <key>LSHandlerRank</key>
       <string>Owner</string>
       <key>LSItemContentTypes</key>
       <array>
-        <string>com.raspberrypi.rpi-imager-manifest</string>
+        <string>com.laerdal.simserver-imager-manifest</string>
       </array>
     </dict>
   </array>
@@ -67,9 +67,9 @@
   <array>
     <dict>
       <key>UTTypeIdentifier</key>
-      <string>com.raspberrypi.rpi-imager-manifest</string>
+      <string>com.laerdal.simserver-imager-manifest</string>
       <key>UTTypeDescription</key>
-      <string>Raspberry Pi Imager Manifest</string>
+      <string>Laerdal SimServer Imager Manifest</string>
       <key>UTTypeConformsTo</key>
       <array>
         <string>public.json</string>
@@ -79,10 +79,10 @@
       <dict>
         <key>public.filename-extension</key>
         <array>
-          <string>rpi-imager-manifest</string>
+          <string>laerdal-imager-manifest</string>
         </array>
         <key>public.mime-type</key>
-        <string>application/vnd.raspberrypi.imager-manifest+json</string>
+        <string>application/vnd.laerdal.imager-manifest+json</string>
       </dict>
     </dict>
   </array>

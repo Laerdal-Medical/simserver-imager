@@ -1,0 +1,9 @@
+#!/usr/bin/dh-exec
+
+laerdal-simserver-imager-embedded.AppImage => /usr/bin/laerdal-simserver-imager-embedded
+
+debian/laerdal-simserver-imager.service lib/systemd/system/
+
+src/linux/icon/laerdal-simserver-imager.svg /usr/share/icons/hicolor/scalable/apps/
+
+debian/com.laerdal.simserver-imager-embedded.desktop /usr/share/applications/

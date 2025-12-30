@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to create a stylized background image for the Raspberry Pi Imager DMG.
+Script to create a stylized background image for the Laerdal SimServer Imager DMG.
 This creates a background that guides users to drag the app to Applications.
 """
 
@@ -28,9 +28,9 @@ def create_dmg_background(output_path="dmg_background.png", version_str="", widt
         color = (gray_value, gray_value, gray_value, 255)
         draw.line([(0, y), (high_width, y)], fill=color)
     
-    # Try to load high-quality system fonts (Raspberry Pi website uses Inter/system fonts)
+    # Try to load high-quality system fonts
     try:
-        # Try to find the best system fonts for macOS (similar to raspberrypi.com)
+        # Try to find the best system fonts for macOS
         font_paths = [
             '/System/Library/Fonts/SF-Pro-Display-Regular.otf',  # macOS system font
             '/System/Library/Fonts/SF-Pro-Text-Regular.otf',     # macOS system font
@@ -65,16 +65,16 @@ def create_dmg_background(output_path="dmg_background.png", version_str="", widt
         title_font = ImageFont.load_default()
         instruction_font = ImageFont.load_default()
     
-    # Colors inspired by raspberrypi.com design
-    raspberry_red = '#C51A4A'      # Official Raspberry Pi red
+    # Colors for Laerdal branding
+    laerdal_blue = '#0066CC'       # Laerdal brand blue
     text_color = '#1a1a1a'         # Darker, more readable text
     light_text = '#666666'         # Better contrast gray
-    
+
     # Draw title with version if provided
     if version_str:
-        title_text = f"Raspberry Pi Imager {version_str}"
+        title_text = f"Laerdal SimServer Imager {version_str}"
     else:
-        title_text = "Raspberry Pi Imager"
+        title_text = "Laerdal SimServer Imager"
     
     title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
     title_width = title_bbox[2] - title_bbox[0]
@@ -82,7 +82,7 @@ def create_dmg_background(output_path="dmg_background.png", version_str="", widt
     title_y = 50 * scale_factor
     
     # Draw title with clean, modern appearance
-    draw.text((title_x, title_y), title_text, fill=raspberry_red, font=title_font)
+    draw.text((title_x, title_y), title_text, fill=laerdal_blue, font=title_font)
     
     # No instruction text needed - the visual elements speak for themselves
     
@@ -114,7 +114,7 @@ def create_dmg_background(output_path="dmg_background.png", version_str="", widt
     ], outline=circle_color, width=circle_width)
     
     # Draw high-quality chevron arrow using simple lines with RGBA antialiasing
-    chevron_color = raspberry_red
+    chevron_color = laerdal_blue
     chevron_y = app_y  # Same vertical level as the icons
     chevron_left_x = app_x + icon_size//2 + circle_padding + (20 * scale_factor)  # Start after left circle
     chevron_right_x = apps_x - icon_size//2 - circle_padding - (20 * scale_factor)  # End before right circle

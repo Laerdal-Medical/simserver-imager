@@ -1,11 +1,11 @@
-.TH RPI\-IMAGER 1
+.TH LAERDAL\-SIMSERVER\-IMAGER 1
 .
 .SH NAME
-rpi\-imager \- Flash disk images to removable storage
+laerdal\-simserver\-imager \- Flash disk images to removable storage for Laerdal SimPad/SimMan devices
 .
 .
 .SH SYNOPSIS
-.SY rpi\-imager
+.SY laerdal\-simserver\-imager
 .OP \-\-debug
 .OP \-\-repo url
 .OP \-\-qm translations
@@ -14,7 +14,7 @@ rpi\-imager \- Flash disk images to removable storage
 .OP image-uri
 .YS
 .
-.SY rpi\-imager
+.SY laerdal\-simserver\-imager
 \-\-cli
 .OP \-\-debug
 .OP \-\-quiet
@@ -25,26 +25,26 @@ image-uri
 destination-device
 .YS
 .
-.SY rpi\-imager
+.SY laerdal\-simserver\-imager
 \-\-version
 .YS
 .
-.SY rpi\-imager
+.SY laerdal\-simserver\-imager
 \-\-help
 .YS
 .
 .
 .SH DESCRIPTION
-.B rpi\-imager
+.B laerdal\-simserver\-imager
 is a utility for writing a disk image file, which may optionally be compressed,
 to a removable destination disk, such as a micro-SD card or a USB-attached SSD
-drive.
+drive. It is designed for imaging Laerdal SimPad and SimMan medical simulation devices.
 .
 .PP
 When run without further command line arguments, the utility presents a simple
 graphical interface with controls for image-file selection, target drive
-selection, and one to start writing. In this mode, the Raspberry Pi server
-(and potentially third party servers) will be queried for available OS images.
+selection, and one to start writing. In this mode, Laerdal servers
+will be queried for available OS images.
 You may also specify an
 .I image-uri
 (which may be a local file, or an HTTP or HTTPS URL) to flash directly on the
@@ -78,8 +78,7 @@ Output extra debugging information on the console.
 .
 .TP
 .B \-\-disable\-telemetry
-Do not report OS writes to
-.I http://rpi-imager-stats.raspberrypi.com/
+Do not report OS writes to telemetry servers.
 .
 .TP
 .B \-\-disable\-verify
@@ -111,7 +110,7 @@ Specify an alternate Qt message translations file to use with the GUI.
 .
 .TP
 .BI \-\-repo \ url
-Instead of querying the Raspberry Pi servers for the list of available OS
+Instead of querying the Laerdal servers for the list of available OS
 images, query this URL instead. The URL will be expected to return a JSON file
 conforming to the format described in the associated
 .IR json-schema .
@@ -119,7 +118,7 @@ conforming to the format described in the associated
 .TP
 .BI \-\-secure\-boot\-key \ key-file
 Path to an RSA 2048-bit private key file in PEM format for signing the boot
-partition to enable Raspberry Pi secure boot. When specified, the utility will
+partition to enable secure boot. When specified, the utility will
 create boot.img and boot.sig files on the boot partition. The key file must exist
 and be readable. This option can be combined with other customization options
 like
@@ -159,15 +158,15 @@ Only valid when run with
 .
 .SH EXAMPLES
 .TP
-.B rpi\-imager
+.B laerdal\-simserver\-imager
 Launch the graphical interface.
 .
 .TP
-.B rpi\-imager \-\-repo http://localhost:8080/os_list_utility.json
+.B laerdal\-simserver\-imager \-\-repo http://localhost:8080/os_list.json
 Test a locally hosted version of the OS list with the graphical interface.
 .
 .TP
-.B rpi\-imager \-\-cli \-\-disable\-verify test.img /dev/mmcblk0
+.B laerdal\-simserver\-imager \-\-cli \-\-disable\-verify test.img /dev/mmcblk0
 Write
 .I test.img
 to
@@ -176,17 +175,17 @@ without any verification of the image itself, and no check that the image
 flashed correctly. This also avoids launching the graphical interface.
 .
 .TP
-.B rpi\-imager \-\-cli \-\-secure\-boot\-key ~/secure\-boot\-key.pem raspios.img /dev/mmcblk0
+.B laerdal\-simserver\-imager \-\-cli \-\-secure\-boot\-key ~/secure\-boot\-key.pem simserver.img /dev/mmcblk0
 Write
-.I raspios.img
+.I simserver.img
 to
 .I /dev/mmcblk0
 and sign the boot partition with the RSA private key located at
 .IR ~/secure\-boot\-key.pem .
-This enables Raspberry Pi secure boot verification.
+This enables secure boot verification.
 .
 .TP
-.B rpi\-imager \-\-enable\-secure\-boot
+.B laerdal\-simserver\-imager \-\-enable\-secure\-boot
 Launch the graphical interface with secure boot customization step enabled for all
 operating systems, regardless of their declared capabilities. The RSA key must still
 be configured in the App Options dialog.

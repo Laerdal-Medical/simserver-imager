@@ -12,14 +12,14 @@ const char *rpiimager_current_ssid_cstr()
     @autoreleasepool {
         // CWWiFiClient default client
         CWWiFiClient *client = [CWWiFiClient sharedWiFiClient];
-        if (!client) { NSLog(@"rpi-imager CoreWLAN: no sharedWiFiClient"); return NULL; }
+        if (!client) { NSLog(@"laerdal-imager CoreWLAN: no sharedWiFiClient"); return NULL; }
 
         // Try default interface first (may be nil on some systems)
         CWInterface *iface = [client interface];
         if (iface) {
             NSString *ssid = [iface ssid];
             if (ssid && [ssid length] > 0) {
-                NSLog(@"rpi-imager CoreWLAN default interface %@ SSID: %@", iface.interfaceName, ssid);
+                NSLog(@"laerdal-imager CoreWLAN default interface %@ SSID: %@", iface.interfaceName, ssid);
                 const char *utf8 = [ssid UTF8String];
                 if (!utf8) return NULL;
                 size_t len = strlen(utf8);
@@ -28,22 +28,22 @@ const char *rpiimager_current_ssid_cstr()
                 memcpy(dup, utf8, len + 1);
                 return dup;
             } else {
-                NSLog(@"rpi-imager CoreWLAN default interface %@ has no SSID", iface.interfaceName);
+                NSLog(@"laerdal-imager CoreWLAN default interface %@ has no SSID", iface.interfaceName);
             }
         } else {
-            NSLog(@"rpi-imager CoreWLAN: default interface is nil, enumerating interfaces");
+            NSLog(@"laerdal-imager CoreWLAN: default interface is nil, enumerating interfaces");
         }
 
         // Enumerate all Wi-Fi interfaces as fallback
         NSArray<CWInterface*> *ifaces = [client interfaces];
         if (!ifaces || [ifaces count] == 0) {
-            NSLog(@"rpi-imager CoreWLAN: no interfaces found");
+            NSLog(@"laerdal-imager CoreWLAN: no interfaces found");
             return NULL;
         }
 
         for (CWInterface *it in ifaces) {
             NSString *ssid = [it ssid];
-            NSLog(@"rpi-imager CoreWLAN interface %@ power:%@ active:%@ ssid:%@",
+            NSLog(@"laerdal-imager CoreWLAN interface %@ power:%@ active:%@ ssid:%@",
                   it.interfaceName,
                   it.powerOn ? @"on" : @"off",
                   it.serviceActive ? @"yes" : @"no",
@@ -84,7 +84,7 @@ const char *rpiimager_current_ssid_cstr()
                         NSString *ssid = [outStr substringFromIndex:range.location + range.length];
                         ssid = [ssid stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
                         if (ssid.length > 0) {
-                            NSLog(@"rpi-imager networksetup %@ -> %@", it.interfaceName, ssid);
+                            NSLog(@"laerdal-imager networksetup %@ -> %@", it.interfaceName, ssid);
                             const char *utf8 = [ssid UTF8String];
                             if (!utf8) continue;
                             size_t len = strlen(utf8);
@@ -94,11 +94,11 @@ const char *rpiimager_current_ssid_cstr()
                             return dup;
                         }
                     } else {
-                        NSLog(@"rpi-imager networksetup %@ -> %@", it.interfaceName, outStr);
+                        NSLog(@"laerdal-imager networksetup %@ -> %@", it.interfaceName, outStr);
                     }
                 }
             } @catch (NSException *ex) {
-                NSLog(@"rpi-imager networksetup exception: %@", ex);
+                NSLog(@"laerdal-imager networksetup exception: %@", ex);
             }
         }
 

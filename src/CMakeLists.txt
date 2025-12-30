@@ -393,7 +393,7 @@ if (WIN32)
             PRIVATE RPI_IMAGER_CALLBACK_PORT=${IMAGER_CALLBACK_PORT})
 
     # Ensure the relay builds with the app
-    add_dependencies(${PROJECT_NAME} rpi-imager-callback-relay)
+    add_dependencies(${PROJECT_NAME} laerdal-imager-callback-relay)
 else()
     add_executable(${PROJECT_NAME} ${SOURCES} ${DEPENDENCIES})
 endif()

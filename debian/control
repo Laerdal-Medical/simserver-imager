@@ -1,51 +1,50 @@
-Source: rpi-imager
+Source: laerdal-simserver-imager
 Section: admin
 Priority: optional
-Maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+Maintainer: Laerdal Medical <support@laerdal.com>
 Build-Depends: debhelper-compat (= 13), cmake, libgnutls28-dev, dh-exec
 Standards-Version: 4.1.2
-Homepage: https://www.raspberrypi.com/software
+Homepage: https://github.com/laerdal/simserver-imager
 
-Package: rpi-imager
+Package: laerdal-simserver-imager
 Build-Profiles: <desktop>
 Architecture: amd64 arm64
 Depends: ${shlibs:Depends}, ${misc:Depends}, dosfstools, fdisk, fuse, libfuse2, util-linux (>= 2.37), pkexec
 Recommends: udisks2
-Conflicts: rpi-imager-embedded
-Description: Raspberry Pi Imaging utility
- A user-friendly tool for creating bootable media for Raspberry Pi Devices.
+Conflicts: laerdal-simserver-imager-embedded
+Description: Laerdal SimServer Imaging utility
+ A user-friendly tool for creating bootable media for Laerdal SimPad and SimMan devices.
 
-Package: rpi-imager-embedded
+Package: laerdal-simserver-imager-embedded
 Build-Profiles: <embedded>
 Architecture: arm64
-Depends: ${shlibs:Depends}, ${misc:Depends}, 
+Depends: ${shlibs:Depends}, ${misc:Depends},
          dosfstools, fdisk, fuse, libfuse2, util-linux (>= 2.37), libdrm2,
          libinput10, libudev1, openssl
-Suggests: rpi-eeprom, firmware-brcm80211
-Conflicts: rpi-imager
-Description: Raspberry Pi Imaging utility for embedded systems
- A user-friendly tool for creating bootable media for Raspberry Pi devices,
+Conflicts: laerdal-simserver-imager
+Description: Laerdal SimServer Imaging utility for embedded systems
+ A user-friendly tool for creating bootable media for Laerdal SimPad and SimMan devices,
  optimized for embedded systems.
  .
- This version is specifically designed for Raspberry Pi embedded systems:
+ This version is specifically designed for embedded systems:
   - Uses linuxfb for direct rendering (no desktop environment required)
   - Optimized for network-based installation
   - Smaller memory footprint for embedded applications
   - Supports DRM/KMS rendering
 
-Package: rpi-imager-cli
+Package: laerdal-simserver-imager-cli
 Build-Profiles: <cli>
 Architecture: amd64 arm64 armhf
-Depends: ${shlibs:Depends}, ${misc:Depends}, 
+Depends: ${shlibs:Depends}, ${misc:Depends},
          dosfstools, fdisk, fuse, libfuse2, util-linux (>= 2.37)
-Conflicts: rpi-imager, rpi-imager-embedded
-Description: Raspberry Pi Imaging utility (command-line only)
- A command-line tool for creating bootable media for Raspberry Pi devices.
+Conflicts: laerdal-simserver-imager, laerdal-simserver-imager-embedded
+Description: Laerdal SimServer Imaging utility (command-line only)
+ A command-line tool for creating bootable media for Laerdal SimPad and SimMan devices.
  .
  This version is optimized for command-line operation:
   - No GUI components - CLI mode only
   - Minimal dependencies (Qt Core only)
-  - Perfect for headless servers, automation and Raspberry Pi OS Lite
+  - Perfect for headless servers, automation and scripting
   - Smaller package size and memory footprint
   - Most imaging functionality available via command line
   - Ideal for scripting and CI/CD pipelines
