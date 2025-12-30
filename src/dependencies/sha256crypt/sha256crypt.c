@@ -8,8 +8,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <sys/param.h>
 #include <sys/types.h>
+#endif
 
 #ifdef __APPLE__
 #include <machine/endian.h>
