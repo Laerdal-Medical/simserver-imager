@@ -21,7 +21,7 @@ jobs:
           - os: ubuntu-24.04
             cmake_generator: Ninja
           - os: windows-latest
-            cmake_generator: MinGW Makefiles
+            cmake_generator: ''  # Use default (Visual Studio)
           - os: macos-14
             cmake_generator: Unix Makefiles
 
@@ -54,8 +54,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           host: windows
-          arch: win64_mingw
-          tools: 'tools_mingw1120'
+          arch: win64_msvc2022_64
           cache: true
 
       - name: Install Qt (macOS)
@@ -67,26 +66,28 @@ jobs:
           arch: clang_64
           cache: true
 
-      - name: Setup MinGW (Windows)
-        if: runner.os == 'Windows'
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1120_64/bin" >> $env:GITHUB_PATH
-
-      - name: Configure
-        shell: bash
-        run: |
-          CMAKE_EXTRA_ARGS=""
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            CMAKE_EXTRA_ARGS="-DMINGW64_ROOT=${{ runner.tool_cache }}/Qt/Tools/mingw1120_64"
-          fi
           cmake -B build -S src \
             -G "${{ matrix.cmake_generator }}" \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DQt6_ROOT="${Qt6_DIR}" \
-            $CMAKE_EXTRA_ARGS
+            -DQt6_ROOT="${Qt6_DIR}"
 
-      - name: Build
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -B build -S src `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DQt6_ROOT="$env:Qt6_DIR"
+
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
         run: cmake --build build --parallel
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
 
       - name: Run tests
         if: runner.os == 'Linux'

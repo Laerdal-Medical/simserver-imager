@@ -159,35 +159,25 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           host: windows
-          arch: win64_mingw
-          tools: 'tools_mingw1120'
+          arch: win64_msvc2022_64
           cache: true
 
-      - name: Setup MinGW
-        run: |
-          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1120_64/bin" >> $env:GITHUB_PATH
-
       - name: Configure CMake
-        shell: bash
         run: |
-          cmake -B build -S src \
-            -G "MinGW Makefiles" \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DQt6_ROOT="${Qt6_DIR}" \
-            -DMINGW64_ROOT="${{ runner.tool_cache }}/Qt/Tools/mingw1120_64"
+          cmake -B build -S src `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DQt6_ROOT="$env:Qt6_DIR"
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
 
       - name: Deploy Qt
-        shell: bash
         run: |
-          mkdir -p dist
-          cp build/laerdal-simserver-imager.exe dist/
-          windeployqt --qmldir src --release dist/laerdal-simserver-imager.exe
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "build\${{ env.BUILD_TYPE }}\laerdal-simserver-imager.exe" dist\
+          & "$env:Qt6_DIR\bin\windeployqt.exe" --qmldir src --release dist\laerdal-simserver-imager.exe
 
       - name: Create ZIP archive
-        shell: powershell
         run: |
           $version = git describe --tags --always
           Compress-Archive -Path dist\* -DestinationPath "laerdal-simserver-imager-$version-windows-x64.zip"
