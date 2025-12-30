@@ -15,6 +15,17 @@
 #include <optional>
 #include "file_operations.h"
 
+// Cross-platform packed struct macros
+#ifdef _MSC_VER
+  #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
+  #define PACKED_STRUCT_END __pragma(pack(pop))
+  #define PACKED_ATTRIBUTE
+#else
+  #define PACKED_STRUCT_BEGIN
+  #define PACKED_STRUCT_END
+  #define PACKED_ATTRIBUTE __attribute__((packed))
+#endif
+
 namespace rpi_imager {
 
 // Error types for disk formatting operations
@@ -73,7 +84,8 @@ struct Fat32Config {
 };
 
 // MBR partition entry
-struct __attribute__((packed)) MbrPartitionEntry {
+PACKED_STRUCT_BEGIN
+struct MbrPartitionEntry {
   std::uint8_t status;
   std::uint8_t first_head;
   std::uint8_t first_sector;
@@ -84,10 +96,12 @@ struct __attribute__((packed)) MbrPartitionEntry {
   std::uint8_t last_cylinder;
   std::uint32_t first_lba;
   std::uint32_t num_sectors;
-};
+} PACKED_ATTRIBUTE;
+PACKED_STRUCT_END
 
 // FAT32 boot sector structure
-struct __attribute__((packed)) Fat32BootSector {
+PACKED_STRUCT_BEGIN
+struct Fat32BootSector {
   std::array<std::uint8_t, 3> jump_instruction;
   std::array<char, 8> oem_name;
   std::uint16_t bytes_per_sector;
@@ -117,10 +131,12 @@ struct __attribute__((packed)) Fat32BootSector {
   std::array<char, 8> fs_type;
   std::array<std::uint8_t, 420> boot_code;
   std::uint16_t signature;
-};
+} PACKED_ATTRIBUTE;
+PACKED_STRUCT_END
 
 // FSInfo sector structure
-struct __attribute__((packed)) Fat32FsInfo {
+PACKED_STRUCT_BEGIN
+struct Fat32FsInfo {
   std::uint32_t lead_signature;
   std::array<std::uint8_t, 480> reserved1;
   std::uint32_t struct_signature;
@@ -128,7 +144,8 @@ struct __attribute__((packed)) Fat32FsInfo {
   std::uint32_t next_free;
   std::array<std::uint8_t, 12> reserved2;
   std::uint32_t trail_signature;
-};
+} PACKED_ATTRIBUTE;
+PACKED_STRUCT_END
 
 class DiskFormatter {
  public:

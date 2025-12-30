@@ -1,8 +1,8 @@
 #!/usr/bin/dh-exec
 
 # Install AppImage directly
-[linux-amd64] laerdal-simserver-imager-x86_64.AppImage => /usr/bin/laerdal-simserver-imager
-[linux-arm64] laerdal-simserver-imager-aarch64.AppImage => /usr/bin/laerdal-simserver-imager
+[amd64] laerdal-simserver-imager-x86_64.AppImage => /usr/bin/laerdal-simserver-imager
+[arm64] laerdal-simserver-imager-aarch64.AppImage => /usr/bin/laerdal-simserver-imager
 
 # Install PolicyKit policy for privilege escalation
 debian/com.laerdal.simserver-imager.policy /usr/share/polkit-1/actions/
