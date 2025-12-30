@@ -62,7 +62,7 @@ WizardStepBase {
                     Layout.fillWidth: true
                     placeholderText: qsTr("Enter your hostname")
                     font.pixelSize: Style.fontSizeInput
-                    Accessible.description: qsTr("A hostname is a unique name that identifies your Raspberry Pi on the network. It should contain only letters, numbers, and hyphens.")
+                    Accessible.description: qsTr("A hostname is a unique name that identifies your device on the network. It should contain only letters, numbers, and hyphens.")
                     
                     validator: RegularExpressionValidator {
                         regularExpression: /^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$/
@@ -72,7 +72,7 @@ WizardStepBase {
             
             WizardDescriptionText {
                 id: helpText
-                text: qsTr("A hostname is a unique name that identifies your Raspberry Pi on the network. It should contain only letters, numbers, and hyphens.")
+                text: qsTr("A hostname is a unique name that identifies your device on the network. It should contain only letters, numbers, and hyphens.")
             }
         }
     }

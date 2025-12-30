@@ -226,10 +226,10 @@ void applyQuirks() {
 
     // make imager single instance because of rpi-connect callback server
     // will be automatically released once the process exits cleanly or crashes
-    HANDLE hMutex = CreateMutexW(nullptr, TRUE, L"Global\\RaspberryPiImagerMutex");
+    HANDLE hMutex = CreateMutexW(nullptr, TRUE, L"Global\\LaerdalSimServerImagerMutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
         // Another instance running
-        MessageBoxW(nullptr, L"Raspberry Pi Imager is already running.", L"Raspberry Pi Imager", MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(nullptr, L"Laerdal SimServer Imager is already running.", L"Laerdal SimServer Imager", MB_OK | MB_ICONINFORMATION);
         exit(0);
     }
 }

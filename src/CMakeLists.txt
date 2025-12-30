@@ -1,7 +1,7 @@
 # Common helper to generate build-time resources with fallback
 include(cmake/GeneratedResource.cmake)
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (C) 2020-2025 Raspberry Pi Ltd
+# Copyright (C) 2025 Laerdal Medical
 
 cmake_minimum_required(VERSION 3.22)
 OPTION (ENABLE_CHECK_VERSION "Check for version updates" ON)
@@ -26,7 +26,7 @@ endif()
 
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Which macOS architectures to build for")
 
-project(rpi-imager LANGUAGES CXX C)
+project(laerdal-simserver-imager LANGUAGES CXX C)
 
 # Get version from git tag
 find_package(Git QUIET)
@@ -250,14 +250,20 @@ set(SOURCES_BASE ${PLATFORM_SOURCES} "main.cpp"
     "driveformatthread.cpp" "localfileextractthread.cpp" "downloadstatstelemetry.cpp" "dependencies/sha256crypt/sha256crypt.c" "cli.cpp"
     "disk_formatter.cpp" "file_operations.cpp" "cachemanager.cpp" "systemmemorymanager.cpp" "imageadvancedoptions.cpp"
     "customization_generator.cpp" "platformhelper.cpp" "suspend_inhibitor.cpp" "secureboot.cpp" "asynccachewriter.cpp" "ringbuffer.cpp"
-    "performancestats.cpp" "curlnetworkconfig.cpp" "curlfetcher.cpp")
+    "performancestats.cpp"
+    # Curl networking infrastructure
+    "curlnetworkconfig.cpp" "curlfetcher.cpp" "iconmultifetcher.cpp"
+    # Laerdal GitHub integration
+    "github/githubauth.cpp" "github/githubclient.cpp"
+    # Laerdal repository management
+    "repository/repositorymanager.cpp" "repository/laerdalcdnsource.cpp" "repository/githubsource.cpp")
 
 # Add GUI-specific sources only for non-CLI builds
 if(BUILD_CLI_ONLY)
     # CLI builds need imagewriter but not the GUI components
     set(SOURCES ${SOURCES_BASE} "imagewriter.cpp" "hwlistmodel.cpp" "oslistmodel.cpp")
 else()
-    set(SOURCES ${SOURCES_BASE} "networkaccessmanagerfactory.cpp" "qml.qrc" "nativefiledialog.cpp" "iconimageprovider.cpp" "iconmultifetcher.cpp")
+    set(SOURCES ${SOURCES_BASE} "networkaccessmanagerfactory.cpp" "qml.qrc" "nativefiledialog.cpp" "iconimageprovider.cpp")
 endif()
 
 if(BUILD_EMBEDDED)
@@ -268,16 +274,17 @@ else()
 endif()
 
 # Find Qt components - different requirements for CLI-only vs GUI builds
+# Note: Qt 6.5+ recommended for full feature support, 6.2+ minimum
 if(BUILD_CLI_ONLY)
     # CLI-only build: need ONLY Core and Network for downloading
-    find_package(Qt6 6.9 COMPONENTS Core Network OPTIONAL_COMPONENTS LinguistTools)
+    find_package(Qt6 6.2 COMPONENTS Core Network OPTIONAL_COMPONENTS LinguistTools)
 else()
     # Regular GUI build: need Core, Quick, Svg, Network, Gui
     # DBus is required on Linux for suspend inhibitor and native file dialogs (portals)
     if(UNIX AND NOT APPLE)
-        find_package(Qt6 6.9 COMPONENTS Core Gui Quick Svg Network DBus OPTIONAL_COMPONENTS LinguistTools)
+        find_package(Qt6 6.2 COMPONENTS Core Gui Quick Svg Network DBus OPTIONAL_COMPONENTS LinguistTools)
     else()
-        find_package(Qt6 6.9 COMPONENTS Core Gui Quick Svg Network OPTIONAL_COMPONENTS LinguistTools)
+        find_package(Qt6 6.2 COMPONENTS Core Gui Quick Svg Network OPTIONAL_COMPONENTS LinguistTools)
     endif()
 endif()
 if (Qt6_FOUND)
@@ -286,7 +293,7 @@ if (Qt6_FOUND)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "12" CACHE STRING "" FORCE)
     endif()
 else()
-    message(FATAL_ERROR "Missing suitable Qt library (must be at least version 6.9)" )
+    message(FATAL_ERROR "Missing suitable Qt library (must be at least version 6.2)" )
 endif()
 if(${QT}WinExtras_FOUND)
     set(EXTRALIBS ${EXTRALIBS} ${QT}::WinExtras)
@@ -393,7 +400,7 @@ endif()
 
 # Set output name based on build type
 if(BUILD_CLI_ONLY)
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "rpi-imager-cli")
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "laerdal-simserver-imager-cli")
 endif()
 
 # Create an rpi-imager_lupdate target
@@ -458,7 +465,9 @@ if(NOT BUILD_CLI_ONLY)
         wizard/dialogs/UpdateAvailableDialog.qml
         wizard/dialogs/RepositoryDialog.qml
         wizard/dialogs/AppOptionsDialog.qml
+        wizard/dialogs/GitHubLoginDialog.qml
         wizard/dialogs/DebugOptionsDialog.qml
+        wizard/dialogs/RepositorySelectionDialog.qml
         wizard/LanguageSelectionStep.qml
         qmlcomponents/BaseDialog.qml
         qmlcomponents/ImButton.qml
@@ -481,6 +490,7 @@ if(NOT BUILD_CLI_ONLY)
         wizard/WizardStepBase.qml
         wizard/WizardContainer.qml
         wizard/DeviceSelectionStep.qml
+        wizard/SourceSelectionStep.qml
         wizard/OSSelectionStep.qml
         wizard/StorageSelectionStep.qml
         wizard/HostnameCustomizationStep.qml

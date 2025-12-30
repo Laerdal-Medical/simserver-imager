@@ -21,15 +21,15 @@ Item {
     function withAll(list)          { return list.concat([allFilesLabel]) }
     function toFilterString(list)   { return list.join(";;") }
 
-    readonly property var imageExtensions: ["*.img","*.zip","*.iso","*.gz","*.xz","*.zst","*.wic"]
+    readonly property var imageExtensions: ["*.wic", "*.wic.xz", "*.wic.gz", "*.wic.zst"]
 
     readonly property var imageFiltersList: withAll([
-        qsTr("Image files (%1)").arg(imageExtensions.join(" "))
+        qsTr("WIC image files (%1)").arg(imageExtensions.join(" "))
     ])
     readonly property string imageFiltersString: toFilterString(imageFiltersList)
 
     // Repository file extensions - must match MANIFEST_EXTENSION in src/config.h
-    readonly property string manifestExtension: "rpi-imager-manifest"
+    readonly property string manifestExtension: "laerdal-imager-manifest"
     readonly property var repoFiltersList: withAll([
         qsTr("Imager Repository Files (*.json *.%1)").arg(manifestExtension)
     ])
@@ -66,7 +66,7 @@ Item {
     readonly property string sshEnabled: qsTr("SSH enabled")
     readonly property string localeConfigured: qsTr("Localisation configured")
     readonly property string wifiConfigured: qsTr("Wi‑Fi configured")
-    readonly property string piConnectEnabled: qsTr("Raspberry Pi Connect enabled")
+    readonly property string piConnectEnabled: qsTr("Remote Connect enabled")
     readonly property string usbGadgetEnabled: qsTr("USB Gadget mode enabled")
     readonly property string i2cEnabled: qsTr("I2C enabled")
     readonly property string spiEnabled: qsTr("SPI enabled")

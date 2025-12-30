@@ -21,8 +21,8 @@ WizardStepBase {
     readonly property HWListModel hwmodel: imageWriter.getHWList()
     readonly property OSListModel osmodel: imageWriter.getOSList()
     
-    title: qsTr("Choose operating system")
-    subtitle: qsTr("Select an operating system to install on your Raspberry Pi")
+    title: qsTr("Choose system image")
+    subtitle: qsTr("Select a system image to install on your device")
     showNextButton: true
     // Disable Next until a concrete OS has been selected
     nextButtonEnabled: oslist.currentIndex !== -1 && wizardContainer.selectedOsName.length > 0
@@ -165,7 +165,7 @@ WizardStepBase {
             imageWriter.setSrc(fileUrl)
             // Update selected OS name to the chosen file name
             root.wizardContainer.selectedOsName = imageWriter.srcFileName()
-            root.wizardContainer.customizationSupported = imageWriter.imageSupportsCustomization()
+            root.wizardContainer.customizationSupported = false  // Disabled for Laerdal SimServer Imager
             // For custom images, customization is not supported; clear any staged flags
             if (!root.wizardContainer.customizationSupported) {
                 root.wizardContainer.hostnameConfigured = false
@@ -235,13 +235,52 @@ WizardStepBase {
     
     // Track whether OS list is unavailable (no data loaded)
     readonly property bool osListUnavailable: imageWriter.isOsListUnavailable
-    
+
+    // Track whether CI images are being fetched
+    readonly property var repoManager: imageWriter.getRepositoryManager()
+    readonly property bool isLoadingCIImages: repoManager ? repoManager.isLoading : false
+
     // Content
     content: [
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-        
+
+        // CI images loading banner
+        Rectangle {
+            id: loadingBanner
+            Layout.fillWidth: true
+            Layout.preferredHeight: visible ? loadingContent.implicitHeight + Style.spacingSmall * 2 : 0
+            visible: root.isLoadingCIImages
+            color: Style.buttonFocusedBackgroundColor
+
+            RowLayout {
+                id: loadingContent
+                anchors.fill: parent
+                anchors.leftMargin: Style.spacingMedium
+                anchors.rightMargin: Style.spacingMedium
+                anchors.topMargin: Style.spacingSmall
+                anchors.bottomMargin: Style.spacingSmall
+                spacing: Style.spacingSmall
+
+                BusyIndicator {
+                    running: root.isLoadingCIImages
+                    Layout.preferredWidth: Style.fontSizeFormLabel
+                    Layout.preferredHeight: Style.fontSizeFormLabel
+                }
+
+                Text {
+                    text: qsTr("Loading CI images from GitHub...")
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamily
+                    color: Style.formLabelColor
+                    Layout.fillWidth: true
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+            }
+        }
+
         // Offline banner (shown when OS list fetch failed)
         Rectangle {
             id: offlineBanner
@@ -363,7 +402,7 @@ WizardStepBase {
         
         Item {
             id: delegateItem
-            
+
             required property int index
             required property string name
             required property string description
@@ -374,6 +413,12 @@ WizardStepBase {
             required property QtObject model
             required property double image_download_size
             required property var devices
+            required property string source
+            required property string source_type
+            required property string branch
+            required property var artifact_id
+            required property string source_owner
+            required property string source_repo
             
             // Get reference to the containing ListView
             // IMPORTANT: Cache ListView.view in a property for reliable access.
@@ -476,17 +521,44 @@ WizardStepBase {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: Style.spacingXXSmall
-                        
-                        Text {
-                            text: delegateItem.name
-                            font.pixelSize: Style.fontSizeFormLabel
-                            font.family: Style.fontFamilyBold
-                            font.bold: true
-                            color: Style.formLabelColor
+
+                        RowLayout {
                             Layout.fillWidth: true
-                            Accessible.ignored: true
+                            spacing: Style.spacingSmall
+
+                            Text {
+                                text: delegateItem.name
+                                font.pixelSize: Style.fontSizeFormLabel
+                                font.family: Style.fontFamilyBold
+                                font.bold: true
+                                color: Style.formLabelColor
+                                Layout.fillWidth: true
+                                Accessible.ignored: true
+                            }
+
+                            // Source badge for GitHub items
+                            Rectangle {
+                                visible: delegateItem.source === "github"
+                                Layout.preferredHeight: badgeText.implicitHeight + 4
+                                Layout.preferredWidth: badgeText.implicitWidth + 8
+                                radius: 3
+                                color: delegateItem.source_type === "artifact" ? "#6f42c1" : "#28a745"  // Purple for artifacts, green for releases
+
+                                Text {
+                                    id: badgeText
+                                    anchors.centerIn: parent
+                                    text: delegateItem.source_type === "artifact" ? qsTr("CI Build") : qsTr("Release")
+                                    font.pixelSize: Style.fontSizeSmall - 1
+                                    font.family: Style.fontFamily
+                                    color: "white"
+                                    Accessible.ignored: true
+                                }
+
+                                Accessible.role: Accessible.StaticText
+                                Accessible.name: delegateItem.source_type === "artifact" ? qsTr("CI Build from GitHub Actions") : qsTr("GitHub Release")
+                            }
                         }
-                        
+
                         Text {
                             text: delegateItem.description
                             font.pixelSize: Style.fontSizeDescription
@@ -614,7 +686,13 @@ WizardStepBase {
                     website: "",
                     init_format: "",
                     capabilities: "",
-                    devices: []
+                    devices: [],
+                    source: "",
+                    source_type: "",
+                    branch: "",
+                    artifact_id: 0,
+                    source_owner: "",
+                    source_repo: ""
                 })
                 
                 // Ensure this sublist can receive keyboard focus
@@ -675,10 +753,10 @@ WizardStepBase {
                     // Ensure reasonable defaults
                     customImageFileDialog.dialogTitle = qsTr("Select image")
                     customImageFileDialog.nameFilters = CommonStrings.imageFiltersList
-                    // Default to Downloads folder
-                    var dl = StandardPaths.writableLocation(StandardPaths.DownloadLocation)
-                    if (dl && dl.length > 0) {
-                        var furl = (Qt.platform.os === "windows") ? ("file:///" + dl) : ("file://" + dl)
+                    // Use last used folder from settings (falls back to Downloads)
+                    var lastFolder = imageWriter.getLastImageFolder()
+                    if (lastFolder && lastFolder.length > 0) {
+                        var furl = (Qt.platform.os === "windows") ? ("file:///" + lastFolder) : ("file://" + lastFolder)
                         customImageFileDialog.currentFolder = furl
                         customImageFileDialog.folder = furl
                     }
@@ -701,7 +779,7 @@ WizardStepBase {
                 imageWriter.setSWCapabilitiesList("[]")
 
                 root.wizardContainer.selectedOsName = model.name
-                root.wizardContainer.customizationSupported = imageWriter.imageSupportsCustomization()
+                root.wizardContainer.customizationSupported = false  // Disabled for Laerdal SimServer Imager
                 root.wizardContainer.piConnectAvailable = false
                 root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
                 root.wizardContainer.ccRpiAvailable = false
@@ -711,22 +789,36 @@ WizardStepBase {
                     Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
                 }
             } else {
-                // Normal OS selection
-                imageWriter.setSrc(
-                    model.url,
-                    model.image_download_size,
-                    model.extract_size,
-                    typeof(model.extract_sha256) != "undefined" ? model.extract_sha256 : "",
-                    typeof(model.contains_multiple_files) != "undefined" ? model.contains_multiple_files : false,
-                    categorySelected,
-                    model.name,
-                    typeof(model.init_format) != "undefined" ? model.init_format : "",
-                    typeof(model.release_date) != "undefined" ? model.release_date : ""
-                )
+                // Normal OS selection - check if this is a GitHub artifact
+                if (typeof(model.source_type) === "string" && model.source_type === "artifact" &&
+                    typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0) {
+                    // GitHub CI artifact - use setSrcArtifact
+                    imageWriter.setSrcArtifact(
+                        model.artifact_id,
+                        model.source_owner,
+                        model.source_repo,
+                        typeof(model.branch) !== "undefined" ? model.branch : "",
+                        model.image_download_size,
+                        model.name
+                    )
+                } else {
+                    // Regular OS (CDN or GitHub release)
+                    imageWriter.setSrc(
+                        model.url,
+                        model.image_download_size,
+                        model.extract_size,
+                        typeof(model.extract_sha256) != "undefined" ? model.extract_sha256 : "",
+                        typeof(model.contains_multiple_files) != "undefined" ? model.contains_multiple_files : false,
+                        categorySelected,
+                        model.name,
+                        typeof(model.init_format) != "undefined" ? model.init_format : "",
+                        typeof(model.release_date) != "undefined" ? model.release_date : ""
+                    )
+                }
                 imageWriter.setSWCapabilitiesList(model.capabilities)
 
                 root.wizardContainer.selectedOsName = model.name
-                root.wizardContainer.customizationSupported = imageWriter.imageSupportsCustomization()
+                root.wizardContainer.customizationSupported = false  // Disabled for Laerdal SimServer Imager
                 root.wizardContainer.piConnectAvailable = imageWriter.checkSWCapability("rpi_connect")
                 root.wizardContainer.secureBootAvailable = imageWriter.checkSWCapability("secure_boot") || imageWriter.isSecureBootForcedByCliFlag()
                 root.wizardContainer.ccRpiAvailable = imageWriter.imageSupportsCcRpi()

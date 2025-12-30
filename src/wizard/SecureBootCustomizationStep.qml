@@ -94,7 +94,7 @@ WizardStepBase {
                 Layout.fillWidth: true
                 Layout.topMargin: Style.spacingMedium
                 text: qsTr("Enable Secure Boot Signing")
-                accessibleDescription: qsTr("Sign the boot partition with your RSA key to enable secure boot verification on Raspberry Pi")
+                accessibleDescription: qsTr("Sign the boot partition with your RSA key to enable secure boot verification")
                 helpLabel: imageWriter.isEmbeddedMode() ? "" : qsTr("Learn about Secure Boot")
                 helpUrl: imageWriter.isEmbeddedMode() ? "" : "https://github.com/raspberrypi/usbboot/blob/master/secure-boot-recovery/README.md"
                 checked: false
@@ -124,7 +124,7 @@ WizardStepBase {
             
             Text {
                 Layout.fillWidth: true
-                text: qsTr("This will create boot.img and boot.sig files required for Raspberry Pi Secure Boot.")
+                text: qsTr("This will create boot.img and boot.sig files required for Secure Boot.")
                 font.family: Style.fontFamily
                 font.pixelSize: Style.fontSizeDescription
                 color: Style.textDescriptionColor

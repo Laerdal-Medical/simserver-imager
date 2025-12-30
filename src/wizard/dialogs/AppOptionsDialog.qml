@@ -21,9 +21,23 @@ BaseDialog {
     // imageWriter is inherited from BaseDialog
     // Optional reference to the wizard container for ephemeral flags
     property var wizardContainer: null
-    
+
+    // GitHub integration properties
+    property var repoManager: imageWriter ? imageWriter.getRepositoryManager() : null
+    property var githubAuth: imageWriter ? imageWriter.getGitHubAuth() : null
+    property bool isGitHubAuthenticated: githubAuth ? githubAuth.isAuthenticated : false
+
     property bool initialized: false
     property bool isInitializing: false
+
+    // Listen to GitHub auth state changes
+    Connections {
+        target: popup.githubAuth
+        enabled: popup.githubAuth !== null
+        function onAuthenticationChanged() {
+            popup.isGitHubAuthenticated = popup.githubAuth.isAuthenticated
+        }
+    }
 
     // Custom escape handling
     function escapePressed() {
@@ -36,7 +50,9 @@ BaseDialog {
         chkEject.naturalWidth,
         chkTelemetry.naturalWidth,
         chkDisableWarnings.naturalWidth,
-        editRepoButton.naturalWidth
+        editRepoButton.naturalWidth,
+        githubSignInButton.naturalWidth,
+        githubReposButton.visible ? githubReposButton.naturalWidth : 0
     ) + Style.cardPadding * 4  // Double padding: contentLayout + optionsLayout margins
     
     // Register focus groups when component is ready
@@ -49,7 +65,7 @@ BaseDialog {
             }
             return []
         }, 0)
-        registerFocusGroup("options", function(){ 
+        registerFocusGroup("options", function(){
             var items = [chkBeep.focusItem, chkEject.focusItem, chkTelemetry.focusItem]
             // Include telemetry help link if visible
             if (chkTelemetry.helpLinkItem && chkTelemetry.helpLinkItem.visible)
@@ -58,6 +74,10 @@ BaseDialog {
             // Only include secure boot key button if visible
             if (secureBootKeyButton.visible)
                 items.push(secureBootKeyButton.focusItem)
+            // GitHub integration buttons
+            items.push(githubSignInButton.focusItem)
+            if (githubReposButton.visible)
+                items.push(githubReposButton.focusItem)
             return items
         }, 1)
         registerFocusGroup("buttons", function(){ 
@@ -116,7 +136,7 @@ BaseDialog {
             ImOptionPill {
                 id: chkTelemetry
                 text: qsTr("Enable anonymous statistics (telemetry)")
-                accessibleDescription: qsTr("Send anonymous usage statistics to help improve Raspberry Pi Imager")
+                accessibleDescription: qsTr("Send anonymous usage statistics to help improve Laerdal SimServer Imager")
                 helpLabel: imageWriter.isEmbeddedMode() ? "" : qsTr("What is this?")
                 helpUrl: imageWriter.isEmbeddedMode() ? "" : "https://github.com/raspberrypi/rpi-imager?tab=readme-ov-file#anonymous-metrics-telemetry"
                 Layout.fillWidth: true
@@ -152,7 +172,7 @@ BaseDialog {
                 id: editRepoButton
                 text: qsTr("Content Repository")
                 btnText: qsTr("Edit")
-                accessibleDescription: qsTr("Change the source of operating system images between official Raspberry Pi repository and custom sources")
+                accessibleDescription: qsTr("Change the source of operating system images between official Laerdal repository and custom sources")
                 Layout.fillWidth: true
                 // Disable while write is in progress to prevent changing source during write
                 enabled: imageWriter.writeState === ImageWriter.Idle ||
@@ -214,6 +234,99 @@ BaseDialog {
                     visible: false
                 }
             }
+
+            // Section separator for GitHub options
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.topMargin: Style.spacingSmall
+                height: 1
+                color: Style.titleSeparatorColor
+            }
+
+            // GitHub section header
+            Text {
+                text: qsTr("GitHub Integration")
+                font.pixelSize: Style.fontSizeFormLabel
+                font.family: Style.fontFamilyBold
+                font.bold: true
+                color: Style.formLabelColor
+                Layout.fillWidth: true
+                Layout.topMargin: Style.spacingSmall
+            }
+
+            ImOptionButton {
+                id: githubSignInButton
+                text: qsTr("GitHub Account")
+                btnText: popup.isGitHubAuthenticated ? qsTr("Sign out") : qsTr("Sign in")
+                accessibleDescription: popup.isGitHubAuthenticated
+                    ? qsTr("Sign out of GitHub to disconnect from private repositories")
+                    : qsTr("Sign in with GitHub to access private Laerdal repositories")
+                Layout.fillWidth: true
+                Component.onCompleted: {
+                    focusItem.activeFocusOnTab = true
+                }
+                onClicked: {
+                    if (popup.isGitHubAuthenticated) {
+                        // Sign out
+                        if (popup.githubAuth) {
+                            popup.githubAuth.logout()
+                        }
+                    } else {
+                        // Open GitHub login dialog
+                        popup.close()
+                        Qt.callLater(function() {
+                            githubLoginDialog.open()
+                        })
+                    }
+                }
+            }
+
+            ImOptionButton {
+                id: githubReposButton
+                text: qsTr("GitHub Repositories")
+                btnText: qsTr("Select...")
+                accessibleDescription: qsTr("Choose which GitHub repositories to search for WIC images")
+                Layout.fillWidth: true
+                visible: popup.isGitHubAuthenticated
+                Component.onCompleted: {
+                    focusItem.activeFocusOnTab = true
+                }
+                onClicked: {
+                    popup.close()
+                    Qt.callLater(function() {
+                        repoSelectionDialog.open()
+                    })
+                }
+            }
+
+            // GitHub status indicator
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Style.spacingSmall
+                visible: popup.isGitHubAuthenticated
+
+                Rectangle {
+                    width: 10
+                    height: 10
+                    radius: 5
+                    color: "#28a745"  // Green indicator
+                }
+
+                Text {
+                    text: {
+                        if (!popup.repoManager) return qsTr("Connected")
+                        var repos = popup.repoManager.githubRepos
+                        var enabledCount = 0
+                        for (var i = 0; i < repos.length; i++) {
+                            if (repos[i].enabled) enabledCount++
+                        }
+                        return qsTr("Connected - %1 repositories enabled").arg(enabledCount)
+                    }
+                    font.pixelSize: Style.fontSizeCaption
+                    font.family: Style.fontFamily
+                    color: Style.textDescriptionColor
+                }
+            }
         }
     }
 
@@ -267,7 +380,7 @@ BaseDialog {
             ImButtonRed {
                 id: saveButton
                 text: qsTr("Save")
-                accessibleDescription: qsTr("Save the selected options and apply them to Raspberry Pi Imager")
+                accessibleDescription: qsTr("Save the selected options and apply them to Laerdal SimServer Imager")
                 Layout.minimumWidth: Style.buttonWidthMinimum
                 activeFocusOnTab: true
                 onClicked: {
@@ -318,6 +431,23 @@ BaseDialog {
                 rsaKeyPath.text = filePath
             }
         }
+    }
+
+    // GitHub Login Dialog
+    GitHubLoginDialog {
+        id: githubLoginDialog
+        imageWriter: popup.imageWriter
+        githubAuth: popup.githubAuth
+        parent: popup.parent
+        anchors.centerIn: parent
+    }
+
+    // Repository Selection Dialog
+    RepositorySelectionDialog {
+        id: repoSelectionDialog
+        repoManager: popup.repoManager
+        parent: popup.parent
+        anchors.centerIn: parent
     }
 
     function initialize() {
@@ -423,7 +553,7 @@ BaseDialog {
             font.family: Style.fontFamily
             color: Style.textDescriptionColor
             Layout.fillWidth: true
-            text: qsTr("If you disable warnings, Raspberry Pi Imager will <b>not show confirmation prompts before writing images</b>. You will still be required to <b>type the exact name</b> when selecting a system drive.")
+            text: qsTr("If you disable warnings, Laerdal SimServer Imager will <b>not show confirmation prompts before writing images</b>. You will still be required to <b>type the exact name</b> when selecting a system drive.")
             Accessible.role: Accessible.StaticText
             Accessible.name: text.replace(/<[^>]+>/g, '')  // Strip HTML tags for accessibility
             Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false

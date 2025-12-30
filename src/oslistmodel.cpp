@@ -21,6 +21,100 @@
 
 namespace {
 
+    // Extract version tuple from name string (e.g., "SimPad Plus v9.2.0.127" -> {9, 2, 0, 127})
+    // Returns empty list if no version found
+    QList<int> extractVersionFromName(const QString &name) {
+        // Match version pattern: vX.Y.Z.B or X.Y.Z.B (with optional 'v' prefix)
+        static QRegularExpression versionRegex(R"(v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?)");
+        QRegularExpressionMatch match = versionRegex.match(name);
+
+        if (match.hasMatch()) {
+            QList<int> version;
+            version.append(match.captured(1).toInt());  // Major
+            version.append(match.captured(2).toInt());  // Minor
+            version.append(match.captured(3).toInt());  // Patch
+            if (!match.captured(4).isEmpty()) {
+                version.append(match.captured(4).toInt());  // Build
+            } else {
+                version.append(0);
+            }
+            return version;
+        }
+        return {};
+    }
+
+    // Compare two version tuples, returns true if a > b (for descending sort)
+    bool isVersionGreater(const QList<int> &a, const QList<int> &b) {
+        if (a.isEmpty() && b.isEmpty()) return false;
+        if (a.isEmpty()) return false;  // Items without version go last
+        if (b.isEmpty()) return true;   // Items without version go last
+
+        for (int i = 0; i < qMin(a.size(), b.size()); ++i) {
+            if (a[i] > b[i]) return true;
+            if (a[i] < b[i]) return false;
+        }
+        return a.size() > b.size();
+    }
+
+    // Check if an entry is a special item (Erase, Use custom) that should appear at the end
+    bool isSpecialEntry(const QJsonObject &obj) {
+        QString url = obj["url"].toString();
+        return url.startsWith("internal://");
+    }
+
+    // Sort OS list by version (newest first), grouping by device type
+    // Special entries (Erase, Use custom) are moved to the end
+    void sortByVersionDescending(QJsonArray &list) {
+        if (list.size() <= 1) return;
+
+        // Separate regular items from special items
+        QList<QJsonValue> regularItems;
+        QList<QJsonValue> specialItems;
+
+        for (const auto &item : list) {
+            QJsonObject obj = item.toObject();
+            if (isSpecialEntry(obj)) {
+                specialItems.append(item);
+            } else {
+                regularItems.append(item);
+            }
+        }
+
+        // Sort regular items by: 1) device type (to group), 2) version descending
+        std::stable_sort(regularItems.begin(), regularItems.end(), [](const QJsonValue &a, const QJsonValue &b) {
+            QJsonObject objA = a.toObject();
+            QJsonObject objB = b.toObject();
+
+            // First, group by device type (from devices array)
+            QJsonArray devicesA = objA["devices"].toArray();
+            QJsonArray devicesB = objB["devices"].toArray();
+            QString deviceA = devicesA.isEmpty() ? "" : devicesA[0].toString();
+            QString deviceB = devicesB.isEmpty() ? "" : devicesB[0].toString();
+
+            if (deviceA != deviceB) {
+                return deviceA < deviceB;  // Group by device alphabetically
+            }
+
+            // Within same device type, sort by version descending (newest first)
+            QList<int> versionA = extractVersionFromName(objA["name"].toString());
+            QList<int> versionB = extractVersionFromName(objB["name"].toString());
+
+            return isVersionGreater(versionA, versionB);
+        });
+
+        // Rebuild list: regular items first (sorted), then special items at end
+        list = QJsonArray();
+        for (const auto &item : regularItems) {
+            list.append(item);
+        }
+        for (const auto &item : specialItems) {
+            list.append(item);
+        }
+
+        qDebug() << "OSListModel: Sorted" << regularItems.size() << "WIC images by version (newest first),"
+                 << specialItems.size() << "special items at end";
+    }
+
     // Valid init_format values according to schema
     static const QStringList VALID_INIT_FORMATS = {
         QStringLiteral(""),
@@ -140,6 +234,9 @@ namespace {
         };
 
         shuffleIfRandom(list);
+
+        // Sort by version (newest first), grouped by device type
+        sortByVersionDescending(list);
 
         // Flatten, since GUI doesn't support a tree model
         for (int i = 0; i < list.size(); i++) {
@@ -280,7 +377,7 @@ bool OSListModel::reload()
 {
     QElapsedTimer parseTimer;
     parseTimer.start();
-    
+
     QJsonDocument doc = _imageWriter.getFilteredOSlistDocument();
     QJsonObject root = doc.object();
 
@@ -346,6 +443,12 @@ bool OSListModel::reload()
         os.website = obj["website"].toString();
         os.architecture = obj["architecture"].toString();
         os.enableRPiConnect = obj.value("enable_rpi_connect").toBool(false);
+        os.source = obj["source"].toString();
+        os.sourceType = obj["source_type"].toString();
+        os.branch = obj["branch"].toString();
+        os.sourceOwner = obj["source_owner"].toString();
+        os.sourceRepo = obj["source_repo_name"].toString();
+        os.artifactId = obj["artifact_id"].toVariant().toLongLong();
 
         _osList.append(os);
     }
@@ -392,7 +495,13 @@ QHash<int, QByteArray> OSListModel::roleNames() const
         { TooltipRole, "tooltip" },
         { WebsiteRole, "website" },
         { ArchitectureRole, "architecture" },
-        { PiConnectRole, "enable_rpi_connect" }
+        { PiConnectRole, "enable_rpi_connect" },
+        { SourceRole, "source" },
+        { SourceTypeRole, "source_type" },
+        { BranchRole, "branch" },
+        { ArtifactIdRole, "artifact_id" },
+        { SourceOwnerRole, "source_owner" },
+        { SourceRepoRole, "source_repo" }
     };
 }
 
@@ -438,6 +547,18 @@ QVariant OSListModel::data(const QModelIndex &index, int role) const {
             return os.architecture;
         case PiConnectRole:
             return os.enableRPiConnect;
+        case SourceRole:
+            return os.source;
+        case SourceTypeRole:
+            return os.sourceType;
+        case BranchRole:
+            return os.branch;
+        case ArtifactIdRole:
+            return os.artifactId;
+        case SourceOwnerRole:
+            return os.sourceOwner;
+        case SourceRepoRole:
+            return os.sourceRepo;
     }
 
     return {};

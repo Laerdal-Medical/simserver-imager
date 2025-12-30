@@ -19,7 +19,7 @@ WizardStepBase {
     property string savedUsername: ""
     
     title: qsTr("Customisation: Choose username")
-    subtitle: qsTr("Create a user account for your Raspberry Pi")
+    subtitle: qsTr("Create a user account for your device")
     showSkipButton: true
     nextButtonAccessibleDescription: qsTr("Save user account settings and continue to next customisation step")
     backButtonAccessibleDescription: qsTr("Return to previous step")
@@ -44,7 +44,7 @@ WizardStepBase {
                 WizardFormLabel {
                     id: labelUsername
                     text: qsTr("Username:")
-                    accessibleDescription: qsTr("Enter a username for your Raspberry Pi account. The username must be lowercase and contain only letters, numbers, underscores, and hyphens.")
+                    accessibleDescription: qsTr("Enter a username for your device account. The username must be lowercase and contain only letters, numbers, underscores, and hyphens.")
                 }
                 
                 ImTextField {

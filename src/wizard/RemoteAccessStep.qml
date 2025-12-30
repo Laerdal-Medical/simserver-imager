@@ -48,7 +48,7 @@ WizardStepBase {
                     id: sshEnablePill
                     Layout.fillWidth: true
                     text: qsTr("Enable SSH")
-                    accessibleDescription: qsTr("Enable secure shell access for remote command-line control of your Raspberry Pi")
+                    accessibleDescription: qsTr("Enable secure shell access for remote command-line control of your device")
                     helpLabel: imageWriter.isEmbeddedMode() ? "" : qsTr("Learn about SSH")
                     helpUrl: imageWriter.isEmbeddedMode() ? "" : "https://www.raspberrypi.com/documentation/computers/remote-access.html#ssh"
                     checked: false
@@ -67,7 +67,7 @@ WizardStepBase {
                         WizardFormLabel {
                             id: labelAuthMechanism
                             text: qsTr("Authentication mechanism:")
-                            accessibleDescription: qsTr("Choose how you will authenticate when connecting to your Raspberry Pi via SSH. Password authentication uses the account credentials you configured. Public key authentication uses a cryptographic key pair and is more secure.")
+                            accessibleDescription: qsTr("Choose how you will authenticate when connecting to your device via SSH. Password authentication uses the account credentials you configured. Public key authentication uses a cryptographic key pair and is more secure.")
                             Layout.alignment: Qt.AlignTop
                             Layout.topMargin: Style.spacingXXSmall  // Align with first radio button
                         }

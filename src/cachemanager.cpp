@@ -314,7 +314,7 @@ void CacheManager::onVerificationComplete(bool isValid, const QString& fileName,
         uncompressedHashForUI = status.cachedHash; // Get the uncompressed hash for UI update
     });
     
-    qDebug() << "Cache verification:" << (isValid ? "valid" : "invalid") << fileName;
+    qDebug() << "Cache verification:" << (isValid ? "valid, using cached file" : "no valid cache found") << fileName;
     
     emit cacheVerificationComplete(isValid);
     

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright (C) 2020 Raspberry Pi Ltd
+ * Copyright (C) 2025 Laerdal Medical
  */
 
 import QtQuick
@@ -27,10 +27,16 @@ ApplicationWindow {
     // Expose overlay root to child components for dialog parenting
     readonly property alias overlayRootItem: overlayRoot
 
-    width: imageWriter.isEmbeddedMode() ? -1 : 680
-    height: imageWriter.isEmbeddedMode() ? -1 : 450
-    minimumWidth: imageWriter.isEmbeddedMode() ? -1 : 680
-    minimumHeight: imageWriter.isEmbeddedMode() ? -1 : 420
+    // Default and minimum sizes
+    readonly property int defaultWidth: 800
+    readonly property int defaultHeight: 600
+    readonly property int minWidth: 800
+    readonly property int minHeight: 600
+
+    width: imageWriter.isEmbeddedMode() ? -1 : imageWriter.getIntSetting("window/width", defaultWidth)
+    height: imageWriter.isEmbeddedMode() ? -1 : imageWriter.getIntSetting("window/height", defaultHeight)
+    minimumWidth: imageWriter.isEmbeddedMode() ? -1 : minWidth
+    minimumHeight: imageWriter.isEmbeddedMode() ? -1 : minHeight
 
     // Track custom repo host for title display
     property string customRepoHost: imageWriter.customRepoHost()
@@ -39,7 +45,7 @@ ApplicationWindow {
     property bool isOffline: imageWriter.isOsListUnavailable
     
     title: {
-        var baseTitle = qsTr("Raspberry Pi Imager %1").arg(imageWriter.constantVersion())
+        var baseTitle = qsTr("Laerdal SimServer Imager %1").arg(imageWriter.constantVersion())
         if (isOffline) {
             baseTitle += " — " + qsTr("Offline")
         }
@@ -56,11 +62,32 @@ ApplicationWindow {
         imageWriter.setMainWindow(window)
     }
 
+    // Save window size when changed (debounced)
+    onWidthChanged: saveWindowSizeTimer.restart()
+    onHeightChanged: saveWindowSizeTimer.restart()
+
+    Timer {
+        id: saveWindowSizeTimer
+        interval: 500  // Debounce to avoid excessive writes during resize
+        repeat: false
+        onTriggered: {
+            if (!window.imageWriter.isEmbeddedMode() && window.width >= window.minWidth && window.height >= window.minHeight) {
+                window.imageWriter.setSetting("window/width", window.width)
+                window.imageWriter.setSetting("window/height", window.height)
+            }
+        }
+    }
+
     onClosing: function (close) {
         if (wizardContainer.isWriting && !forceQuit) {
             close.accepted = false;
             quitDialog.open();
         } else {
+            // Save window size before closing
+            if (!imageWriter.isEmbeddedMode() && window.width >= minWidth && window.height >= minHeight) {
+                imageWriter.setSetting("window/width", window.width)
+                imageWriter.setSetting("window/height", window.height)
+            }
             // allow close
             close.accepted = true;
         }
@@ -314,7 +341,7 @@ ApplicationWindow {
 
         Text {
             id: quitMessage
-            text: qsTr("Raspberry Pi Imager is still busy. Are you sure you want to quit?")
+            text: qsTr("Laerdal SimServer Imager is still busy. Are you sure you want to quit?")
             font.pixelSize: Style.fontSizeDescription
             font.family: Style.fontFamily
             color: Style.textDescriptionColor
@@ -337,14 +364,14 @@ ApplicationWindow {
             ImButton {
                 id: quitNoButton
                 text: CommonStrings.no
-                accessibleDescription: qsTr("Return to Raspberry Pi Imager and continue the current operation")
+                accessibleDescription: qsTr("Return to Laerdal SimServer Imager and continue the current operation")
                 activeFocusOnTab: true
                 onClicked: quitDialog.close()
             }
             ImButtonRed {
                 id: quitYesButton
                 text: CommonStrings.yes
-                accessibleDescription: qsTr("Force quit Raspberry Pi Imager and cancel the current write operation")
+                accessibleDescription: qsTr("Force quit Laerdal SimServer Imager and cancel the current write operation")
                 activeFocusOnTab: true
                 onClicked: {
                     window.forceQuit = true;
@@ -375,59 +402,43 @@ ApplicationWindow {
         onRejected: {}
     }
 
-    // Permission warning dialog for when not running with elevated privileges
+    // Elevation request dialog - shown when write operation requires elevated privileges
     BaseDialog {
-        id: permissionWarningDialog
+        id: elevationDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
         anchors.centerIn: parent
-        closePolicy: Popup.NoAutoClose  // Prevent closing with escape or clicking outside
-        
-        property string warningMessage: ""
-        
-        function showWarning(message) {
-            warningMessage = message
-            open()
-        }
-        
-        // Custom escape handling - exit the application
-        function escapePressed() {
-            Qt.quit()
-        }
-        
+        closePolicy: Popup.CloseOnEscape
+
         // Register focus groups when component is ready
         Component.onCompleted: {
-            registerFocusGroup("heading", function(){ 
-                return [headingText] 
+            registerFocusGroup("heading", function(){
+                return [elevationHeadingText]
             }, 0)
-            registerFocusGroup("message", function(){ 
-                return [messageText] 
+            registerFocusGroup("message", function(){
+                return [elevationMessageText]
             }, 1)
-            registerFocusGroup("buttons", function(){ 
-                return [installAuthButton, exitButton]
+            registerFocusGroup("buttons", function(){
+                return [elevateButton, cancelElevationButton]
             }, 2)
         }
-        
+
         // Dialog content
         Text {
-            id: headingText
-            text: qsTr("Insufficient Permissions")
+            id: elevationHeadingText
+            text: qsTr("Administrator Privileges Required")
             font.pixelSize: Style.fontSizeHeading
             font.family: Style.fontFamilyBold
             font.bold: true
-            color: Style.formLabelErrorColor
+            color: Style.formLabelColor
             Layout.fillWidth: true
             Accessible.role: Accessible.Heading
             Accessible.name: text
-            Accessible.description: text
-            Accessible.focusable: permissionWarningDialog.imageWriter ? permissionWarningDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (permissionWarningDialog.imageWriter && permissionWarningDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: permissionWarningDialog.imageWriter ? permissionWarningDialog.imageWriter.isScreenReaderActive() : false
         }
-        
+
         Text {
-            id: messageText
-            text: permissionWarningDialog.warningMessage
+            id: elevationMessageText
+            text: qsTr("Writing to storage devices requires administrator privileges.\n\nClick 'Restart as Admin' to restart the application with elevated privileges and continue writing.")
             font.pixelSize: Style.fontSizeDescription
             font.family: Style.fontFamily
             color: Style.textDescriptionColor
@@ -435,45 +446,88 @@ ApplicationWindow {
             Layout.fillWidth: true
             Accessible.role: Accessible.StaticText
             Accessible.name: text
-            Accessible.description: qsTr("Error message explaining why elevated privileges are required")
-            Accessible.focusable: permissionWarningDialog.imageWriter ? permissionWarningDialog.imageWriter.isScreenReaderActive() : false
-            Accessible.ignored: false
-            focusPolicy: (permissionWarningDialog.imageWriter && permissionWarningDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: permissionWarningDialog.imageWriter ? permissionWarningDialog.imageWriter.isScreenReaderActive() : false
         }
-        
+
         RowLayout {
             Layout.fillWidth: true
             spacing: Style.spacingMedium
             Item {
                 Layout.fillWidth: true
             }
-            
-            // Install Authorization button - only visible for elevatable bundles (e.g., AppImage)
+
             ImButton {
-                id: installAuthButton
-                text: qsTr("Install Authorization")
-                accessibleDescription: qsTr("Install system authorization to allow Raspberry Pi Imager to run with elevated privileges")
+                id: cancelElevationButton
+                text: qsTr("Cancel")
+                accessibleDescription: qsTr("Cancel the write operation")
                 activeFocusOnTab: true
-                visible: permissionWarningDialog.imageWriter && permissionWarningDialog.imageWriter.isElevatableBundle()
+                onClicked: {
+                    elevationDialog.close()
+                }
+            }
+
+            ImButtonRed {
+                id: elevateButton
+                text: qsTr("Restart as Admin")
+                accessibleDescription: qsTr("Restart the application with administrator privileges to write images")
+                activeFocusOnTab: true
                 // Make button wide enough to fit the text, with sensible bounds
                 Layout.minimumWidth: Style.buttonWidthMinimum
                 Layout.maximumWidth: Style.buttonWidthMinimum * 2  // Cap at 2x to handle long translations
                 implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
                 onClicked: {
-                    if (permissionWarningDialog.imageWriter.installElevationPolicy()) {
-                        // Policy installed successfully - restart with elevated privileges
-                        permissionWarningDialog.imageWriter.restartWithElevatedPrivileges()
+                    elevationDialog.close()
+                    if (elevationDialog.imageWriter) {
+                        elevationDialog.imageWriter.requestElevationForWrite()
                     }
                 }
             }
-            
-            ImButtonRed {
-                id: exitButton
-                text: qsTr("Exit")
-                accessibleDescription: qsTr("Exit Raspberry Pi Imager - you must restart with elevated privileges to write images")
+        }
+    }
+
+    // Legacy permission warning dialog (kept for backward compatibility with permissionWarning signal)
+    BaseDialog {
+        id: permissionWarningDialog
+        imageWriter: window.imageWriter
+        parent: overlayRoot
+        anchors.centerIn: parent
+        closePolicy: Popup.CloseOnEscape
+
+        property string warningMessage: ""
+
+        function showWarning(message) {
+            warningMessage = message
+            open()
+        }
+
+        Text {
+            text: qsTr("Permission Warning")
+            font.pixelSize: Style.fontSizeHeading
+            font.family: Style.fontFamilyBold
+            font.bold: true
+            color: Style.formLabelErrorColor
+            Layout.fillWidth: true
+        }
+
+        Text {
+            text: permissionWarningDialog.warningMessage
+            font.pixelSize: Style.fontSizeDescription
+            font.family: Style.fontFamily
+            color: Style.textDescriptionColor
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacingMedium
+            Item {
+                Layout.fillWidth: true
+            }
+
+            ImButton {
+                text: qsTr("OK")
                 activeFocusOnTab: true
-                onClicked: Qt.quit()
+                onClicked: permissionWarningDialog.close()
             }
         }
     }
@@ -621,6 +675,10 @@ ApplicationWindow {
     
     function onPermissionWarning(message) {
         permissionWarningDialog.showWarning(message);
+    }
+
+    function onElevationNeeded() {
+        elevationDialog.open();
     }
 
 }

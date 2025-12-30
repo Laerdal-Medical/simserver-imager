@@ -1,12 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Raspberry Pi Imager (Embedded)
-Comment=Raspberry Pi Imager for embedded systems
-Exec=rpi-imager-embedded
-Icon=rpi-imager
+Name=Laerdal SimServer Imager (Embedded)
+Comment=Laerdal SimServer Imager for embedded systems
+Exec=laerdal-simserver-imager-embedded
+Icon=laerdal-simserver-imager
 Terminal=false
 Categories=System;Utility;Embedded;
-Keywords=raspberry;pi;imager;embedded;linuxfb;headless;
+Keywords=laerdal;simserver;simpad;simman;imager;embedded;linuxfb;headless;
 X-GNOME-SingleWindow=true
-StartupNotify=false 
+StartupNotify=false

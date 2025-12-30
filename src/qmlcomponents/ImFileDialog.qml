@@ -15,12 +15,12 @@ BaseDialog {
 
     // Public API (aligning loosely with FileDialog)
     property string dialogTitle: qsTr("Select File")
-    property url currentFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    property url currentFolder: ""  // Empty by default, will be set in open()
     // Back-compat property name some callers may set
     property url folder: currentFolder
     property var nameFilters: [] // ["Images (*.png *.jpg)", "All files (*)"]
     property url selectedFile: ""
-    
+
     // Save dialog mode - when true, shows filename input and hides file list
     property bool isSaveDialog: false
     property string suggestedFilename: ""
@@ -28,12 +28,41 @@ BaseDialog {
     // Use Dialog's built-in accepted/rejected signals; do not redeclare to avoid overrides
 
     property string _currentFilename: suggestedFilename
-    
+
+    // Settings for persisting last folder
+    Settings {
+        id: dialogSettings
+        category: "ImFileDialog"
+        property string lastOpenFolder: ""
+        property string lastSaveFolder: ""
+    }
+
     function open() {
         // For save dialogs, initialize filename from suggestion
         if (isSaveDialog) {
             _currentFilename = suggestedFilename
         }
+
+        // Restore last used folder, or use sensible default
+        var savedFolder = isSaveDialog ? dialogSettings.lastSaveFolder : dialogSettings.lastOpenFolder
+        if (savedFolder && savedFolder.length > 0) {
+            dialog.currentFolder = savedFolder
+        } else if (String(dialog.currentFolder).length === 0) {
+            // No saved folder and no folder set - use Downloads as default
+            var defaultFolder = String(StandardPaths.writableLocation(StandardPaths.DownloadLocation))
+            if (defaultFolder && defaultFolder.length > 0) {
+                dialog.currentFolder = (Qt.platform.os === "windows")
+                    ? ("file:///" + defaultFolder)
+                    : ("file://" + defaultFolder)
+            } else {
+                // Fallback to home if Downloads not available
+                var homeFolder = String(StandardPaths.writableLocation(StandardPaths.HomeLocation))
+                dialog.currentFolder = (Qt.platform.os === "windows")
+                    ? ("file:///" + homeFolder)
+                    : ("file://" + homeFolder)
+            }
+        }
+
         dialog.visible = true
     }
     function close() { dialog.visible = false }
@@ -49,8 +78,9 @@ BaseDialog {
     }
 
     // Override BaseDialog defaults for file dialog specific sizing
-    width: Math.min(720, Math.max(520, parent ? parent.width - 80 : 720))
-    height: Math.min(540, Math.max(360, parent ? parent.height - 80 : 540))
+    // Use most of the available parent space for better usability
+    width: parent ? Math.max(600, parent.width * 0.85) : 720
+    height: parent ? Math.max(400, parent.height * 0.85) : 540
 
     // Convert Qt-style nameFilters to FolderListModel.nameFilters
     function _extractGlobs(filters) {
@@ -339,13 +369,18 @@ BaseDialog {
         id: mainRow
         Layout.fillWidth: true
         Layout.fillHeight: true
-        spacing: 6
+        spacing: 0
 
         // Left navigation pane
         Frame {
             id: leftPane
-            Layout.preferredWidth: 180
+            Layout.preferredWidth: leftPaneWidth
+            Layout.minimumWidth: 120
+            Layout.maximumWidth: dialog.width * 0.4
             Layout.fillHeight: true
+
+            // Store the width for resizing
+            property real leftPaneWidth: 200
             clip: true
             padding: 8
             background: Rectangle {
@@ -431,13 +466,48 @@ BaseDialog {
                     }
                 }
 
-                Text { 
+                Text {
                     text: qsTr("Folders")
                     font.pixelSize: Style.fontSizeDescription
                     color: Style.textDescriptionColor
                     Layout.fillWidth: true
                     Layout.topMargin: 8
                     Layout.bottomMargin: 2
+                }
+
+                // Go up one folder button
+                ItemDelegate {
+                    id: goUpButton
+                    Layout.fillWidth: true
+                    text: "⬆ " + qsTr("Go up a folder")
+                    visible: {
+                        // Hide if we're at root
+                        var path = dialog._toDisplayPath(dialog.currentFolder)
+                        return path !== "/" && path !== ""
+                    }
+                    Accessible.role: Accessible.Button
+                    Accessible.name: qsTr("Go up to parent folder")
+                    background: Rectangle {
+                        color: goUpButton.hovered ? Style.listViewHoverRowBackgroundColor : "transparent"
+                        radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
+                        antialiasing: true
+                    }
+                    onClicked: {
+                        var currentPath = dialog._toDisplayPath(dialog.currentFolder)
+                        // Remove trailing slash if present
+                        if (currentPath.endsWith("/") && currentPath.length > 1) {
+                            currentPath = currentPath.slice(0, -1)
+                        }
+                        // Find last slash
+                        var lastSlash = currentPath.lastIndexOf("/")
+                        if (lastSlash > 0) {
+                            var parentPath = currentPath.substring(0, lastSlash)
+                            dialog.currentFolder = dialog._toFileUrl(parentPath)
+                        } else if (lastSlash === 0) {
+                            // Go to root
+                            dialog.currentFolder = "file:///"
+                        }
+                    }
                 }
 
                 ListView {
@@ -474,8 +544,8 @@ BaseDialog {
                     delegate: ItemDelegate {
                         required property int index
                         required property string fileName
-                        required property string fileURL
-                        
+                        required property url fileUrl
+
                         width: (ListView.view ? ListView.view.width : 0)
                         text: "📁 " + fileName
                         highlighted: ListView.isCurrentItem
@@ -495,7 +565,7 @@ BaseDialog {
                         }
                         onClicked: {
                             subfoldersList.currentIndex = index
-                            dialog.currentFolder = fileURL
+                            dialog.currentFolder = fileUrl
                         }
                     }
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: Style.scrollBarWidth }
@@ -511,13 +581,46 @@ BaseDialog {
                     }
                     Keys.onEnterPressed: {
                         if (currentIndex >= 0) {
-                            dialog.currentFolder = model.get(currentIndex, "fileURL")
+                            dialog.currentFolder = model.get(currentIndex, "fileUrl")
                         }
                     }
                     Keys.onReturnPressed: {
                         if (currentIndex >= 0) {
-                            dialog.currentFolder = model.get(currentIndex, "fileURL")
+                            dialog.currentFolder = model.get(currentIndex, "fileUrl")
                         }
+                    }
+                }
+            }
+        }
+
+        // Resizable splitter handle
+        Rectangle {
+            id: splitter
+            Layout.preferredWidth: 6
+            Layout.fillHeight: true
+            color: splitterMouseArea.containsMouse || splitterMouseArea.pressed ? Style.popupBorderColor : "transparent"
+
+            MouseArea {
+                id: splitterMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.SplitHCursor
+
+                property real startX: 0
+                property real startWidth: 0
+
+                onPressed: function(mouse) {
+                    startX = mouse.x
+                    startWidth = leftPane.leftPaneWidth
+                }
+
+                onPositionChanged: function(mouse) {
+                    if (pressed) {
+                        var delta = mouse.x - startX
+                        var newWidth = startWidth + delta
+                        // Clamp to reasonable bounds
+                        newWidth = Math.max(120, Math.min(newWidth, mainRow.width - 200))
+                        leftPane.leftPaneWidth = newWidth
                     }
                 }
             }
@@ -543,7 +646,8 @@ BaseDialog {
                 anchors.fill: parent
                 activeFocusOnTab: false  // Don't focus the ScrollView itself, only its children
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: Style.scrollBarWidth }
-                
+                contentWidth: availableWidth  // Ensure content fills width
+
                 property int currentFileIndex: -1
                 
                 Keys.onUpPressed: {
@@ -551,8 +655,8 @@ BaseDialog {
                         currentFileIndex--
                         // Update selection
                         var fileItem = fileColumn.children[currentFileIndex + 1] // +1 because of up entry
-                        if (fileItem && fileItem.fileURL) {
-                            dialog.selectedFile = fileItem.fileURL
+                        if (fileItem && fileItem.fileUrl) {
+                            dialog.selectedFile = fileItem.fileUrl
                         }
                     }
                 }
@@ -561,8 +665,8 @@ BaseDialog {
                         currentFileIndex++
                         // Update selection
                         var fileItem = fileColumn.children[currentFileIndex + 1] // +1 because of up entry
-                        if (fileItem && fileItem.fileURL) {
-                            dialog.selectedFile = fileItem.fileURL
+                        if (fileItem && fileItem.fileUrl) {
+                            dialog.selectedFile = fileItem.fileUrl
                         }
                     }
                 }
@@ -581,7 +685,7 @@ BaseDialog {
 
                 Column {
                     id: fileColumn
-                    width: parent.width
+                    width: fileListScrollView.availableWidth
                     spacing: 0
 
                     // Up entry at top of right pane - always show when not at root
@@ -647,38 +751,38 @@ BaseDialog {
                                 currentIndex = 0
                                 // Set the selected file to the first file
                                 if (count > 0) {
-                                    dialog.selectedFile = model.get(0, "fileURL")
+                                    dialog.selectedFile = model.get(0, "fileUrl")
                                 }
                             }
                         }
-                        
+
                         // Navigate with arrow keys
                         Keys.onUpPressed: {
                             if (currentIndex > 0) {
                                 currentIndex--
-                                dialog.selectedFile = model.get(currentIndex, "fileURL")
+                                dialog.selectedFile = model.get(currentIndex, "fileUrl")
                             }
                         }
                         Keys.onDownPressed: {
                             if (currentIndex < count - 1) {
                                 currentIndex++
-                                dialog.selectedFile = model.get(currentIndex, "fileURL")
+                                dialog.selectedFile = model.get(currentIndex, "fileUrl")
                             }
                         }
-                        
+
                         delegate: ItemDelegate {
                             required property int index
                             required property string fileName
-                            required property string fileURL
-                            
-                            width: fileColumn.width
+                            required property url fileUrl
+
+                            width: ListView.view.width
                             text: "📄 " + fileName
                             highlighted: ListView.isCurrentItem
                             Accessible.role: Accessible.ListItem
                             Accessible.name: qsTr("File: %1").arg(fileName)
                             background: Rectangle {
                                 color: {
-                                    if (dialog.selectedFile === fileURL)
+                                    if (dialog.selectedFile === fileUrl)
                                         return Style.listViewHighlightColor
                                     else if (ListView.isCurrentItem && filesList.activeFocus)
                                         return Style.listViewHighlightColor
@@ -692,7 +796,7 @@ BaseDialog {
                             }
                             onClicked: {
                                 filesList.currentIndex = index
-                                dialog.selectedFile = fileURL
+                                dialog.selectedFile = fileUrl
                             }
                         }
                         
@@ -754,13 +858,19 @@ BaseDialog {
         ImButton {
             id: openButton
             text: dialog.isSaveDialog ? qsTr("Save") : qsTr("Open")
-            enabled: dialog.isSaveDialog 
-                ? String(dialog._currentFilename).trim().length > 0 
+            enabled: dialog.isSaveDialog
+                ? String(dialog._currentFilename).trim().length > 0
                 : String(dialog.selectedFile).length > 0
             activeFocusOnTab: true
             onClicked: {
                 if (dialog.isSaveDialog) {
                     dialog.selectedFile = dialog._toFileUrl(dialog._buildFilePath())
+                }
+                // Save current folder for next time
+                if (dialog.isSaveDialog) {
+                    dialogSettings.lastSaveFolder = String(dialog.currentFolder)
+                } else {
+                    dialogSettings.lastOpenFolder = String(dialog.currentFolder)
                 }
                 dialog.close()
                 dialog.accepted()

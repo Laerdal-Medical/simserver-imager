@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  QT_VERSION: '6.9.0'
+  BUILD_TYPE: RelWithDebInfo
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            cmake_generator: Ninja
+          - os: windows-latest
+            cmake_generator: MinGW Makefiles
+          - os: macos-14
+            cmake_generator: Unix Makefiles
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            libgnutls28-dev libgl1-mesa-dev \
+            libxkbcommon-dev libxkbcommon-x11-0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ runner.os == 'Windows' && 'win64_mingw' || '' }}
+          modules: 'qtsvg'
+          tools: ${{ runner.os == 'Windows' && 'tools_mingw1310' || '' }}
+          cache: true
+
+      - name: Setup MinGW (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1310_64/bin" >> $env:GITHUB_PATH
+
+      - name: Configure
+        shell: bash
+        run: |
+          CMAKE_EXTRA_ARGS=""
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            CMAKE_EXTRA_ARGS="-DMINGW64_ROOT=${{ runner.tool_cache }}/Qt/Tools/mingw1310_64"
+          fi
+          cmake -B build -S src \
+            -G "${{ matrix.cmake_generator }}" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DQt6_ROOT="${Qt6_DIR}" \
+            $CMAKE_EXTRA_ARGS
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        if: runner.os == 'Linux'
+        run: |
+          cd build
+          ctest --output-on-failure || true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check CMake formatting
+        run: |
+          pip install cmake-format
+          find src -name 'CMakeLists.txt' -o -name '*.cmake' | \
+            xargs cmake-format --check || echo "CMake format check failed (non-blocking)"

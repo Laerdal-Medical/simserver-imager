@@ -47,6 +47,12 @@ public:
         WebsiteRole,
         ArchitectureRole,
         PiConnectRole,
+        SourceRole,
+        SourceTypeRole,
+        BranchRole,
+        ArtifactIdRole,
+        SourceOwnerRole,
+        SourceRepoRole,
     };
 
     struct OS {
@@ -64,6 +70,12 @@ public:
         QString website;
         QString extractSha256;
         QString architecture; // Architecture this OS expects (armel, armhf, armv8)
+        QString source;       // Source of this OS (e.g., "github", "cdn")
+        QString sourceType;   // Type within source (e.g., "release", "artifact")
+        QString branch;       // Branch name for artifacts
+        QString sourceOwner;  // GitHub owner for artifacts
+        QString sourceRepo;   // GitHub repo for artifacts
+        qint64 artifactId = 0; // GitHub artifact ID for CI builds
 
         quint64 imageDownloadSize = 0;
         quint64 extractSize = 0;

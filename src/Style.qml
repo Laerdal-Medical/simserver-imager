@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright (C) 2025 Raspberry Pi Ltd
+ * Copyright (C) 2025 Laerdal Medical
  */
 
 pragma Singleton
@@ -10,25 +10,30 @@ import QtQuick
 Item {
     id: root
 
-    // === COLORS ===
+    // === LAERDAL BRAND COLORS ===
     readonly property color mainBackgroundColor: "#ffffff"
-    readonly property color raspberryRed: "#ab1e3a"
+    readonly property color laerdalBlue: "#2e7fa1"           // Primary brand color
+    readonly property color laerdalDarkBlue: "#1a5a73"       // Darker variant for focus states
+    readonly property color laerdalLightBlue: "#5fa8c4"      // Lighter variant
     readonly property color transparent: "transparent"
 
+    // Legacy alias for compatibility
+    readonly property color raspberryRed: laerdalBlue
+
     readonly property color buttonBackgroundColor: mainBackgroundColor
-    readonly property color buttonForegroundColor: raspberryRed
-    readonly property color buttonFocusedBackgroundColor: "#d1dcfb"
+    readonly property color buttonForegroundColor: laerdalBlue
+    readonly property color buttonFocusedBackgroundColor: "#d1e8f0"
     readonly property color buttonHoveredBackgroundColor: "#f2f2f2"
 
-    readonly property color button2BackgroundColor: raspberryRed
+    readonly property color button2BackgroundColor: laerdalBlue
     readonly property color button2ForegroundColor: mainBackgroundColor
     // Focused: noticeably darker for strong state indication (keyboard focus)
-    readonly property color button2FocusedBackgroundColor: "#8f122c"
+    readonly property color button2FocusedBackgroundColor: laerdalDarkBlue
     // Hovered: noticeably lighter to differentiate from base (≥4.5:1 contrast vs base)
-    readonly property color button2HoveredBackgroundColor: "#eac7ce"
-    // Hovered foreground should be Raspberry Red for ≥4.5:1 contrast on the light hover bg
-    readonly property color button2HoveredForegroundColor: raspberryRed
-    readonly property color raspberryRedHighlight: "#d64561"
+    readonly property color button2HoveredBackgroundColor: "#c7e0ea"
+    // Hovered foreground should be Laerdal Blue for ≥4.5:1 contrast on the light hover bg
+    readonly property color button2HoveredForegroundColor: laerdalBlue
+    readonly property color raspberryRedHighlight: laerdalLightBlue
 
     readonly property color titleBackgroundColor: "#f5f5f5"
     readonly property color titleSeparatorColor: "#afafaf"
@@ -46,14 +51,14 @@ Item {
     // descriptions in list views
     readonly property color textDescriptionColor: "#1a1a1a"
     // Sidebar colors
-    readonly property color sidebarActiveBackgroundColor: raspberryRed
+    readonly property color sidebarActiveBackgroundColor: laerdalBlue
     readonly property color sidebarTextOnActiveColor: "#FFFFFF"
-    readonly property color sidebarTextOnInactiveColor: raspberryRed
+    readonly property color sidebarTextOnInactiveColor: laerdalBlue
     readonly property color sidebarTextDisabledColor: "#E0E0E0"
     // Sidebar controls
     readonly property color sidebarControlBorderColor: "#767676"
     readonly property color sidebarBackgroundColour: mainBackgroundColor
-    readonly property color sidebarBorderColour: raspberryRed
+    readonly property color sidebarBorderColour: laerdalBlue
 
     // OS metadata
     readonly property color textMetadataColor: "#646464"
@@ -62,10 +67,10 @@ Item {
     readonly property color subtitleColor: "#ffffff"
 
     readonly property color progressBarTextColor: "white"
-    readonly property color progressBarVerifyForegroundColor: "#6cc04a"
-    readonly property color progressBarBackgroundColor: raspberryRed
+    readonly property color progressBarVerifyForegroundColor: "#37a851"  // Laerdal success green
+    readonly property color progressBarBackgroundColor: laerdalBlue
     // New: distinct colors for writing vs verification phases
-    readonly property color progressBarWritingForegroundColor: raspberryRed
+    readonly property color progressBarWritingForegroundColor: laerdalBlue
     readonly property color progressBarTrackColor: titleBackgroundColor
 
     readonly property color lanbarBackgroundColor: "#ffffe3"

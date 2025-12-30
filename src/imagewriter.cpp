@@ -73,6 +73,11 @@
 #include <QMetaType>
 #include "imageadvancedoptions.h"
 
+// Laerdal-specific includes
+#include "github/githubauth.h"
+#include "github/githubclient.h"
+#include "repository/repositorymanager.h"
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <QProcessEnvironment>
@@ -342,6 +347,9 @@ ImageWriter::ImageWriter(QObject *parent)
         _settings.sync();
         qDebug() << "Removed persisted disable_warnings flag from settings";
     }
+
+    // Initialize Laerdal-specific components
+    initializeGitHubAuth();
 }
 
 void ImageWriter::setMainWindow(QObject *window)
@@ -485,6 +493,12 @@ void ImageWriter::setSrc(const QUrl &url, quint64 downloadLen, quint64 extrLen, 
     _osName = osname;
     _initFormat = (initFormat == "none") ? "" : initFormat;
     _osReleaseDate = releaseDate;
+    // Clear artifact source flag when setting regular source
+    _isArtifactSource = false;
+    _artifactId = 0;
+    _artifactOwner.clear();
+    _artifactRepo.clear();
+    _artifactBranch.clear();
     qDebug() << "setSrc: initFormat parameter:" << initFormat << "-> _initFormat set to:" << _initFormat;
 
     if (!_downloadLen && url.isLocalFile())
@@ -492,6 +506,118 @@ void ImageWriter::setSrc(const QUrl &url, quint64 downloadLen, quint64 extrLen, 
         QFileInfo fi(url.toLocalFile());
         _downloadLen = fi.size();
     }
+}
+
+void ImageWriter::setSrcArtifact(qint64 artifactId, const QString &owner, const QString &repo,
+                                  const QString &branch, quint64 downloadLen, QString osname)
+{
+    // Set artifact-specific properties
+    _isArtifactSource = true;
+    _artifactId = artifactId;
+    _artifactOwner = owner;
+    _artifactRepo = repo;
+    _artifactBranch = branch;
+    _downloadLen = downloadLen;
+    _osName = osname;
+
+    // Build the artifact download URL (requires authentication)
+    QString urlStr = QString("https://api.github.com/repos/%1/%2/actions/artifacts/%3/zip")
+                         .arg(owner, repo, QString::number(artifactId));
+    _src = QUrl(urlStr);
+
+    // Clear regular source properties
+    _extrLen = 0;  // Unknown until we extract
+    _expectedHash.clear();  // Artifacts don't have pre-computed hashes
+    _multipleFilesInZip = false;
+    _parentCategory = "GitHub CI";
+    _initFormat.clear();
+    _osReleaseDate.clear();
+
+    qDebug() << "setSrcArtifact: artifact_id:" << artifactId << "owner:" << owner
+             << "repo:" << repo << "branch:" << branch << "name:" << osname;
+}
+
+QString ImageWriter::extractWicFromZip(const QString &zipPath)
+{
+    qDebug() << "ImageWriter: Extracting WIC from ZIP:" << zipPath;
+
+    struct archive *a = archive_read_new();
+    struct archive_entry *entry;
+
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+        qWarning() << "ImageWriter: Failed to open ZIP:" << archive_error_string(a);
+        archive_read_free(a);
+        return QString();
+    }
+
+    QString wicPath;
+    QDir tempDir = QDir::temp();
+    QString extractDir = tempDir.filePath("simserver-imager-artifact");
+
+    // Create extraction directory if it doesn't exist
+    QDir().mkpath(extractDir);
+
+    // WIC file extensions to look for
+    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
+        qDebug() << "ImageWriter: Found entry in ZIP:" << entryName;
+
+        // Check if this is a WIC file
+        bool isWic = false;
+        for (const QString &ext : wicExtensions) {
+            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+                isWic = true;
+                break;
+            }
+        }
+
+        if (isWic) {
+            // Extract this file
+            QString destPath = QDir(extractDir).filePath(entryName);
+
+            // Ensure parent directory exists
+            QFileInfo fi(destPath);
+            QDir().mkpath(fi.absolutePath());
+
+            QFile destFile(destPath);
+            if (!destFile.open(QIODevice::WriteOnly)) {
+                qWarning() << "ImageWriter: Failed to create output file:" << destPath;
+                archive_read_data_skip(a);
+                continue;
+            }
+
+            // Read and write the file content
+            const void *buff;
+            size_t size;
+            la_int64_t offset;
+
+            while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
+                destFile.write(static_cast<const char*>(buff), size);
+            }
+
+            destFile.close();
+            wicPath = destPath;
+
+            qDebug() << "ImageWriter: Extracted WIC file to:" << wicPath;
+            break;  // Found and extracted the WIC file
+        } else {
+            archive_read_data_skip(a);
+        }
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+
+    if (wicPath.isEmpty()) {
+        qWarning() << "ImageWriter: No WIC file found in ZIP archive";
+    }
+
+    return wicPath;
 }
 
 /* Set device to write to */
@@ -560,14 +686,14 @@ void ImageWriter::startWrite()
         // Provide a user-visible error rather than silently returning, so the UI can recover
         // Check all conditions and provide comprehensive error messages
         QStringList missingItems;
-        
+
         if (_src.isEmpty())
             missingItems.append(tr("image"));
         if (_dst.isEmpty())
             missingItems.append(tr("storage device"));
         else if (!_selectedDeviceValid)
             missingItems.append(tr("valid storage device (device no longer available)"));
-        
+
         QString reason;
         if (!missingItems.isEmpty())
         {
@@ -585,7 +711,77 @@ void ImageWriter::startWrite()
         return;
     }
 
+#if defined(Q_OS_WIN)
+    // On Windows, check for admin privileges
+    if (!PlatformQuirks::hasElevatedPrivileges())
+    {
+        qWarning() << "Write operation requires elevated privileges";
+        emit elevationNeeded();
+        return;
+    }
+#endif
+
     setWriteState(WriteState::Preparing);
+
+    // Handle GitHub artifact source - download and extract WIC file first
+    if (_isArtifactSource)
+    {
+        qDebug() << "Starting artifact download for artifact ID:" << _artifactId;
+        emit preparationStatusUpdate(tr("Downloading CI build artifact..."));
+
+        // Create temp directory for artifact download
+        QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+        QString zipPath = tempDir + QString("/artifact_%1.zip").arg(_artifactId);
+
+        // Connect to download completion
+        connect(_githubClient, &GitHubClient::artifactDownloadComplete, this,
+                [this, zipPath](const QString &localPath) {
+                    qDebug() << "Artifact download complete:" << localPath;
+                    emit preparationStatusUpdate(tr("Extracting WIC file from artifact..."));
+
+                    // Extract WIC file from ZIP
+                    QString wicPath = extractWicFromZip(localPath);
+                    if (wicPath.isEmpty()) {
+                        onError(tr("Failed to extract WIC file from artifact ZIP"));
+                        return;
+                    }
+
+                    qDebug() << "Extracted WIC file:" << wicPath;
+
+                    // Update source to the extracted WIC file
+                    _src = QUrl::fromLocalFile(wicPath);
+                    _isArtifactSource = false;  // No longer an artifact source
+
+                    // Get file size
+                    QFileInfo wicInfo(wicPath);
+                    if (wicInfo.exists()) {
+                        _downloadLen = wicInfo.size();
+                        _extrLen = wicInfo.size();  // WIC files are not compressed
+                    }
+
+                    // Clean up the ZIP file
+                    QFile::remove(localPath);
+
+                    // Continue with normal write flow
+                    startWrite();
+                }, Qt::SingleShotConnection);
+
+        // Disconnect any existing progress connection to avoid duplicates on retry
+        disconnect(_githubClient, &GitHubClient::artifactDownloadProgress, this, nullptr);
+        connect(_githubClient, &GitHubClient::artifactDownloadProgress, this,
+                [this](qint64 bytesReceived, qint64 bytesTotal) {
+                    emit downloadProgress(QVariant(bytesReceived), QVariant(bytesTotal));
+                });
+
+        connect(_githubClient, &GitHubClient::error, this,
+                [this](const QString &message) {
+                    onError(tr("Artifact download failed: %1").arg(message));
+                }, Qt::SingleShotConnection);
+
+        // Start the download
+        _githubClient->downloadArtifact(_artifactOwner, _artifactRepo, _artifactId, zipPath);
+        return;
+    }
 
     if (_src.toString() == "internal://format")
     {
@@ -1461,6 +1657,105 @@ bool ImageWriter::checkSWCapability(const QString &cap) {
     return false;
 }
 
+namespace {
+    // Convert Laerdal CDN "updates" format to standard "os_list" format
+    // This is placed here (before handleNetworkRequestFinished) to be visible when called
+    QJsonArray convertLaerdalCdnFormat(const QJsonArray &updates) {
+        QJsonArray osList;
+
+        for (const auto &updateValue : updates) {
+            QJsonObject update = updateValue.toObject();
+
+            QString simpadType = update["simpadtype"].toString();
+            QString version = update["version"].toString();
+            QString url = update["url"].toString();
+            QString md5 = update["md5"].toString();
+            QString info = update["info"].toString();
+            QString releaseNotes = update["releasenotes"].toString();
+
+            // Create OS list entry
+            QJsonObject osEntry;
+
+            // Name with device type and version
+            QString deviceName;
+            QString type = simpadType.toLower();
+            if (type == "plus" || type == "imx6") {
+                deviceName = "SimPad Plus";
+            } else if (type == "plus2" || type == "imx8") {
+                deviceName = "SimPad Plus 2";
+            } else if (type.contains("simman") && type.contains("32")) {
+                deviceName = "SimMan 3G (32-bit)";
+            } else if (type.contains("simman") && type.contains("64")) {
+                deviceName = "SimMan 3G (64-bit)";
+            } else {
+                deviceName = simpadType;
+                if (!deviceName.isEmpty()) {
+                    deviceName[0] = deviceName[0].toUpper();
+                }
+            }
+            osEntry["name"] = QString("%1 v%2").arg(deviceName, version);
+
+            // Description from info field
+            osEntry["description"] = info.isEmpty() ? releaseNotes : info;
+
+            // Download URL
+            osEntry["url"] = url;
+
+            // MD5 hash
+            osEntry["extract_md5"] = md5;
+
+            // Mark as no customization support (WIC files don't support cloud-init)
+            osEntry["init_format"] = "none";
+
+            // Device tag for filtering
+            QString tag;
+            if (type == "plus" || type == "imx6") {
+                tag = "imx6";
+            } else if (type == "plus2" || type == "imx8") {
+                tag = "imx8";
+            } else if (type.contains("simman") && type.contains("32")) {
+                tag = "simman3g-32";
+            } else if (type.contains("simman") && type.contains("64")) {
+                tag = "simman3g-64";
+            } else {
+                tag = type;
+            }
+            osEntry["devices"] = QJsonArray({tag});
+
+            // Icon based on device type
+            if (type.contains("plus2") || type.contains("imx8")) {
+                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
+            } else if (type.contains("plus") || type.contains("imx6")) {
+                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
+            } else if (type.contains("simman")) {
+                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+            } else {
+                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
+            }
+
+            // Source identifier
+            osEntry["source"] = "laerdal_cdn";
+
+            // Full release notes if available
+            if (!releaseNotes.isEmpty()) {
+                osEntry["release_notes"] = releaseNotes;
+            }
+
+            osList.append(osEntry);
+        }
+
+        // Add "Use custom" option for local WIC files
+        QJsonObject customEntry;
+        customEntry["name"] = QObject::tr("Use custom");
+        customEntry["description"] = QObject::tr("Select a local .wic file");
+        customEntry["url"] = "internal://custom";
+        customEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
+        osList.append(customEntry);
+
+        return osList;
+    }
+} // anonymous namespace for convertLaerdalCdnFormat
+
 void ImageWriter::onOsListFetchComplete(const QByteArray &data, const QUrl &url)
 {
     // Calculate request duration for performance tracking
@@ -1477,7 +1772,26 @@ void ImageWriter::onOsListFetchComplete(const QByteArray &data, const QUrl &url)
 
     auto response_object = QJsonDocument::fromJson(data).object();
 
+    // Handle both Raspberry Pi format (os_list) and Laerdal CDN format (updates)
+    QJsonArray osListArray;
+    bool hasOsList = false;
+
     if (response_object.contains("os_list")) {
+        // Standard Raspberry Pi format
+        osListArray = response_object["os_list"].toArray();
+        hasOsList = true;
+    } else if (response_object.contains("updates")) {
+        // Laerdal CDN format - convert to standard format
+        osListArray = convertLaerdalCdnFormat(response_object["updates"].toArray());
+        hasOsList = true;
+        // Create a compatible response object for downstream processing
+        response_object = QJsonObject({
+            {"os_list", osListArray},
+            {"imager", QJsonObject()}
+        });
+    }
+
+    if (hasOsList) {
         // Step 1: Insert the items into the canonical JSON document.
         //         It doesn't matter that these may still contain subitems_url items
         //         As these will be fixed up as the subitems_url instances are blinked in
@@ -1528,6 +1842,7 @@ void ImageWriter::onOsListFetchComplete(const QByteArray &data, const QUrl &url)
         if (isTopLevelRequest && _completeOsList.isEmpty()) {
             qWarning() << "Top-level OS list fetch failed - malformed response. Operating in offline mode.";
             emit osListUnavailableChanged();
+			emit osListPrepared();  // Still emit so "Use custom" and "Erase" are available
         }
     }
 }
@@ -1657,17 +1972,29 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
         }
     }
 
+    // Append GitHub artifacts if authenticated and available (also filter by device)
+    if (_repositoryManager && _githubAuth && _githubAuth->isAuthenticated()) {
+        QJsonArray githubOsList = _repositoryManager->getGitHubOsList();
+        if (!_deviceFilter.isEmpty()) {
+            // Filter GitHub artifacts by device tags
+            githubOsList = filterOsListWithHWTags(githubOsList, _deviceFilter, _deviceFilterIsInclusive, 1);
+        }
+        for (const auto &item : githubOsList) {
+            reference_os_list_array.append(item);
+        }
+    }
+
     reference_os_list_array.append(QJsonObject({
             {"name", QCoreApplication::translate("main", "Erase")},
             {"description", QCoreApplication::translate("main", "Format card as FAT32")},
-            {"icon", "../icons/erase.png"},
+            {"icon", "qrc:/qt/qml/RpiImager/icons/erase.png"},
             {"url", "internal://format"},
         }));
 
     reference_os_list_array.append(QJsonObject({
             {"name", QCoreApplication::translate("main", "Use custom")},
-            {"description", QCoreApplication::translate("main", "Select a custom .img from your computer")},
-            {"icon", "../icons/use_custom.png"},
+            {"description", QCoreApplication::translate("main", "Select a custom .wic file from your computer")},
+            {"icon", "qrc:/qt/qml/RpiImager/icons/use_custom.png"},
             {"url", "internal://custom"},
         }));
 
@@ -1682,6 +2009,8 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
 void ImageWriter::beginOSListFetch() {
     const QUrl topUrl = osListUrl();
     if (!preflightValidateUrl(topUrl, QStringLiteral("repository:"))) {
+        // Even if we can't fetch, emit osListPrepared so "Use custom" and "Erase" are available
+        emit osListPrepared();
         return;
     }
 
@@ -2247,7 +2576,7 @@ QByteArray ImageWriter::getUsbSourceOSlist()
     QJsonArray oslist;
     QDir dir("/media");
     const QStringList medialist = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    QStringList namefilters = {"*.img", "*.zip", "*.gz", "*.xz", "*.zst", "*.wic"};
+    QStringList namefilters = {"*.wic", "*.wic.xz", "*.wic.gz", "*.wic.zst"};
 
     for (const QString &devname : medialist)
     {
@@ -2596,6 +2925,11 @@ bool ImageWriter::getBoolSetting(const QString &key)
 QString ImageWriter::getStringSetting(const QString &key)
 {
     return _settings.value(key).toString();
+}
+
+int ImageWriter::getIntSetting(const QString &key, int defaultValue)
+{
+    return _settings.value(key, defaultValue).toInt();
 }
 
 // Debug options implementation (secret menu: Cmd+Option+S on macOS, Ctrl+Alt+S on others)
@@ -3897,8 +4231,52 @@ void ImageWriter::restartWithElevatedPrivileges()
             break;
         }
     }
-    
+
     PlatformQuirks::execElevated(extraArgs);
+}
+
+bool ImageWriter::hasElevatedPrivileges()
+{
+    return PlatformQuirks::hasElevatedPrivileges();
+}
+
+bool ImageWriter::requestElevationForWrite()
+{
+#ifdef Q_OS_LINUX
+    // On Linux, use pkexec to restart the application with elevated privileges
+    // The user will be prompted for their password
+
+    // Get the current executable path
+    QString execPath;
+    const char* appImagePath = PlatformQuirks::getBundlePath();
+    if (appImagePath) {
+        execPath = QString::fromUtf8(appImagePath);
+    } else {
+        execPath = QCoreApplication::applicationFilePath();
+    }
+
+    // Build arguments to pass to the elevated process
+    QStringList args;
+    args << "--disable-internal-agent";  // pkexec flag
+    args << execPath;
+
+    // Pass through relevant arguments
+    QStringList appArgs = QCoreApplication::arguments();
+    for (int i = 1; i < appArgs.size(); i++) {
+        args << appArgs[i];
+    }
+
+    // Use pkexec to run the application with elevated privileges
+    QProcess::startDetached("/usr/bin/pkexec", args);
+
+    // Quit current instance - the elevated one will take over
+    QCoreApplication::quit();
+    return true;
+#else
+    // On other platforms, just emit the signal for the UI to handle
+    emit elevationNeeded();
+    return false;
+#endif
 }
 
 bool ImageWriter::hasPerformanceData()
@@ -3987,4 +4365,83 @@ bool ImageWriter::exportPerformanceDataToFile(const QString &filePath)
     qDebug() << "Performance data export not available in CLI build";
     return false;
 #endif
+}
+
+/*
+ * Laerdal-specific: GitHub and Repository Management
+ */
+
+void ImageWriter::initializeGitHubAuth()
+{
+    qDebug() << "Initializing Laerdal GitHub authentication and repository management";
+
+    // Create GitHub authentication handler
+    _githubAuth = new GitHubAuth(this);
+    _githubAuth->setClientId(QString(GITHUB_CLIENT_ID));
+
+    // Create GitHub API client
+    _githubClient = new GitHubClient(this);
+
+    // Create repository manager
+    _repositoryManager = new RepositoryManager(this);
+    _repositoryManager->setGitHubClient(_githubClient);
+
+    // Connect GitHub auth to client
+    connect(_githubAuth, &GitHubAuth::authenticationChanged, this, [this]() {
+        if (_githubAuth->isAuthenticated()) {
+            _githubClient->setAuthToken(_githubAuth->accessToken());
+            qDebug() << "GitHub client configured with auth token";
+            // Fetch GitHub artifacts now that we're authenticated
+            _repositoryManager->refreshAllSources();
+        } else {
+            _githubClient->setAuthToken(QString());
+            // Re-emit osListPrepared to refresh UI without GitHub items
+            emit osListPrepared();
+        }
+    });
+
+    // When GitHub OS list is ready, notify that OS list needs refresh
+    connect(_repositoryManager, &RepositoryManager::osListReady, this, [this]() {
+        qDebug() << "GitHub OS list ready, emitting osListPrepared to refresh UI";
+        emit osListPrepared();
+    });
+
+    // Load default GitHub repositories from config
+    QString defaultRepos = QString(DEFAULT_GITHUB_REPOS);
+    if (!defaultRepos.isEmpty()) {
+        _repositoryManager->loadReposFromJson(defaultRepos);
+    }
+
+    // Load persisted settings
+    _repositoryManager->loadSettings();
+
+    // Try to load stored GitHub token
+    if (_githubAuth->loadStoredToken()) {
+        _githubClient->setAuthToken(_githubAuth->accessToken());
+        qDebug() << "Loaded stored GitHub token";
+        // Fetch GitHub artifacts since we have a stored token
+        _repositoryManager->refreshAllSources();
+    }
+
+    qDebug() << "Laerdal components initialized";
+}
+
+GitHubAuth* ImageWriter::getGitHubAuth()
+{
+    return _githubAuth;
+}
+
+GitHubClient* ImageWriter::getGitHubClient()
+{
+    return _githubClient;
+}
+
+RepositoryManager* ImageWriter::getRepositoryManager()
+{
+    return _repositoryManager;
+}
+
+bool ImageWriter::isGitHubAuthenticated() const
+{
+    return _githubAuth && _githubAuth->isAuthenticated();
 }

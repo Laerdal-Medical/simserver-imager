@@ -20,6 +20,12 @@
         <file>icons/ic_sd_storage_40px.svg</file>
         <file>icons/ic_storage_40px.svg</file>
         <file>icons/ic_usb_40px.svg</file>
+        <file>icons/simpad_plus.png</file>
+        <file>icons/simpad_plus2.png</file>
+        <file>icons/simman3g.png</file>
+        <file alias="icons/simpad_plus.svg">icons/simpad_plus.png</file>
+        <file alias="icons/simpad_plus2.svg">icons/simpad_plus2.png</file>
+        <file alias="icons/simman3g.svg">icons/simman3g.png</file>
         <file>icons/use_custom.png</file>
         <file>icons/erase.png</file>
         <file>icons/cat_raspberry_pi_os.png</file>

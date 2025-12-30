@@ -468,6 +468,9 @@ WizardStepBase {
             activeFocusOnTab: confirmDialog.imageWriter ? confirmDialog.imageWriter.isScreenReaderActive() : false
         }
 
+        // Flexible spacer to push buttons to the bottom
+        Item { Layout.fillHeight: true }
+
         Text {
             id: waitText
             text: qsTr("Please wait... %1").arg(confirmDialog.countdown)
@@ -476,14 +479,12 @@ WizardStepBase {
             color: Style.textMetadataColor
             horizontalAlignment: Text.AlignRight
             Layout.fillWidth: true
-            Layout.topMargin: Style.spacingSmall
             visible: !confirmDialog.allowAccept
         }
 
         RowLayout {
             id: confirmButtonRow
             Layout.fillWidth: true
-            Layout.topMargin: Style.spacingSmall
             spacing: Style.spacingMedium
             visible: confirmDialog.allowAccept
             Item { Layout.fillWidth: true }
@@ -493,24 +494,23 @@ WizardStepBase {
                 text: CommonStrings.cancel
                 accessibleDescription: qsTr("Cancel and return to the write summary without erasing the storage device")
                 activeFocusOnTab: true
+                Layout.preferredHeight: Style.buttonHeightStandard
                 onClicked: confirmDialog.close()
             }
 
             ImButtonRed {
                 id: acceptBtn
-                text: confirmDialog.allowAccept ? qsTr("I understand, erase and write") : qsTr("Please wait...")
+                text: confirmDialog.allowAccept ? qsTr("Erase and write") : qsTr("Please wait...")
                 accessibleDescription: qsTr("Confirm erasure and begin writing the image to the storage device")
                 enabled: confirmDialog.allowAccept
                 activeFocusOnTab: true
+                Layout.preferredHeight: Style.buttonHeightStandard
                 onClicked: {
                     confirmDialog.close()
                     beginWriteDelay.start()
                 }
             }
         }
-
-        // Bottom spacer to balance the dialog's internal top padding
-        Item { Layout.preferredHeight: Style.cardPadding }
     }
 
     // Delay accept for 2 seconds - moved outside dialog content
@@ -551,8 +551,12 @@ WizardStepBase {
     }
 
     function onDownloadProgress(now, total) {
-        // Download progress is tracked for performance stats but not shown in UI
-        // (the write progress is more accurate as it reflects actual data written to disk)
+        // Show download progress during artifact download (preparation phase)
+        if (root.isWriting && root.imageWriter.writeState === ImageWriter.Preparing) {
+            var progress = total > 0 ? (now / total) * 100 : 0
+            progressBar.value = progress
+            progressText.text = qsTr("Downloading... %1%").arg(Math.round(progress))
+        }
     }
 
     function onWriteProgress(now, total) {

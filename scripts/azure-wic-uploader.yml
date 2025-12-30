@@ -1,0 +1,374 @@
+# Azure DevOps Pipeline: WIC File Uploader and JSON Generator
+#
+# This pipeline finds all WIC files from specified folders, uploads them to Azure Blob Storage,
+# generates a JSON manifest in Raspberry Pi Imager format, and uploads it to the same location.
+#
+# Required Variables (set in Azure DevOps pipeline or variable group):
+#   - AZURE_STORAGE_ACCOUNT: Azure Storage account name
+#   - AZURE_STORAGE_CONTAINER: Container name (e.g., "software")
+#   - AZURE_STORAGE_KEY: Storage account key (mark as secret)
+#   - CDN_BASE_URL: Base URL for CDN (e.g., "https://laerdalcdn.blob.core.windows.net")
+#
+# Required Parameters:
+#   - sourceFolders: Semicolon-separated list of folders to search for WIC files
+#   - targetPath: Target path within the container (e.g., "release/SimPad/Updates-imx6-imx8")
+
+trigger: none
+
+parameters:
+  - name: sourceFolders
+    displayName: 'Source folders (semicolon-separated)'
+    type: string
+    default: ''
+
+  - name: targetPath
+    displayName: 'Target path in CDN container'
+    type: string
+    default: 'release/SimPad/Updates-imx6-imx8'
+
+  - name: jsonFileName
+    displayName: 'Output JSON filename'
+    type: string
+    default: 'updates.json'
+
+  - name: dryRun
+    displayName: 'Dry run (no actual uploads)'
+    type: boolean
+    default: false
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: UploadWicFiles
+    displayName: 'Upload WIC Files and Generate JSON'
+    jobs:
+      - job: ProcessWicFiles
+        displayName: 'Process and Upload WIC Files'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.x'
+            displayName: 'Use Python 3.x'
+
+          - script: |
+              pip install azure-storage-blob
+            displayName: 'Install Azure Storage SDK'
+
+          - task: PythonScript@0
+            displayName: 'Find, Upload WIC Files and Generate JSON'
+            inputs:
+              scriptSource: 'inline'
+              script: |
+                import os
+                import sys
+                import json
+                import hashlib
+                import subprocess
+                import re
+                from datetime import datetime, timedelta
+                from pathlib import Path
+                from azure.storage.blob import BlobServiceClient, ContentSettings
+
+                # Configuration from pipeline variables
+                STORAGE_ACCOUNT = os.environ.get('AZURE_STORAGE_ACCOUNT', '')
+                STORAGE_KEY = os.environ.get('AZURE_STORAGE_KEY', '')
+                CONTAINER_NAME = os.environ.get('AZURE_STORAGE_CONTAINER', 'software')
+                CDN_BASE_URL = os.environ.get('CDN_BASE_URL', 'https://laerdalcdn.blob.core.windows.net')
+
+                # Parameters
+                SOURCE_FOLDERS = '${{ parameters.sourceFolders }}'.split(';')
+                TARGET_PATH = '${{ parameters.targetPath }}'
+                JSON_FILENAME = '${{ parameters.jsonFileName }}'
+                DRY_RUN = '${{ parameters.dryRun }}' == 'True'
+
+                def calculate_md5(filepath):
+                    """Calculate MD5 hash of a file."""
+                    hash_md5 = hashlib.md5()
+                    with open(filepath, 'rb') as f:
+                        for chunk in iter(lambda: f.read(8192), b''):
+                            hash_md5.update(chunk)
+                    return hash_md5.hexdigest()
+
+                def calculate_sha256(filepath):
+                    """Calculate SHA256 hash of a file."""
+                    hash_sha256 = hashlib.sha256()
+                    with open(filepath, 'rb') as f:
+                        for chunk in iter(lambda: f.read(8192), b''):
+                            hash_sha256.update(chunk)
+                    return hash_sha256.hexdigest()
+
+                def get_wic_extracted_size(filepath):
+                    """
+                    Estimate the extracted size of a WIC file.
+                    WIC files are typically compressed with zstd, xz, or gz.
+                    """
+                    file_size = os.path.getsize(filepath)
+                    filename = filepath.lower()
+
+                    # Try to get actual uncompressed size
+                    if filename.endswith('.zst') or filename.endswith('.zstd'):
+                        try:
+                            result = subprocess.run(['zstd', '-l', filepath], capture_output=True, text=True)
+                            # Parse output to get decompressed size
+                            for line in result.stdout.split('\n'):
+                                if 'Decompressed Size' in line:
+                                    match = re.search(r'(\d+)', line.replace(',', ''))
+                                    if match:
+                                        return int(match.group(1))
+                        except:
+                            pass
+                        return file_size * 4  # Estimate 4x compression ratio
+
+                    elif filename.endswith('.xz'):
+                        try:
+                            result = subprocess.run(['xz', '-l', filepath], capture_output=True, text=True)
+                            for line in result.stdout.split('\n'):
+                                parts = line.split()
+                                if len(parts) >= 5 and parts[0].isdigit():
+                                    return int(parts[4].replace(',', ''))
+                        except:
+                            pass
+                        return file_size * 5  # Estimate 5x compression ratio
+
+                    elif filename.endswith('.gz'):
+                        return file_size * 3  # Estimate 3x compression ratio
+
+                    # Uncompressed WIC
+                    return file_size
+
+                def parse_wic_filename(filename):
+                    """
+                    Parse WIC filename to extract metadata.
+                    Expected formats:
+                      - simpad-plus-image-1.2.3.wic.zst
+                      - simserver-imx8-2024.01.15.wic.xz
+                      - simman3g-32bit-v1.0.0.wic
+                    """
+                    info = {
+                        'simpadtype': 'unknown',
+                        'version': '0.0.0',
+                        'info': ''
+                    }
+
+                    basename = filename.lower()
+
+                    # Remove compression extensions
+                    for ext in ['.zst', '.zstd', '.xz', '.gz', '.bz2']:
+                        basename = basename.replace(ext, '')
+                    basename = basename.replace('.wic', '')
+
+                    # Detect device type (simpad2 must come before simpad check)
+                    if 'simpad2' in basename or 'plus2' in basename or 'imx8' in basename:
+                        info['simpadtype'] = 'Plus2'
+                    elif 'simpad' in basename or 'plus' in basename or 'imx6' in basename:
+                        info['simpadtype'] = 'Plus'
+                    elif 'simman' in basename and '64' in basename:
+                        info['simpadtype'] = 'SimMan3G-64'
+                    elif 'simman' in basename and '32' in basename:
+                        info['simpadtype'] = 'SimMan3G-32'
+                    elif 'simman' in basename:
+                        info['simpadtype'] = 'SimMan3G'
+
+                    # Extract version - look for patterns like v1.2.3, 1.2.3, 2024.01.15
+                    version_patterns = [
+                        r'v?(\d+\.\d+\.\d+(?:\.\d+)?)',  # v1.2.3 or 1.2.3.4
+                        r'(\d{4}\.\d{2}\.\d{2})',         # 2024.01.15
+                        r'(\d+\.\d+)',                    # 1.2
+                    ]
+
+                    for pattern in version_patterns:
+                        match = re.search(pattern, basename)
+                        if match:
+                            info['version'] = match.group(1)
+                            break
+
+                    return info
+
+                def find_wic_files(folders):
+                    """Find all WIC files in the specified folders."""
+                    wic_files = []
+                    wic_extensions = ['.wic', '.wic.zst', '.wic.zstd', '.wic.xz', '.wic.gz', '.wic.bz2']
+
+                    for folder in folders:
+                        folder = folder.strip()
+                        if not folder or not os.path.isdir(folder):
+                            print(f"Warning: Folder not found or empty: {folder}")
+                            continue
+
+                        print(f"Searching in: {folder}")
+
+                        for root, dirs, files in os.walk(folder):
+                            for file in files:
+                                for ext in wic_extensions:
+                                    if file.lower().endswith(ext):
+                                        filepath = os.path.join(root, file)
+                                        wic_files.append(filepath)
+                                        print(f"  Found: {filepath}")
+                                        break
+
+                    return wic_files
+
+                def upload_file(blob_service_client, container_name, local_path, blob_path):
+                    """Upload a file to Azure Blob Storage."""
+                    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_path)
+
+                    # Set content type based on file extension
+                    content_type = 'application/octet-stream'
+                    if blob_path.endswith('.json'):
+                        content_type = 'application/json'
+
+                    content_settings = ContentSettings(content_type=content_type)
+
+                    with open(local_path, 'rb') as data:
+                        blob_client.upload_blob(data, overwrite=True, content_settings=content_settings)
+
+                    print(f"Uploaded: {blob_path}")
+
+                def main():
+                    if not STORAGE_ACCOUNT or not STORAGE_KEY:
+                        print("Error: Azure Storage credentials not configured")
+                        sys.exit(1)
+
+                    if not SOURCE_FOLDERS or SOURCE_FOLDERS == ['']:
+                        print("Error: No source folders specified")
+                        sys.exit(1)
+
+                    print(f"=== WIC File Uploader ===")
+                    print(f"Storage Account: {STORAGE_ACCOUNT}")
+                    print(f"Container: {CONTAINER_NAME}")
+                    print(f"Target Path: {TARGET_PATH}")
+                    print(f"Source Folders: {SOURCE_FOLDERS}")
+                    print(f"Dry Run: {DRY_RUN}")
+                    print()
+
+                    # Find WIC files
+                    wic_files = find_wic_files(SOURCE_FOLDERS)
+
+                    if not wic_files:
+                        print("No WIC files found in the specified folders")
+                        sys.exit(0)
+
+                    print(f"\nFound {len(wic_files)} WIC file(s)")
+
+                    # Initialize Azure client
+                    connection_string = f"DefaultEndpointsProtocol=https;AccountName={STORAGE_ACCOUNT};AccountKey={STORAGE_KEY};EndpointSuffix=core.windows.net"
+                    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+
+                    # Process files and build os_list
+                    os_list = []
+
+                    for filepath in wic_files:
+                        filename = os.path.basename(filepath)
+                        print(f"\nProcessing: {filename}")
+
+                        # Parse filename for metadata
+                        file_info = parse_wic_filename(filename)
+                        simpadtype = file_info['simpadtype'].lower()
+
+                        # Determine device tag, icon, and display name
+                        if 'plus2' in simpadtype:
+                            devices = ["imx8"]
+                            icon = "icons/simpad_plus2.svg"
+                            device_name = "SimPad Plus 2"
+                        elif 'plus' in simpadtype:
+                            devices = ["imx6"]
+                            icon = "icons/simpad_plus.svg"
+                            device_name = "SimPad Plus"
+                        elif 'simman' in simpadtype and '64' in simpadtype:
+                            devices = ["simman3g-64"]
+                            icon = "icons/simman3g.svg"
+                            device_name = "SimMan 3G (64-bit)"
+                        elif 'simman' in simpadtype and '32' in simpadtype:
+                            devices = ["simman3g-32"]
+                            icon = "icons/simman3g.svg"
+                            device_name = "SimMan 3G (32-bit)"
+                        else:
+                            devices = []
+                            icon = "icons/use_custom.png"
+                            device_name = file_info['simpadtype']
+
+                        # Calculate hashes
+                        print("  Calculating MD5...")
+                        md5_hash = calculate_md5(filepath)
+
+                        print("  Calculating SHA256...")
+                        sha256_hash = calculate_sha256(filepath)
+
+                        # Get file sizes
+                        download_size = os.path.getsize(filepath)
+                        extract_size = get_wic_extracted_size(filepath)
+
+                        # Build blob path
+                        blob_path = f"{TARGET_PATH}/{filename}"
+                        download_url = f"{CDN_BASE_URL}/{CONTAINER_NAME}/{blob_path}"
+
+                        # Get file modification time + 2 weeks as release date
+                        mtime = os.path.getmtime(filepath)
+                        release_date = (datetime.fromtimestamp(mtime) + timedelta(weeks=2)).strftime('%Y-%m-%d')
+
+                        # Create os_list entry (Raspberry Pi Imager format)
+                        os_entry = {
+                            "name": f"{device_name} v{file_info['version']}",
+                            "description": f"{device_name} firmware version {file_info['version']}",
+                            "url": download_url,
+                            "icon": icon,
+                            "extract_size": extract_size,
+                            "extract_sha256": sha256_hash,
+                            "extract_md5": md5_hash,
+                            "image_download_size": download_size,
+                            "release_date": release_date,
+                            "init_format": "none",
+                            "devices": devices
+                        }
+
+                        os_list.append(os_entry)
+
+                        # Upload WIC file
+                        if not DRY_RUN:
+                            print(f"  Uploading to: {blob_path}")
+                            upload_file(blob_service_client, CONTAINER_NAME, filepath, blob_path)
+                        else:
+                            print(f"  [DRY RUN] Would upload to: {blob_path}")
+
+                    # Generate JSON manifest (Raspberry Pi Imager format)
+                    manifest = {
+                        "os_list": os_list
+                    }
+
+                    # Save JSON file locally
+                    json_path = f"/tmp/{JSON_FILENAME}"
+
+                    with open(json_path, 'w') as f:
+                        json.dump(manifest, f, indent=2)
+
+                    print(f"\n=== Generated JSON ===")
+                    print(json.dumps(manifest, indent=2))
+
+                    # Upload JSON file
+                    if not DRY_RUN:
+                        json_blob_path = f"{TARGET_PATH}/{JSON_FILENAME}"
+                        print(f"\nUploading JSON to: {json_blob_path}")
+                        upload_file(blob_service_client, CONTAINER_NAME, json_path, json_blob_path)
+
+                        print(f"\n=== Upload Complete ===")
+                        print(f"CDN URL: {CDN_BASE_URL}/{CONTAINER_NAME}/{json_blob_path}")
+                    else:
+                        print(f"\n[DRY RUN] Would upload JSON to: {TARGET_PATH}/{JSON_FILENAME}")
+
+                    print("\nDone!")
+
+                if __name__ == '__main__':
+                    main()
+            env:
+              AZURE_STORAGE_ACCOUNT: $(AZURE_STORAGE_ACCOUNT)
+              AZURE_STORAGE_KEY: $(AZURE_STORAGE_KEY)
+              AZURE_STORAGE_CONTAINER: $(AZURE_STORAGE_CONTAINER)
+              CDN_BASE_URL: $(CDN_BASE_URL)
+
+          - publish: $(System.DefaultWorkingDirectory)
+            artifact: pipeline-artifacts
+            condition: always()

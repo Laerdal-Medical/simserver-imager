@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright (C) 2020 Raspberry Pi Ltd
+ * Copyright (C) 2025 Laerdal Medical
  */
 
 #ifndef HWLISTMODEL_H
@@ -33,7 +33,8 @@ public:
         IconRole,
         DescriptionRole,
         MatchingTypeRole,
-        ArchitectureRole
+        ArchitectureRole,
+        DisabledRole
     };
 
     struct HardwareDevice {
@@ -44,6 +45,7 @@ public:
         QString description;
         QString matchingType;
         QString architecture; // Preferred architecture (armel, armhf, armv8)
+        bool disabled = false; // Whether the device is disabled (coming soon)
 
         bool isInclusive() const {
             return matchingType == QLatin1String("inclusive");

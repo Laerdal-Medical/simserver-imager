@@ -16,10 +16,10 @@ WizardStepBase {
     required property ImageWriter imageWriter
     required property var wizardContainer
 
-    title: qsTr("Customisation: Raspberry Pi Connect")
-    subtitle: qsTr("Sign in to receive a token and enable Raspberry Pi Connect")
+    title: qsTr("Customisation: Remote Connect")
+    subtitle: qsTr("Sign in to receive a token and enable Remote Connect")
     showSkipButton: true
-    nextButtonAccessibleDescription: qsTr("Save Raspberry Pi Connect settings and continue to next customisation step")
+    nextButtonAccessibleDescription: qsTr("Save Remote Connect settings and continue to next customisation step")
     backButtonAccessibleDescription: qsTr("Return to previous step")
     skipButtonAccessibleDescription: qsTr("Skip all customisation and proceed directly to writing the image")
 
@@ -41,9 +41,9 @@ WizardStepBase {
             ImOptionPill {
                 id: useTokenPill
                 Layout.fillWidth: true
-                text: qsTr("Enable Raspberry Pi Connect")
-                accessibleDescription: qsTr("Enable secure remote access to your Raspberry Pi through the Raspberry Pi Connect cloud service")
-                helpLabel: imageWriter.isEmbeddedMode() ? "" : qsTr("What is Raspberry Pi Connect?")
+                text: qsTr("Enable Remote Connect")
+                accessibleDescription: qsTr("Enable secure remote access to your device through the Remote Connect cloud service")
+                helpLabel: imageWriter.isEmbeddedMode() ? "" : qsTr("What is Remote Connect?")
                 helpUrl: imageWriter.isEmbeddedMode() ? "" : "https://www.raspberrypi.com/software/connect/"
                 checked: false
                 onToggled: function(isChecked) { 
@@ -57,8 +57,8 @@ WizardStepBase {
             ImButton {
                 id: btnOpenConnect
                 Layout.fillWidth: true
-                text: qsTr("Open Raspberry Pi Connect")
-                accessibleDescription: qsTr("Open the Raspberry Pi Connect website in your browser to sign in and receive an authentication token")
+                text: qsTr("Open Remote Connect")
+                accessibleDescription: qsTr("Open the Remote Connect website in your browser to sign in and receive an authentication token")
                 enabled: useTokenPill.checked
                 visible: useTokenPill.checked && !root.connectTokenReceived
                 onClicked: {
@@ -74,7 +74,7 @@ WizardStepBase {
                 id: labelConnectToken
                 text: qsTr("Authentication token:")
                 visible: useTokenPill.checked
-                accessibleDescription: qsTr("Enter or paste the authentication token from Raspberry Pi Connect. The token will be automatically filled if you use the 'Open Raspberry Pi Connect' button to sign in.")
+                accessibleDescription: qsTr("Enter or paste the authentication token from Remote Connect. The token will be automatically filled if you use the 'Open Remote Connect' button to sign in.")
             }
             
             ImTextField {
@@ -170,7 +170,7 @@ WizardStepBase {
                 if (fieldConnectToken) {
                     fieldConnectToken.text = token
                 }
-                // Rebuild focus order since the "Open Raspberry Pi Connect" button is now hidden
+                // Rebuild focus order since the "Open Remote Connect" button is now hidden
                 root.rebuildFocusOrder()
             }
         }
@@ -235,7 +235,7 @@ WizardStepBase {
         }
     }
     
-    // Start countdown when user clicks "Open Raspberry Pi Connect"
+    // Start countdown when user clicks "Open Remote Connect"
     Connections {
         target: btnOpenConnect
         function onClicked() {
@@ -324,7 +324,7 @@ WizardStepBase {
         
         Text {
             id: dialogMessage
-            text: qsTr("The token you entered is not valid. Please check the token and try again, or use the 'Open Raspberry Pi Connect' button to get a valid token.")
+            text: qsTr("The token you entered is not valid. Please check the token and try again, or use the 'Open Remote Connect' button to get a valid token.")
             font.pixelSize: Style.fontSizeFormLabel
             font.family: Style.fontFamily
             color: Style.formLabelColor

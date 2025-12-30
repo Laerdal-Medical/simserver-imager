@@ -140,7 +140,7 @@ WizardStepBase {
                 WizardFormLabel { 
                     id: labelTimezone
                     text: qsTr("Time zone:") 
-                    accessibleDescription: qsTr("Choose your time zone so your Raspberry Pi displays the correct local time. This is automatically recommended based on your capital city selection, but you can change it if the suggestion is incorrect.")
+                    accessibleDescription: qsTr("Choose your time zone so your device displays the correct local time. This is automatically recommended based on your capital city selection, but you can change it if the suggestion is incorrect.")
                 }
                 ImComboBox {
                     id: comboTimezone

@@ -13,17 +13,21 @@ Text {
     id: root
     signal clicked
 
+    // Set to false when using inside a Layout to avoid anchor conflicts
+    property bool useAnchors: true
+
     text: "X"
 
-    // Layouting is here as all usage sites use the same code, so we save some lines.
-    // Move it out usage once different usage is needed
-    Layout.alignment: Qt.AlignRight
-    horizontalAlignment: Text.AlignRight
+    // Default alignment for Layout contexts
+    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+    horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
-    anchors.right: parent.right
-    anchors.top: parent.top
-    anchors.rightMargin: 25
-    anchors.topMargin: 10
+
+    // Anchors for non-Layout contexts (e.g., inside Rectangle)
+    anchors.right: useAnchors ? parent.right : undefined
+    anchors.top: useAnchors ? parent.top : undefined
+    anchors.rightMargin: useAnchors ? 25 : 0
+    anchors.topMargin: useAnchors ? 10 : 0
 
     font.family: Style.fontFamily
     font.bold: true

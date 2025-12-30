@@ -1,12 +1,13 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright (C) 2020 Raspberry Pi Ltd
+ * Copyright (C) 2025 Laerdal Medical
  */
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtCore
 import "../qmlcomponents"
 
 import RpiImager
@@ -27,11 +28,11 @@ Item {
     // This updates reactively when OS list becomes available after a retry
     readonly property bool hasNetworkConnectivity: !imageWriter.isOsListUnavailable
     
-    // Current wizard step - initialized in Component.onCompleted based on network state.
+    // Laerdal simplified wizard: Device -> Source -> OS -> Storage -> Writing -> Done
     // NOT a binding, so it won't auto-change when hasNetworkConnectivity changes.
     // The onOsListUnavailableChanged handler manages the offline→online transition.
     property int currentStep: 0
-    readonly property int totalSteps: 13
+    readonly property int totalSteps: 6
     
     // Track which steps have been made permissible/unlocked for navigation
     // Each bit represents a step: bit 0 = Device, bit 1 = OS, etc.
@@ -63,7 +64,7 @@ Item {
     property bool sshEnabled: false
     property bool secureBootEnabled: false
     property bool piConnectEnabled: false
-    // Whether selected OS supports Raspberry Raspberry Pi Connect customization
+    // Whether selected OS supports Remote Connect customization
     property bool piConnectAvailable: false
     // Whether selected OS supports Secure Boot signing
     property bool secureBootAvailable: false
@@ -83,7 +84,8 @@ Item {
     // Ephemeral per-run setting: do not persist across runs
     property bool disableWarnings: false
     // Whether the selected OS supports customisation (init_format present)
-    property bool customizationSupported: true
+    // Disabled for Laerdal SimServer Imager - WIC images don't need customization
+    property bool customizationSupported: false
     
     // Conserved customization settings object - runtime state passed to generator
     // This is the single source of truth for what customizations will be applied
@@ -107,22 +109,25 @@ Item {
         featUsbGadgetEnabled: false
     })
     
-    // Wizard steps enum
+    // Laerdal simplified wizard steps enum
     // Language selection is -1 (special pre-step, only shown when showLanguageSelection is true)
     readonly property int stepLanguageSelection: -1
     readonly property int stepDeviceSelection: 0
-    readonly property int stepOSSelection: 1
-    readonly property int stepStorageSelection: 2
-    readonly property int stepHostnameCustomization: 3
+    readonly property int stepSourceSelection: 1
+    readonly property int stepOSSelection: 2
+    readonly property int stepStorageSelection: 3
+    readonly property int stepWriting: 4
+    readonly property int stepDone: 5
+
+    // Legacy step indices (kept for compatibility, mapped to stepWriting)
+    readonly property int stepHostnameCustomization: 4
     readonly property int stepLocaleCustomization: 4
-    readonly property int stepUserCustomization: 5
-    readonly property int stepWifiCustomization: 6
-    readonly property int stepRemoteAccess: 7
-    readonly property int stepSecureBootCustomization: 8
-    readonly property int stepPiConnectCustomization: 9
-    readonly property int stepIfAndFeatures: 10
-    readonly property int stepWriting: 11
-    readonly property int stepDone: 12
+    readonly property int stepUserCustomization: 4
+    readonly property int stepWifiCustomization: 4
+    readonly property int stepRemoteAccess: 4
+    readonly property int stepSecureBootCustomization: 4
+    readonly property int stepPiConnectCustomization: 4
+    readonly property int stepIfAndFeatures: 4
     
     signal wizardCompleted()
     
@@ -192,92 +197,37 @@ Item {
         }
     }
 
-    // Wizard step names for sidebar (grouped for cleaner display)
-    // When offline, skip Device selection
-    readonly property var stepNames: hasNetworkConnectivity ? [
+    // Laerdal simplified wizard step names for sidebar
+    readonly property var stepNames: [
         qsTr("Device"),
-        qsTr("OS"), 
+        qsTr("Source"),
+        qsTr("System Image"),
         qsTr("Storage"),
-        qsTr("Customisation"),
-        qsTr("Writing"),
-        qsTr("Done")
-    ] : [
-        qsTr("OS"), 
-        qsTr("Storage"),
-        qsTr("Customisation"),
         qsTr("Writing"),
         qsTr("Done")
     ]
-    
-    readonly property int firstCustomizationStep: stepHostnameCustomization
+
+    // No customization steps in Laerdal wizard
+    readonly property int firstCustomizationStep: stepWriting
 
     // Helper function to map wizard step to sidebar index
+    // Laerdal simplified: direct 1:1 mapping
     function getSidebarIndex(wizardStep) {
-        // When offline, device selection is skipped, so adjust indices
-        var offset = hasNetworkConnectivity ? 0 : -1
-        
-        if (wizardStep === stepDeviceSelection) {
-            // Device is at index 0 when online, not shown when offline
-            return hasNetworkConnectivity ? 0 : -1
-        } else if (wizardStep === stepOSSelection) {
-            return hasNetworkConnectivity ? 1 : 0
-        } else if (wizardStep === stepStorageSelection) {
-            return hasNetworkConnectivity ? 2 : 1
-        } else if (wizardStep >= firstCustomizationStep && wizardStep <= getLastCustomizationStep()) {
-            return hasNetworkConnectivity ? 3 : 2 // Customization group
-        } else if (wizardStep === stepWriting) {
-            return hasNetworkConnectivity ? 4 : 3 // Writing
-        } else if (wizardStep === stepDone) {
-            return hasNetworkConnectivity ? 5 : 4 // Done
-        }
-        return 0
+        return wizardStep
     }
 
+    // No customization steps in Laerdal wizard
     function getLastCustomizationStep() {
-        return (ccRpiAvailable && ifAndFeaturesAvailable)
-            ? stepIfAndFeatures
-            : piConnectAvailable
-                ? stepPiConnectCustomization
-                : secureBootAvailable
-                    ? stepSecureBootCustomization
-                    : stepRemoteAccess
+        return stepStorageSelection
     }
 
+    // No customization substeps in Laerdal wizard
     function getCustomizationSubstepLabels() {
-        // Only return labels if customization is supported
-        if (!customizationSupported) {
-            return []
-        }
-        
-        var labels = [qsTr("Hostname"), qsTr("Localisation"), qsTr("User"), qsTr("Wi‑Fi"), qsTr("Remote access")]
-        if (secureBootAvailable) {
-            labels.push(qsTr("Secure Boot"))
-        }
-        if (piConnectAvailable) {
-            labels.push(qsTr("Raspberry Pi Connect"))
-        }
-        if (ccRpiAvailable && ifAndFeaturesAvailable) {
-            labels.push(qsTr("Interfaces & Features"))
-        }
-
-        return labels
+        return []
     }
 
+    // No customization substeps in Laerdal wizard
     function isCustomizationSubstepConfigured(subIndex) {
-        // Map the display index to the actual step based on what's available
-        var labels = getCustomizationSubstepLabels()
-        if (subIndex >= labels.length) return false
-        
-        var stepLabel = labels[subIndex]
-        if (stepLabel === qsTr("Hostname")) return hostnameConfigured
-        if (stepLabel === qsTr("Localisation")) return localeConfigured
-        if (stepLabel === qsTr("User")) return userConfigured
-        if (stepLabel === qsTr("Wi‑Fi")) return wifiConfigured
-        if (stepLabel === qsTr("Remote access")) return sshEnabled
-        if (stepLabel === qsTr("Secure Boot")) return secureBootEnabled
-        if (stepLabel === qsTr("Raspberry Pi Connect")) return piConnectEnabled
-        if (stepLabel === qsTr("Interfaces & Features")) return (ifI2cEnabled || ifSpiEnabled || if1WireEnabled || ifSerial !== "" || featUsbGadgetEnabled)
-        
         return false
     }
 
@@ -305,7 +255,7 @@ Item {
         // Clear device-dependent state
         selectedOsName = ""
         selectedStorageName = ""
-        customizationSupported = true  // Reset to default
+        customizationSupported = false  // Disabled for Laerdal SimServer Imager
         
         // Clear all customization flags
         hostnameConfigured = false
@@ -354,30 +304,9 @@ Item {
     }
 
 
-    // Map sidebar index back to the first wizard step in that group
+    // Map sidebar index back to wizard step (1:1 in Laerdal simplified wizard)
     function getWizardStepFromSidebarIndex(sidebarIndex) {
-        // When offline, device selection is not shown, so indices shift
-        if (hasNetworkConnectivity) {
-            switch (sidebarIndex) {
-                case 0: return stepDeviceSelection
-                case 1: return stepOSSelection
-                case 2: return stepStorageSelection
-                case 3: return firstCustomizationStep
-                case 4: return stepWriting
-                case 5: return stepDone
-                default: return stepDeviceSelection
-            }
-        } else {
-            // Offline: no device selection in sidebar
-            switch (sidebarIndex) {
-                case 0: return stepOSSelection
-                case 1: return stepStorageSelection
-                case 2: return firstCustomizationStep
-                case 3: return stepWriting
-                case 4: return stepDone
-                default: return stepOSSelection
-            }
-        }
+        return sidebarIndex
     }
     
     // Main horizontal layout
@@ -546,7 +475,7 @@ Item {
                                         else if (root.currentStep === root.stepUserCustomization) currentStepLabel = qsTr("User")
                                         else if (root.currentStep === root.stepWifiCustomization) currentStepLabel = qsTr("Wi‑Fi")
                                         else if (root.currentStep === root.stepRemoteAccess) currentStepLabel = qsTr("Remote access")
-                                        else if (root.currentStep === root.stepPiConnectCustomization) currentStepLabel = qsTr("Raspberry Pi Connect")
+                                        else if (root.currentStep === root.stepPiConnectCustomization) currentStepLabel = qsTr("Remote Connect")
                                         else if (root.currentStep === root.stepIfAndFeatures) currentStepLabel = qsTr("Interfaces & Features")
                                         
                                         return labels[subItem.index] === currentStepLabel
@@ -586,7 +515,7 @@ Item {
                                             else if (stepLabel === qsTr("User")) target = root.stepUserCustomization
                                             else if (stepLabel === qsTr("Wi‑Fi")) target = root.stepWifiCustomization
                                             else if (stepLabel === qsTr("Remote access")) target = root.stepRemoteAccess
-                                            else if (stepLabel === qsTr("Raspberry Pi Connect")) target = root.stepPiConnectCustomization
+                                            else if (stepLabel === qsTr("Remote Connect")) target = root.stepPiConnectCustomization
                                             else if (stepLabel === qsTr("Interfaces & Features")) target = root.stepIfAndFeatures
                                             
                                             // Allow navigation to permissible steps or backward navigation within customization
@@ -687,10 +616,8 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             
-            // Skip device selection if offline (no network = no device list available)
-            // Start with language selection if requested, otherwise device selection if online, or OS selection if offline
-            initialItem: root.showLanguageSelection ? languageSelectionStep : 
-                        (root.hasNetworkConnectivity ? deviceSelectionStep : osSelectionStep)
+            // Laerdal simplified: always start with device selection
+            initialItem: root.showLanguageSelection ? languageSelectionStep : deviceSelectionStep
             
             // Smooth transitions between steps
             pushEnter: Transition {
@@ -747,59 +674,17 @@ Item {
         }
     }
     
-    // Navigation functions
+    // Navigation functions - Laerdal simplified (no customization steps)
     function nextStep() {
         if (root.currentStep < root.totalSteps - 1) {
             var nextIndex = root.currentStep + 1
-            
+
             // Special handling for "write another" mode: skip directly to writing step after storage selection
             if (writeAnotherMode && root.currentStep === stepStorageSelection) {
                 nextIndex = stepWriting
                 writeAnotherMode = false  // Reset the flag
             }
-            // If customization is not supported, skip customization steps entirely
-            else if (!customizationSupported && nextIndex === firstCustomizationStep) {
-                nextIndex = stepWriting
-            }
-            // Skip optional Secure Boot step when OS does not support it
-            if (!secureBootAvailable && nextIndex === stepSecureBootCustomization) {
-                nextIndex++
-            }
-            // Skip optional Raspberry Pi Connect step when OS does not support it
-            if (!piConnectAvailable && nextIndex === stepPiConnectCustomization) {
-                nextIndex++
-            }
-            // Skip interfaces and features if OS doesn't support it or no capabilities are available
-            if ((!ccRpiAvailable || !ifAndFeaturesAvailable) && nextIndex == stepIfAndFeatures) {
-                nextIndex++
-            }
-            // Before entering the writing step, apply customization (when supported)
-            if (nextIndex === stepWriting) {
-                if (customizationSupported && imageWriter) {
-                    // Pass the complete customizationSettings object directly to the generator
-                    // This includes both persistent settings (hostname, wifi, etc.) and
-                    // ephemeral settings (piConnectEnabled) from the current wizard session
-                    imageWriter.applyCustomisationFromSettings(customizationSettings)
-                }
-                
-                // Capture snapshot of customization flags at write summary stage
-                // This preserves the state for the completion screen, before any write operations
-                // or token clearing happens. This is the most reliable place to capture it.
-                completionSnapshot = {
-                    customizationSupported: customizationSupported,
-                    hostnameConfigured: hostnameConfigured,
-                    localeConfigured: localeConfigured,
-                    userConfigured: userConfigured,
-                    wifiConfigured: wifiConfigured,
-                    sshEnabled: sshEnabled,
-                    piConnectEnabled: piConnectEnabled,
-                    ifI2cEnabled: ifI2cEnabled,
-                    ifSpiEnabled: ifSpiEnabled,
-                    if1WireEnabled: if1WireEnabled,
-                    ifSerial: ifSerial,
-                    featUsbGadgetEnabled: featUsbGadgetEnabled
-                }
-            }
+
             root.currentStep = nextIndex
             var nextComponent = getStepComponent(root.currentStep)
             if (nextComponent) {
@@ -810,31 +695,10 @@ Item {
         }
     }
     
+    // Simplified previousStep - no customization steps to skip
     function previousStep() {
         if (root.currentStep > 0) {
             var prevIndex = root.currentStep - 1
-            // From Writing step:
-            // - If customization not supported, jump straight back to Storage Selection
-            // - If Raspberry Pi Connect step is not available, skip it when navigating back
-            if (root.currentStep === stepWriting && !customizationSupported) {
-                prevIndex = stepStorageSelection
-            } else {
-                // Skip interfaces and features if OS doesn't support it or no capabilities are available
-                if (prevIndex == stepIfAndFeatures && (!ccRpiAvailable || !ifAndFeaturesAvailable)) {
-                    prevIndex--
-                }
-                if (prevIndex === stepPiConnectCustomization && !piConnectAvailable) {
-                    prevIndex--
-                }
-                if (prevIndex === stepSecureBootCustomization && !secureBootAvailable) {
-                    prevIndex--
-                }
-                // Skip device selection if offline (it would be empty/useless)
-                if (prevIndex === stepDeviceSelection && !hasNetworkConnectivity) {
-                    // Can't go back further, stay at current step
-                    return
-                }
-            }
             root.currentStep = prevIndex
             var prevComponent = getStepComponent(root.currentStep)
             if (prevComponent) {
@@ -847,11 +711,6 @@ Item {
     
     function jumpToStep(stepIndex) {
         if (stepIndex >= 0 && stepIndex < root.totalSteps) {
-            // Prevent jumping to device selection when offline
-            if (stepIndex === stepDeviceSelection && !hasNetworkConnectivity) {
-                console.log("Cannot jump to device selection when offline")
-                return
-            }
             root.currentStep = stepIndex
             var stepComponent = getStepComponent(stepIndex)
             if (stepComponent) {
@@ -861,21 +720,72 @@ Item {
             }
         }
     }
-    
+
+    // Check if "Use custom" device is selected (for local WIC file selection)
+    function isUseCustomSelected() {
+        var hwModel = root.imageWriter.getHWList()
+        if (!hwModel || hwModel.currentIndex < 0) return false
+        var currentName = hwModel.currentName
+        return currentName === qsTr("Use custom")
+    }
+
+    // Open file dialog for custom WIC file selection
+    function openCustomFileDialog() {
+        // Use native file dialog if available, otherwise fall back to QML FileDialog
+        if (root.imageWriter.nativeFileDialogAvailable()) {
+            Qt.callLater(function() {
+                root.imageWriter.openFileDialog(CommonStrings.imageFiltersString, false)
+            })
+        } else {
+            // Use QML fallback dialog - it remembers the last folder automatically
+            customImageFileDialog.dialogTitle = qsTr("Select image")
+            customImageFileDialog.nameFilters = CommonStrings.imageFiltersList
+            customImageFileDialog.open()
+        }
+    }
+
+    // Fallback QML file dialog when native dialogs are unavailable
+    ImFileDialog {
+        id: customImageFileDialog
+        imageWriter: root.imageWriter
+        parent: root.overlayRootRef ? root.overlayRootRef : root
+        anchors.centerIn: parent
+        nameFilters: CommonStrings.imageFiltersList
+        onAccepted: {
+            if (selectedFile && String(selectedFile).length > 0) {
+                root.handleCustomFileSelected(selectedFile)
+            }
+        }
+    }
+
+    // Handle file selection for "Use custom" flow (from both native and fallback dialogs)
+    function handleCustomFileSelected(fileUrl) {
+        if (root.isUseCustomSelected() && root.currentStep === root.stepDeviceSelection && fileUrl.toString().length > 0) {
+            // Set the source to the selected file
+            root.imageWriter.setSrc(fileUrl)
+            root.selectedOsName = root.imageWriter.srcFileName()
+            root.customizationSupported = false  // Disabled for Laerdal SimServer Imager
+            // Skip Source and OS steps, go directly to Storage
+            root.jumpToStep(root.stepStorageSelection)
+        }
+    }
+
+    // Handle file selection from native dialog for "Use custom" flow
+    Connections {
+        target: root.imageWriter
+        function onFileSelected(fileUrl) {
+            root.handleCustomFileSelected(fileUrl)
+        }
+    }
+
+    // Laerdal simplified wizard step components
     function getStepComponent(stepIndex) {
         switch(stepIndex) {
             case stepLanguageSelection: return languageSelectionStep
             case stepDeviceSelection: return deviceSelectionStep
+            case stepSourceSelection: return sourceSelectionStep
             case stepOSSelection: return osSelectionStep
             case stepStorageSelection: return storageSelectionStep
-            case stepHostnameCustomization: return hostnameCustomizationStep
-            case stepLocaleCustomization: return localeCustomizationStep
-            case stepUserCustomization: return userCustomizationStep
-            case stepWifiCustomization: return wifiCustomizationStep
-            case stepRemoteAccess: return remoteAccessStep
-            case stepSecureBootCustomization: return secureBootCustomizationStep
-            case stepPiConnectCustomization: return piConnectCustomizationStep
-            case stepIfAndFeatures: return ifAndFeaturesStep
             case stepWriting: return writingStep
             case stepDone: return doneStep
             default: return null
@@ -890,13 +800,8 @@ Item {
             wizardContainer: root
             appOptionsButton: optionsButton
             onNextClicked: {
-                // After choosing language, jump to first real wizard step
-                // Skip device selection if offline
-                if (root.hasNetworkConnectivity) {
-                    root.jumpToStep(root.stepDeviceSelection)
-                } else {
-                    root.jumpToStep(root.stepOSSelection)
-                }
+                // After choosing language, jump to device selection
+                root.jumpToStep(root.stepDeviceSelection)
             }
         }
     }
@@ -907,17 +812,34 @@ Item {
             wizardContainer: root
             showBackButton: false
             appOptionsButton: optionsButton
-            onNextClicked: root.nextStep()
+            onNextClicked: {
+                // If "Use custom" is selected, open file dialog instead of going to next step
+                if (isUseCustomSelected()) {
+                    openCustomFileDialog()
+                } else {
+                    root.nextStep()
+                }
+            }
         }
     }
-    
+
+    Component {
+        id: sourceSelectionStep
+        SourceSelectionStep {
+            imageWriter: root.imageWriter
+            wizardContainer: root
+            appOptionsButton: optionsButton
+            onNextClicked: root.nextStep()
+            onBackClicked: root.previousStep()
+        }
+    }
+
     Component {
         id: osSelectionStep
         OSSelectionStep {
             imageWriter: root.imageWriter
             wizardContainer: root
-            // Hide back button when offline (device selection was skipped)
-            showBackButton: root.hasNetworkConnectivity
+            showBackButton: true
             appOptionsButton: optionsButton
             onNextClicked: root.nextStep()
             onBackClicked: root.previousStep()
@@ -1147,7 +1069,7 @@ Item {
         // ----- CONTENT -----
         Text {
             id: titleText
-            text: qsTr("Replace existing Raspberry Pi Connect token?")
+            text: qsTr("Replace existing Remote Connect token?")
             font.pixelSize: Style.fontSizeHeading
             font.family: Style.fontFamilyBold
             font.bold: true
@@ -1165,7 +1087,7 @@ Item {
         // Body / security note
         Text {
             id: bodyText
-            text: qsTr("A new Raspberry Pi Connect token was received that differs from your current one.\n\n") +
+            text: qsTr("A new Remote Connect token was received that differs from your current one.\n\n") +
                   qsTr("Do you want to overwrite the existing token?\n\n") +
                   qsTr("Warning: Only overwrite the token if you initiated this action.")
             font.pixelSize: Style.fontSizeFormLabel
@@ -1206,7 +1128,7 @@ Item {
             ImButtonRed {
                 id: keepBtn
                 text: qsTr("Keep existing")
-                accessibleDescription: qsTr("Keep your current Raspberry Pi Connect token")
+                accessibleDescription: qsTr("Keep your current Remote Connect token")
                 activeFocusOnTab: true
                 onClicked: tokenConflictDialog.close()
             }
@@ -1228,7 +1150,7 @@ Item {
             delete customizationSettings.piConnectEnabled
         }
         
-        // Handle repository URL received from deep link (rpi-imager://open?repo=...)
+        // Handle repository URL received from deep link (laerdal-imager://open?repo=...)
         function onRepositoryUrlReceived(url) {
             repositoryUrlDialog.openWithUrl(url)
         }
@@ -1325,8 +1247,8 @@ Item {
         Text {
             id: repoBodyText
             text: repositoryUrlDialog.isLocalFile
-                ? qsTr("You are opening a local Raspberry Pi Imager manifest file. This will replace the current OS list with the contents of this file.")
-                : qsTr("A website is requesting to switch Raspberry Pi Imager to use a custom OS repository.\n\n") +
+                ? qsTr("You are opening a local Laerdal Imager manifest file. This will replace the current OS list with the contents of this file.")
+                : qsTr("A website is requesting to switch Laerdal SimServer Imager to use a custom OS repository.\n\n") +
                   qsTr("Only accept if you trust this source and intentionally clicked a link to open this repository.")
             font.pixelSize: Style.fontSizeFormLabel
             font.family: Style.fontFamily
@@ -1465,9 +1387,8 @@ Item {
     }
     
     function resetWizard() {
-        // Reset all wizard state to initial values
-        // Start at OS selection if offline, device selection if online
-        currentStep = hasNetworkConnectivity ? 0 : 1
+        // Reset all wizard state to initial values - Laerdal simplified
+        currentStep = 0
         permissibleStepsBitmap = 1  // Reset to only Device step permissible
         isWriting = false
         writeAnotherMode = false
@@ -1476,24 +1397,7 @@ Item {
         selectedStorageName = ""
         previousDeviceName = ""
         previousOsName = ""
-        hostnameConfigured = false
-        localeConfigured = false
-        userConfigured = false
-        wifiConfigured = false
-        sshEnabled = false
-        piConnectEnabled = false
-        piConnectAvailable = false
 
-        ccRpiAvailable = false
-        ifI2cEnabled = false
-        ifSpiEnabled = false
-        if1WireEnabled = false
-        ifSerial = ""
-        featUsbGadgetEnabled = false
-
-        supportsSerialConsoleOnly = false
-        supportsUsbGadget = false
-        
         // Reset hardware model selection to prevent stale state
         if (imageWriter) {
             var hwModel = imageWriter.getHWList()
@@ -1504,28 +1408,23 @@ Item {
             imageWriter.setSrc("")
             imageWriter.setDst("", 0)
         }
-        
-        // Navigate back to the first step (device selection if online, OS selection if offline)
+
+        // Navigate back to device selection
         wizardStack.clear()
-        wizardStack.push(hasNetworkConnectivity ? deviceSelectionStep : osSelectionStep)
+        wizardStack.push(deviceSelectionStep)
     }
     
     function resetToWriteStep() {
         // Reset only the storage selection to allow choosing a new storage device
-        // while preserving device, OS, and customization settings
+        // while preserving device, OS settings
         selectedStorageName = ""
-        
-        // Reset ephemeral Pi Connect state (session-only, not preserved)
-        // The token is already cleared when write completes, but ensure the enabled flag is reset
-        piConnectEnabled = false
-        delete customizationSettings.piConnectEnabled
-        
+
         // Keep all steps permissible - they've already been completed
         // This allows backward navigation if needed
-        
+
         // Enable write another mode to skip directly to writing step after storage selection
         writeAnotherMode = true
-        
+
         // Navigate to storage selection step so user can select a new SD card
         currentStep = stepStorageSelection
         wizardStack.clear()

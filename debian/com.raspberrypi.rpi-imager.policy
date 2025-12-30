@@ -4,19 +4,20 @@
  "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
 <policyconfig>
 
-  <vendor>Raspberry Pi Ltd</vendor>
-  <vendor_url>https://www.raspberrypi.com/</vendor_url>
+  <vendor>Laerdal Medical</vendor>
+  <vendor_url>https://www.laerdal.com/</vendor_url>
 
-  <action id="com.raspberrypi.rpi-imager.run">
-    <description>Run Raspberry Pi Imager</description>
-    <message>Authentication is required to run Raspberry Pi Imager</message>
-    <icon_name>rpi-imager</icon_name>
+  <!-- Production action for installed binary -->
+  <action id="com.laerdal.simserver-imager.run">
+    <description>Run Laerdal SimServer Imager</description>
+    <message>Authentication is required to write images to storage devices</message>
+    <icon_name>laerdal-simserver-imager</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/rpi-imager</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/laerdal-simserver-imager</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
   </action>
 

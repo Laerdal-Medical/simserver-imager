@@ -1,49 +1,78 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright (C) 2020 Raspberry Pi Ltd
+ * Copyright (C) 2025 Laerdal Medical
  */
 
 #include "hwlistmodel.h"
 #include "imagewriter.h"
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDebug>
 #include <QJsonValue>
+
+// Returns static Laerdal device definitions
+static QJsonArray getLaerdalDevices()
+{
+    static QJsonArray devices;
+    if (devices.isEmpty()) {
+        QJsonObject simpadPlus;
+        simpadPlus["name"] = "SimPad Plus";
+        simpadPlus["tags"] = QJsonArray({"imx6"});
+        simpadPlus["capabilities"] = QJsonArray();
+        simpadPlus["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
+        simpadPlus["description"] = "i.MX6 based SimPad Plus device";
+        simpadPlus["matching_type"] = "exclusive";
+        simpadPlus["architecture"] = "armhf";
+        simpadPlus["default"] = true;
+        devices.append(simpadPlus);
+
+        QJsonObject simpadPlus2;
+        simpadPlus2["name"] = "SimPad Plus 2";
+        simpadPlus2["tags"] = QJsonArray({"imx8"});
+        simpadPlus2["capabilities"] = QJsonArray();
+        simpadPlus2["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
+        simpadPlus2["description"] = "i.MX8 based SimPad Plus 2 device";
+        simpadPlus2["matching_type"] = "exclusive";
+        simpadPlus2["architecture"] = "aarch64";
+        devices.append(simpadPlus2);
+
+        QJsonObject simman3g32;
+        simman3g32["name"] = "SimMan 3G (32-bit)";
+        simman3g32["tags"] = QJsonArray({"simman3g-32"});
+        simman3g32["capabilities"] = QJsonArray();
+        simman3g32["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+        simman3g32["description"] = "SimMan 3G 32-bit platform";
+        simman3g32["matching_type"] = "exclusive";
+        simman3g32["architecture"] = "armhf";
+        devices.append(simman3g32);
+
+        QJsonObject simman3g64;
+        simman3g64["name"] = "SimMan 3G (64-bit)";
+        simman3g64["tags"] = QJsonArray({"simman3g-64"});
+        simman3g64["capabilities"] = QJsonArray();
+        simman3g64["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+        simman3g64["description"] = "SimMan 3G 64-bit platform";
+        simman3g64["matching_type"] = "exclusive";
+        simman3g64["architecture"] = "aarch64";
+        devices.append(simman3g64);
+    }
+    return devices;
+}
 
 HWListModel::HWListModel(ImageWriter &imageWriter)
     : QAbstractListModel(&imageWriter), _imageWriter(imageWriter) {}
 
 bool HWListModel::reload()
 {
-    QJsonDocument doc = _imageWriter.getFilteredOSlistDocument();
-    QJsonObject root = doc.object();
-
-    if (root.isEmpty() || !doc.isObject()) {
-        qWarning() << Q_FUNC_INFO << "Invalid root";
-        return false;
-    }
-
-    QJsonValue imager = root.value("imager");
-
-    if (!imager.isObject()) {
-        qWarning() << Q_FUNC_INFO << "missing imager";
-        return false;
-    }
-
-    QJsonValue devices = imager.toObject().value("devices");
-
-    if (!devices.isArray()) {
-        // just means list hasn't been loaded yet
-        return false;
-    }
+    // Use static Laerdal device list instead of remote JSON
+    const QJsonArray deviceArray = getLaerdalDevices();
 
     beginResetModel();
     _currentIndex = -1;
     // Replace contents on reload to avoid duplicate entries when re-entering the step
     _hwDevices.clear();
-
-    const QJsonArray deviceArray = devices.toArray();
     _hwDevices.reserve(deviceArray.size());
     int indexOfDefault = -1;
     for (const QJsonValue &deviceValue: deviceArray) {
@@ -67,13 +96,27 @@ bool HWListModel::reload()
             }(),
             deviceObj["description"].toString(),
             deviceObj["matching_type"].toString(),
-            deviceObj["architecture"].toString()
+            deviceObj["architecture"].toString(),
+            deviceObj["disabled"].toBool(false)
         };
         _hwDevices.append(hwDevice);
 
         if (deviceObj["default"].isBool() && deviceObj["default"].toBool())
             indexOfDefault = _hwDevices.size() - 1;
     }
+
+    // Add "Use custom" option at the end - allows selecting a local WIC file
+    HardwareDevice customDevice = {
+        tr("Use custom"),
+        QJsonArray(),  // Empty tags = no device filtering
+        QJsonArray(),
+        "qrc:/qt/qml/RpiImager/icons/use_custom.png",
+        tr("Select a local .wic image file"),
+        "inclusive",  // Show all OS images (no filtering)
+        "",  // No architecture preference
+        false  // Not disabled
+    };
+    _hwDevices.append(customDevice);
 
     endResetModel();
 
@@ -96,7 +139,8 @@ QHash<int, QByteArray> HWListModel::roleNames() const
         {IconRole, "icon"},
         {DescriptionRole, "description"},
         {MatchingTypeRole, "matching_type"},
-        {ArchitectureRole, "architecture"}
+        {ArchitectureRole, "architecture"},
+        {DisabledRole, "disabled"}
     };
 }
 
@@ -122,6 +166,8 @@ QVariant HWListModel::data(const QModelIndex &index, int role) const {
         return device.matchingType;
     case ArchitectureRole:
         return device.architecture;
+    case DisabledRole:
+        return device.disabled;
     }
 
     return {};

@@ -1,0 +1,292 @@
+name: Build and Package
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  QT_VERSION: '6.9.0'
+  BUILD_TYPE: MinSizeRel
+
+jobs:
+  # ============================================================================
+  # Linux Builds
+  # ============================================================================
+  build-linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            qt_arch: gcc_64
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            qt_arch: gcc_arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version detection
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            libgnutls28-dev \
+            libfuse2 \
+            fuse \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-xinerama0 \
+            libxcb-xfixes0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qt_arch }}
+          modules: 'qtsvg'
+          cache: true
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S src \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DQt6_ROOT=${{ env.Qt6_DIR }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Create AppImage
+        run: |
+          chmod +x create-appimage.sh
+          ./create-appimage.sh --arch=${{ matrix.arch }} --qt-root=${{ env.Qt6_DIR }} --no-clean
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage-${{ matrix.arch }}
+          path: '*.AppImage'
+          if-no-files-found: error
+
+  # ============================================================================
+  # Linux Debian Package
+  # ============================================================================
+  build-debian:
+    name: Debian Package (${{ matrix.profile }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [desktop, cli]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            devscripts \
+            debhelper \
+            dh-exec \
+            cmake \
+            libgnutls28-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: 'qtsvg'
+          cache: true
+
+      - name: Build Debian package
+        run: |
+          export Qt6_ROOT=${{ env.Qt6_DIR }}
+          dpkg-buildpackage -uc -us --profile=${{ matrix.profile }}
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-${{ matrix.profile }}
+          path: |
+            ../*.deb
+            ../*.changes
+          if-no-files-found: error
+
+  # ============================================================================
+  # Windows Build
+  # ============================================================================
+  build-windows:
+    name: Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_mingw
+          modules: 'qtsvg'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      - name: Setup MinGW
+        run: |
+          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1310_64/bin" >> $env:GITHUB_PATH
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cmake -B build -S src \
+            -G "MinGW Makefiles" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DQt6_ROOT="${Qt6_DIR}" \
+            -DMINGW64_ROOT="${{ runner.tool_cache }}/Qt/Tools/mingw1310_64"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Deploy Qt
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/laerdal-simserver-imager.exe dist/
+          windeployqt --qmldir src --release dist/laerdal-simserver-imager.exe
+
+      - name: Create ZIP archive
+        shell: powershell
+        run: |
+          $version = git describe --tags --always
+          Compress-Archive -Path dist\* -DestinationPath "laerdal-simserver-imager-$version-windows-x64.zip"
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: '*.zip'
+          if-no-files-found: error
+
+  # ============================================================================
+  # macOS Build
+  # ============================================================================
+  build-macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: macos-13
+            qt_arch: clang_64
+          - arch: arm64
+            runner: macos-14
+            qt_arch: clang_64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qt_arch }}
+          modules: 'qtsvg'
+          cache: true
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S src \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DQt6_ROOT=${{ env.Qt6_DIR }} \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Create DMG
+        run: |
+          cd build
+          # Deploy Qt frameworks
+          macdeployqt "Laerdal SimServer Imager.app" -qmldir=../src
+
+          # Create DMG
+          VERSION=$(git describe --tags --always)
+          hdiutil create -volname "Laerdal SimServer Imager" \
+            -srcfolder "Laerdal SimServer Imager.app" \
+            -ov -format UDZO \
+            "laerdal-simserver-imager-${VERSION}-macos-${{ matrix.arch }}.dmg"
+
+      - name: Upload macOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: build/*.dmg
+          if-no-files-found: error
+
+  # ============================================================================
+  # Create Release
+  # ============================================================================
+  release:
+    name: Create Release
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display artifacts
+        run: find artifacts -type f | head -50
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.AppImage
+            artifacts/**/*.zip
+            artifacts/**/*.dmg
+            artifacts/**/*.deb

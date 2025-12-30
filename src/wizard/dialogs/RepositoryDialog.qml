@@ -96,8 +96,8 @@ BaseDialog {
 
             ImRadioButton {
                 id: radioOfficial
-                text: "Raspberry Pi (default)"
-                accessibleDescription: qsTr("Use the official Raspberry Pi operating system repository")
+                text: "Laerdal CDN (default)"
+                accessibleDescription: qsTr("Use the official Laerdal operating system repository")
                 checked: true
                 ButtonGroup.group: repoGroup
                 Layout.fillWidth: true  // Enable text wrapping for long translations

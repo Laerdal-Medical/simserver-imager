@@ -3,7 +3,7 @@
 
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright (C) 2020-2025 Raspberry Pi Ltd
+ * Copyright (C) 2025 Laerdal Medical
  */
 
 #include <memory>
@@ -41,6 +41,11 @@ class QTranslator;
 class NativeFileDialog;
 #endif
 
+// Laerdal-specific includes (full headers required for Q_INVOKABLE return types in Qt 6.10+)
+#include "github/githubauth.h"
+#include "github/githubclient.h"
+#include "repository/repositorymanager.h"
+
 class ImageWriter : public QObject
 {
     Q_OBJECT
@@ -70,6 +75,16 @@ public:
 
     /* Set URL to download from, and if known download length and uncompressed length */
     Q_INVOKABLE void setSrc(const QUrl &url, quint64 downloadLen = 0, quint64 extrLen = 0, QByteArray expectedHash = "", bool multifilesinzip = false, QString parentcategory = "", QString osname = "", QByteArray initFormat = "", QString releaseDate = "");
+
+    /* Set GitHub artifact as source (requires authenticated download and ZIP extraction) */
+    Q_INVOKABLE void setSrcArtifact(qint64 artifactId, const QString &owner, const QString &repo,
+                                     const QString &branch, quint64 downloadLen, QString osname);
+
+    /* Check if current source is a GitHub artifact */
+    Q_INVOKABLE bool isArtifactSource() const { return _isArtifactSource; }
+
+    /* Extract WIC file from a ZIP archive and return the path to the extracted file */
+    Q_INVOKABLE QString extractWicFromZip(const QString &zipPath);
 
     /* Set device to write to */
     Q_INVOKABLE void setDst(const QString &device, quint64 deviceSize = 0);
@@ -193,6 +208,15 @@ public:
     /* Accept selection from QML fallback FileDialog */
     Q_INVOKABLE void acceptCustomImageFromQml(const QUrl &fileUrl) { onFileSelected(fileUrl.toLocalFile()); }
 
+    /* Get last used folder for custom image selection (for QML fallback FileDialog) */
+    Q_INVOKABLE QString getLastImageFolder() {
+        QSettings settings;
+        QString path = settings.value("lastpath").toString();
+        if (path.isEmpty())
+            path = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        return path;
+    }
+
     /* Generic native open-file dialog for QML callsites (sync) */
     Q_INVOKABLE QString getNativeOpenFileName(const QString &title = QString(),
                                              const QString &initialDir = QString(),
@@ -251,6 +275,7 @@ public:
 
     Q_INVOKABLE bool getBoolSetting(const QString &key);
     Q_INVOKABLE QString getStringSetting(const QString &key);
+    Q_INVOKABLE int getIntSetting(const QString &key, int defaultValue = 0);
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
     Q_INVOKABLE QString getRsaKeyFingerprint(const QString &keyPath);
     
@@ -325,6 +350,12 @@ public:
     Q_INVOKABLE bool installElevationPolicy();
     Q_INVOKABLE void restartWithElevatedPrivileges();
 
+    /* Check if running with elevated privileges */
+    Q_INVOKABLE bool hasElevatedPrivileges();
+
+    /* Request elevation via pkexec for write operation */
+    Q_INVOKABLE bool requestElevationForWrite();
+
     /* Performance data export - opens native save dialog and writes performance data to file.
        If native dialogs aren't available, emits performanceSaveDialogNeeded for QML fallback. */
     Q_INVOKABLE bool exportPerformanceData();
@@ -343,6 +374,21 @@ public:
 
     /* Get access to performance stats for instrumentation */
     PerformanceStats* performanceStats() { return _performanceStats; }
+
+    /* Laerdal-specific: Get GitHub authentication handler */
+    Q_INVOKABLE GitHubAuth* getGitHubAuth();
+
+    /* Laerdal-specific: Get GitHub API client */
+    Q_INVOKABLE GitHubClient* getGitHubClient();
+
+    /* Laerdal-specific: Get repository manager */
+    Q_INVOKABLE RepositoryManager* getRepositoryManager();
+
+    /* Laerdal-specific: Check if GitHub is authenticated */
+    Q_INVOKABLE bool isGitHubAuthenticated() const;
+
+    /* Laerdal-specific: Initialize GitHub authentication with client ID */
+    void initializeGitHubAuth();
 
 signals:
     /* We are emiting signals with QVariant as parameters because QML likes it that way */
@@ -376,6 +422,7 @@ signals:
     void cacheStatusChanged();
     void osListUnavailableChanged();
     void permissionWarning(QVariant msg);
+    void elevationNeeded();  // Emitted when write requires elevation (Windows)
     void locationPermissionGranted();
     void performanceSaveDialogNeeded(const QString &suggestedFilename, const QString &initialDir);
 
@@ -440,6 +487,12 @@ protected:
     SuspendInhibitor *_suspendInhibitor;
     DownloadThread *_thread;
     bool _verifyEnabled, _multipleFilesInZip, _online;
+    // GitHub artifact source tracking
+    bool _isArtifactSource = false;
+    qint64 _artifactId = 0;
+    QString _artifactOwner;
+    QString _artifactRepo;
+    QString _artifactBranch;
     QSettings _settings;
     QMap<QString,QString> _translations;
     QTranslator *_trans;
@@ -464,6 +517,11 @@ protected:
     int _debugAsyncQueueDepth;
     bool _debugIPv4Only;
     bool _debugSkipEndOfDevice;
+
+    // Laerdal-specific: GitHub and repository management
+    GitHubAuth *_githubAuth;
+    GitHubClient *_githubClient;
+    RepositoryManager *_repositoryManager;
 
     void _parseCompressedFile();
     void _parseXZFile();

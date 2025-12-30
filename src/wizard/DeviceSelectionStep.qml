@@ -13,27 +13,27 @@ import RpiImager
 
 WizardStepBase {
     id: root
-    
+
     required property ImageWriter imageWriter
     required property var wizardContainer
-    
+
     readonly property HWListModel hwModel: imageWriter.getHWList()
-    
-    title: qsTr("Select your Raspberry Pi device")
+
+    title: qsTr("Select your device")
     showNextButton: true
     // Enable Next when device selected OR when offline (so users can proceed with custom image)
     nextButtonEnabled: hasDeviceSelected || (osListUnavailable && hwlist.count === 0)
-    
+
     property alias hwlist: hwlist
     property bool modelLoaded: false
     property bool hasDeviceSelected: false
     property bool isReloadingModel: false
-    
+
     // Forward the nextClicked signal as next() function for keyboard auto-advance
     function next() {
         root.nextClicked()
     }
-    
+
     Component.onCompleted: {
         // Initial load only
         if (!modelLoaded) onOsListPreparedHandler()
@@ -197,10 +197,10 @@ WizardStepBase {
                     // (During model reload, the list may have changed and we should start at top)
                     var shouldPreserveScroll = !root.isReloadingModel
                     var savedContentY = shouldPreserveScroll ? contentY : 0
-                    
+
                     // Update ListView's currentIndex (for visual highlight)
                     currentIndex = index
-                    
+
                     // Set the model's current index (this triggers the HWListModel logic)
                     root.hwModel.currentIndex = index
                     // Use the model's currentName property
