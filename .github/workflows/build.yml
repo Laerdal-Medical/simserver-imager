@@ -130,7 +130,7 @@ jobs:
       - name: Build Debian package
         run: |
           export Qt6_ROOT="${Qt6_DIR}"
-          dpkg-buildpackage -uc -us --profile=${{ matrix.profile }}
+          dpkg-buildpackage -uc -us -P${{ matrix.profile }}
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
