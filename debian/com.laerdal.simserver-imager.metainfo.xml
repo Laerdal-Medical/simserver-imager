@@ -26,7 +26,7 @@
     <binary>laerdal-simserver-imager</binary>
   </provides>
   <releases>
-    <release version="09b40296-dirty" />
+    <release version="23d29fe0-dirty" />
   </releases>
   <content_rating type="oars-1.1">
     <content_attribute id="social-info">moderate</content_attribute>

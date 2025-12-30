@@ -24,8 +24,11 @@ unset(SKIP_INSTALL_ALL)
 # Set zlib variables that libarchive's CMake will use
 set(ZLIB_USE_STATIC_LIBS ON CACHE BOOL "" FORCE) # Prefer static
 set(ZLIB_ROOT ${zlib_SOURCE_DIR} CACHE PATH "" FORCE)
-# Mingw vs others library naming
-if (WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
+# Platform-specific library naming
+if(MSVC)
+    set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/zlibstatic.lib CACHE FILEPATH "" FORCE)
+    set(ZLIB_LIBRARIES ${zlib_BINARY_DIR}/zlibstatic.lib CACHE STRING "" FORCE)
+elseif(WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/libzsd.a CACHE FILEPATH "" FORCE)
         set(ZLIB_LIBRARIES ${zlib_BINARY_DIR}/libzsd.a CACHE STRING "" FORCE)
@@ -42,25 +45,10 @@ set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR} CACHE PATH "" FORCE)
 set(ZLIB_INCLUDE_DIRS ${zlib_SOURCE_DIR} CACHE PATH "" FORCE)
 set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
 add_library(ZLIB::ZLIB STATIC IMPORTED)
-if (WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/libzsd.a CACHE FILEPATH "" FORCE)
-        set(ZLIB_LIBRARIES ${zlib_BINARY_DIR}/libzsd.a CACHE STRING "" FORCE)
-    else()
-        set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/libzs.a CACHE FILEPATH "" FORCE)
-        set(ZLIB_LIBRARIES ${zlib_BINARY_DIR}/libzs.a CACHE STRING "" FORCE)
-    endif()
-    set_target_properties(ZLIB::ZLIB PROPERTIES
-        IMPORTED_LOCATION "${ZLIB_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}"
-    )
-    add_dependencies(ZLIB::ZLIB zlibstatic)
-else()
-    set_target_properties(ZLIB::ZLIB PROPERTIES
-        IMPORTED_LOCATION "${zlib_BINARY_DIR}/libz.a"
-        INTERFACE_INCLUDE_DIRECTORIES "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}"
-    )
-    add_dependencies(ZLIB::ZLIB zlibstatic)
-endif()
+set_target_properties(ZLIB::ZLIB PROPERTIES
+    IMPORTED_LOCATION "${ZLIB_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}"
+)
+add_dependencies(ZLIB::ZLIB zlibstatic)
 
 

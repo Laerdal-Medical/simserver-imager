@@ -30,6 +30,10 @@ set(Zstd_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/_deps/zstd-src/lib CACHE PATH 
 set(ZSTD_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/_deps/zstd-src/lib CACHE PATH "" FORCE)
 set(Zstd_LIBRARIES libzstd_static CACHE FILEPATH "" FORCE)
 set(ZSTD_LIBRARIES libzstd_static CACHE FILEPATH "" FORCE)
-set(ZSTD_LIBRARY ${CMAKE_CURRENT_BINARY_DIR}/_deps/zstd-build/lib/libzstd.a CACHE FILEPATH "" FORCE)
+if(MSVC)
+    set(ZSTD_LIBRARY ${CMAKE_CURRENT_BINARY_DIR}/_deps/zstd-build/lib/zstd_static.lib CACHE FILEPATH "" FORCE)
+else()
+    set(ZSTD_LIBRARY ${CMAKE_CURRENT_BINARY_DIR}/_deps/zstd-build/lib/libzstd.a CACHE FILEPATH "" FORCE)
+endif()
 
 
