@@ -72,14 +72,14 @@ jobs:
           cmake -B build -S src \
             -G "${{ matrix.cmake_generator }}" \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DQt6_ROOT="${Qt6_DIR}"
+            -DQt6_ROOT="${QT_ROOT_DIR}"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         run: |
           cmake -B build -S src `
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-            -DQt6_ROOT="$env:Qt6_DIR"
+            -DQt6_ROOT="$env:QT_ROOT_DIR"
 
       - name: Build (Linux/macOS)
         if: runner.os != 'Windows'
