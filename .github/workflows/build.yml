@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  QT_VERSION: '6.9.0'
+  QT_VERSION: '6.8.2'
   BUILD_TYPE: MinSizeRel
 
 jobs:
@@ -26,10 +26,11 @@ jobs:
         include:
           - arch: x86_64
             runner: ubuntu-24.04
-            qt_arch: gcc_64
+            qt_arch: linux_gcc_64
           - arch: aarch64
             runner: ubuntu-24.04-arm
-            qt_arch: gcc_arm64
+            qt_arch: linux_gcc_arm64
+            qt_host: linux_arm64
 
     steps:
       - name: Checkout
@@ -64,6 +65,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
+          host: ${{ matrix.qt_host || 'linux' }}
           arch: ${{ matrix.qt_arch }}
           modules: 'qtsvg'
           cache: true
@@ -123,6 +125,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
+          arch: linux_gcc_64
           modules: 'qtsvg'
           cache: true
 
@@ -157,14 +160,15 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
+          host: windows
           arch: win64_mingw
           modules: 'qtsvg'
-          tools: 'tools_mingw1310'
+          tools: 'tools_mingw1120'
           cache: true
 
       - name: Setup MinGW
         run: |
-          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1310_64/bin" >> $env:GITHUB_PATH
+          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1120_64/bin" >> $env:GITHUB_PATH
 
       - name: Configure CMake
         shell: bash
@@ -173,7 +177,7 @@ jobs:
             -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DQt6_ROOT="${Qt6_DIR}" \
-            -DMINGW64_ROOT="${{ runner.tool_cache }}/Qt/Tools/mingw1310_64"
+            -DMINGW64_ROOT="${{ runner.tool_cache }}/Qt/Tools/mingw1120_64"
 
       - name: Build
         run: cmake --build build --parallel
@@ -210,10 +214,8 @@ jobs:
         include:
           - arch: x86_64
             runner: macos-13
-            qt_arch: clang_64
           - arch: arm64
             runner: macos-14
-            qt_arch: clang_64
 
     steps:
       - name: Checkout
@@ -225,7 +227,8 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          arch: ${{ matrix.qt_arch }}
+          host: mac
+          arch: clang_64
           modules: 'qtsvg'
           cache: true
 

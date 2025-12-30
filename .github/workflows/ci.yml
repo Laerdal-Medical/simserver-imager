@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  QT_VERSION: '6.9.0'
+  QT_VERSION: '6.8.2'
   BUILD_TYPE: RelWithDebInfo
 
 jobs:
@@ -40,26 +40,47 @@ jobs:
             libgnutls28-dev libgl1-mesa-dev \
             libxkbcommon-dev libxkbcommon-x11-0
 
-      - name: Install Qt
+      - name: Install Qt (Linux)
+        if: runner.os == 'Linux'
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          arch: ${{ runner.os == 'Windows' && 'win64_mingw' || '' }}
+          arch: linux_gcc_64
           modules: 'qtsvg'
-          tools: ${{ runner.os == 'Windows' && 'tools_mingw1310' || '' }}
+          cache: true
+
+      - name: Install Qt (Windows)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          arch: win64_mingw
+          modules: 'qtsvg'
+          tools: 'tools_mingw1120'
+          cache: true
+
+      - name: Install Qt (macOS)
+        if: runner.os == 'macOS'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: mac
+          arch: clang_64
+          modules: 'qtsvg'
           cache: true
 
       - name: Setup MinGW (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1310_64/bin" >> $env:GITHUB_PATH
+          echo "${{ runner.tool_cache }}/Qt/Tools/mingw1120_64/bin" >> $env:GITHUB_PATH
 
       - name: Configure
         shell: bash
         run: |
           CMAKE_EXTRA_ARGS=""
           if [ "${{ runner.os }}" = "Windows" ]; then
-            CMAKE_EXTRA_ARGS="-DMINGW64_ROOT=${{ runner.tool_cache }}/Qt/Tools/mingw1310_64"
+            CMAKE_EXTRA_ARGS="-DMINGW64_ROOT=${{ runner.tool_cache }}/Qt/Tools/mingw1120_64"
           fi
           cmake -B build -S src \
             -G "${{ matrix.cmake_generator }}" \
