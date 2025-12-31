@@ -195,7 +195,8 @@ jobs:
         shell: msys2 {0}
         run: |
           # Use Qt's MinGW toolchain for consistent DLL dependencies
-          QT_MINGW_ROOT="${QT_ROOT_DIR}/../Tools/mingw1310_64"
+          # IQTA_TOOLS is set by install-qt-action and points to Qt/Tools
+          QT_MINGW_ROOT="${IQTA_TOOLS}/mingw1310_64"
           export PATH="${QT_MINGW_ROOT}/bin:${PATH}"
           cmake -B build -S src \
             -G Ninja \
@@ -209,14 +210,14 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
-          QT_MINGW_ROOT="${QT_ROOT_DIR}/../Tools/mingw1310_64"
+          QT_MINGW_ROOT="${IQTA_TOOLS}/mingw1310_64"
           export PATH="${QT_MINGW_ROOT}/bin:${PATH}"
           cmake --build build --parallel
 
       - name: Build Inno Setup installer
         shell: msys2 {0}
         run: |
-          QT_MINGW_ROOT="${QT_ROOT_DIR}/../Tools/mingw1310_64"
+          QT_MINGW_ROOT="${IQTA_TOOLS}/mingw1310_64"
           export PATH="${QT_MINGW_ROOT}/bin:${PATH}"
           cmake --build build --target inno_installer
 
@@ -331,3 +332,20 @@ jobs:
             artifacts/**/*.zip
             artifacts/**/*.exe
             artifacts/**/*.dmg
+
+  # ============================================================================
+  # Lint
+  # ============================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check CMake formatting
+        run: |
+          pip install cmake-format
+          find src -name 'CMakeLists.txt' -o -name '*.cmake' | \
+            xargs cmake-format --check || echo "CMake format check failed (non-blocking)"
