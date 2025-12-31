@@ -91,6 +91,24 @@ void GitHubClient::fetchTagFile(const QString &owner, const QString &repo,
     fetchBranchFile(owner, repo, tag, path);
 }
 
+void GitHubClient::fetchRepoInfo(const QString &owner, const QString &repo)
+{
+    QString urlStr = QString("%1/repos/%2/%3")
+                         .arg(API_BASE_URL, owner, repo);
+
+    QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
+    QNetworkReply *reply = _networkManager.get(request);
+
+    _pendingRequests[reply] = RequestRepoInfo;
+    _requestMetadata[reply] = qMakePair(owner, repo);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleNetworkReply(reply);
+    });
+
+    qDebug() << "GitHubClient: Fetching repo info for" << owner << "/" << repo;
+}
+
 void GitHubClient::fetchBranches(const QString &owner, const QString &repo)
 {
     QString urlStr = QString("%1/repos/%2/%3/branches")
@@ -405,6 +423,19 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
         break;
     }
 
+    case RequestRepoInfo: {
+        if (doc.isObject()) {
+            QJsonObject repoObj = doc.object();
+            QString defaultBranch = repoObj["default_branch"].toString();
+            emit repoInfoReady(metadata.first, metadata.second, defaultBranch);
+            qDebug() << "GitHubClient: Repo" << metadata.first << "/" << metadata.second
+                     << "default branch:" << defaultBranch;
+        } else {
+            emit error(tr("Unexpected response format for repository info"));
+        }
+        break;
+    }
+
     case RequestBranches: {
         if (doc.isArray()) {
             QJsonArray branches;
@@ -431,7 +462,7 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
 
     case RequestWicSearch: {
         if (doc.isArray()) {
-            QJsonArray wicFiles = filterWicAssets(doc.array());
+            QJsonArray wicFiles = filterWicAssets(doc.array(), metadata.first, metadata.second);
             emit wicFilesReady(wicFiles);
         }
         break;
@@ -597,7 +628,7 @@ void GitHubClient::checkRateLimitHeaders(QNetworkReply *reply)
     }
 }
 
-QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases)
+QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QString &owner, const QString &repo)
 {
     QJsonArray wicFiles;
 
@@ -637,6 +668,8 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases)
                 wicFile["download_url"] = asset["browser_download_url"].toString();
                 wicFile["asset_id"] = asset["id"].toVariant().toLongLong();
                 wicFile["content_type"] = asset["content_type"].toString();
+                wicFile["owner"] = owner;
+                wicFile["repo"] = repo;
 
                 wicFiles.append(wicFile);
             }

@@ -281,6 +281,37 @@ WizardStepBase {
             }
         }
 
+        // CI images status banner (shown after loading completes)
+        Rectangle {
+            id: ciStatusBanner
+            Layout.fillWidth: true
+            Layout.preferredHeight: visible ? ciStatusContent.implicitHeight + Style.spacingSmall * 2 : 0
+            visible: !root.isLoadingCIImages && root.repoManager && root.repoManager.statusMessage.length > 0
+            color: root.repoManager && root.repoManager.statusMessage.indexOf("found") >= 0 &&
+                   root.repoManager.statusMessage.indexOf("No") < 0
+                   ? Style.buttonFocusedBackgroundColor : Style.titleBackgroundColor
+
+            RowLayout {
+                id: ciStatusContent
+                anchors.fill: parent
+                anchors.leftMargin: Style.spacingMedium
+                anchors.rightMargin: Style.spacingMedium
+                anchors.topMargin: Style.spacingSmall
+                anchors.bottomMargin: Style.spacingSmall
+                spacing: Style.spacingSmall
+
+                Text {
+                    text: root.repoManager ? root.repoManager.statusMessage : ""
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamily
+                    color: Style.formLabelColor
+                    Layout.fillWidth: true
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+            }
+        }
+
         // Offline banner (shown when OS list fetch failed)
         Rectangle {
             id: offlineBanner

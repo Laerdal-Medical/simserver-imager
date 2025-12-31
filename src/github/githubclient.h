@@ -76,6 +76,13 @@ public:
                                    const QString &tag, const QString &path);
 
     /**
+     * @brief Fetch repository info (including default branch)
+     * @param owner Repository owner
+     * @param repo Repository name
+     */
+    Q_INVOKABLE void fetchRepoInfo(const QString &owner, const QString &repo);
+
+    /**
      * @brief List branches for a repository
      * @param owner Repository owner
      * @param repo Repository name
@@ -190,6 +197,14 @@ signals:
     void fileUrlReady(const QString &downloadUrl, const QString &fileName);
 
     /**
+     * @brief Emitted when repository info is fetched
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param defaultBranch Default branch name
+     */
+    void repoInfoReady(const QString &owner, const QString &repo, const QString &defaultBranch);
+
+    /**
      * @brief Emitted when branches are fetched
      * @param branches Array of branch names
      */
@@ -251,7 +266,7 @@ private slots:
 private:
     QNetworkRequest createAuthenticatedRequest(const QUrl &url);
     void checkRateLimitHeaders(QNetworkReply *reply);
-    QJsonArray filterWicAssets(const QJsonArray &releases);
+    QJsonArray filterWicAssets(const QJsonArray &releases, const QString &owner, const QString &repo);
     QJsonArray filterWicArtifacts(const QJsonArray &artifacts,
                                    const QString &owner, const QString &repo,
                                    const QString &branch, const QString &runCreatedAt);
@@ -266,6 +281,7 @@ private:
     // Track pending requests
     enum RequestType {
         RequestReleases,
+        RequestRepoInfo,
         RequestBranches,
         RequestTags,
         RequestFile,

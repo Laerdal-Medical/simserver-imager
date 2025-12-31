@@ -129,6 +129,58 @@ void RepositoryManager::addGitHubRepo(const QString &owner, const QString &repo,
     qDebug() << "RepositoryManager: Added repo:" << owner << "/" << repo;
 }
 
+void RepositoryManager::addGitHubRepoWithAutoDetect(const QString &owner, const QString &repo)
+{
+    // Check if already exists
+    for (const auto &existing : _githubRepos) {
+        if (existing.owner == owner && existing.repo == repo) {
+            qDebug() << "RepositoryManager: Repo already exists:" << owner << "/" << repo;
+            return;
+        }
+    }
+
+    // Fetch repo info to get default branch
+    if (_githubClient) {
+        // Connect to receive the repo info (one-shot connection)
+        QMetaObject::Connection *conn = new QMetaObject::Connection;
+        *conn = connect(_githubClient, &GitHubClient::repoInfoReady, this,
+            [this, owner, repo, conn](const QString &rOwner, const QString &rRepo, const QString &defaultBranch) {
+                if (rOwner == owner && rRepo == repo) {
+                    // Disconnect this one-shot handler
+                    disconnect(*conn);
+                    delete conn;
+
+                    // Now add the repo with the detected default branch
+                    addGitHubRepo(owner, repo, defaultBranch);
+                    qDebug() << "RepositoryManager: Auto-detected default branch for"
+                             << owner << "/" << repo << ":" << defaultBranch;
+                }
+            });
+
+        // Also handle errors
+        QMetaObject::Connection *errConn = new QMetaObject::Connection;
+        *errConn = connect(_githubClient, &GitHubClient::error, this,
+            [this, owner, repo, conn, errConn](const QString &message) {
+                // Disconnect handlers
+                disconnect(*conn);
+                disconnect(*errConn);
+                delete conn;
+                delete errConn;
+
+                // Fall back to "main" on error
+                qDebug() << "RepositoryManager: Failed to fetch repo info for"
+                         << owner << "/" << repo << ":" << message
+                         << "- using 'main' as default";
+                addGitHubRepo(owner, repo, "main");
+            });
+
+        _githubClient->fetchRepoInfo(owner, repo);
+    } else {
+        // No GitHub client, fall back to "main"
+        addGitHubRepo(owner, repo, "main");
+    }
+}
+
 void RepositoryManager::removeGitHubRepo(const QString &owner, const QString &repo)
 {
     for (int i = 0; i < _githubRepos.size(); ++i) {
@@ -221,6 +273,11 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
 
             if (_pendingRefreshCount > 0) {
                 setLoading(true);
+                qDebug() << "RepositoryManager: Branch filter refresh started, pending:" << _pendingRefreshCount;
+            } else {
+                // No enabled repos, complete immediately
+                setLoading(false);
+                emit osListReady();
             }
         }
     }
@@ -450,7 +507,7 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &wicFiles)
 
         QJsonObject osEntry;
         osEntry["name"] = wic["name"].toString();
-        osEntry["description"] = QString("Release: %1").arg(wic["release_name"].toString());
+        osEntry["description"] = QString("%1/%2 - Release: %3").arg(wic["owner"].toString(), wic["repo"].toString(), wic["release_name"].toString());
         osEntry["url"] = wic["download_url"].toString();
         osEntry["extract_size"] = wic["size"].toVariant().toLongLong();
         osEntry["image_download_size"] = wic["size"].toVariant().toLongLong();
@@ -479,7 +536,7 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
 
         QJsonObject osEntry;
         osEntry["name"] = artifactName;
-        osEntry["description"] = QString("Artifact from branch: %1").arg(wic["branch"].toString());
+        osEntry["description"] = QString("%1/%2 - Branch: %3").arg(wic["owner"].toString(), wic["repo"].toString(), wic["branch"].toString());
         osEntry["url"] = wic["download_url"].toString();
         osEntry["extract_size"] = wic["size"].toVariant().toLongLong();
         osEntry["image_download_size"] = wic["size"].toVariant().toLongLong();
@@ -519,7 +576,8 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         _githubOsList.append(osEntry);
     }
 
-    qDebug() << "RepositoryManager: GitHub artifact WIC files added:" << wicFiles.size();
+    qDebug() << "RepositoryManager: GitHub artifact WIC files added:" << wicFiles.size()
+             << ", pending before decrement:" << _pendingRefreshCount;
 
     _pendingRefreshCount--;
     checkRefreshComplete();
@@ -576,6 +634,14 @@ void RepositoryManager::setError(const QString &message)
     }
 }
 
+void RepositoryManager::setStatusMessage(const QString &message)
+{
+    if (_statusMessage != message) {
+        _statusMessage = message;
+        emit statusMessageChanged();
+    }
+}
+
 void RepositoryManager::checkRefreshComplete()
 {
     if (_pendingRefreshCount <= 0) {
@@ -583,6 +649,26 @@ void RepositoryManager::checkRefreshComplete()
         setLoading(false);
         emit osListReady();
         emit githubListReady(_githubOsList);
+
+        // Set status message based on results
+        int githubCount = _githubOsList.size();
+        if (githubCount == 0) {
+            // Check if there are any enabled repos
+            bool hasEnabledRepos = false;
+            for (const auto &repo : _githubRepos) {
+                if (repo.enabled) {
+                    hasEnabledRepos = true;
+                    break;
+                }
+            }
+            if (hasEnabledRepos) {
+                setStatusMessage(tr("No CI builds found for selected repositories"));
+            } else {
+                setStatusMessage(tr("No GitHub repositories enabled"));
+            }
+        } else {
+            setStatusMessage(tr("%1 CI build(s) found").arg(githubCount));
+        }
 
         qDebug() << "RepositoryManager: Refresh complete, total items:"
                  << getMergedOsList().size();

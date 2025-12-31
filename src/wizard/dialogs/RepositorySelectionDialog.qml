@@ -20,16 +20,25 @@ BaseDialog {
     title: qsTr("GitHub Repositories")
     implicitWidth: 480
     // Ensure dialog is tall enough to contain all content including buttons
-    height: Math.max(420, contentLayout ? (contentLayout.implicitHeight + Style.cardPadding * 2) : 420)
+    // Use larger height when add form is visible
+    height: root.showAddForm ? 500 : 420
 
     // Get repos from manager
     property var repos: repoManager ? repoManager.githubRepos : []
+
+    // Listen for repo changes to refresh list
+    Connections {
+        target: root.repoManager
+        function onReposChanged() {
+            root.repos = root.repoManager.githubRepos
+        }
+    }
 
     // State for add repo form
     property bool showAddForm: false
     property string newRepoOwner: ""
     property string newRepoName: ""
-    property string newRepoBranch: "main"
+    property string newRepoBranch: ""  // Empty = auto-detect from GitHub
 
     // State for editing repo branch
     property string editingRepoOwner: ""
@@ -44,7 +53,7 @@ BaseDialog {
         showAddForm = false
         newRepoOwner = ""
         newRepoName = ""
-        newRepoBranch = "main"
+        newRepoBranch = ""
         editingRepoOwner = ""
         editingRepoName = ""
         editingRepoBranch = ""
@@ -336,12 +345,27 @@ BaseDialog {
                     color: Style.textDescriptionColor
                 }
 
-                ImTextField {
-                    id: ownerField
+                ComboBox {
+                    id: ownerCombo
                     Layout.fillWidth: true
-                    placeholderText: qsTr("e.g., Laerdal")
-                    text: root.newRepoOwner
-                    onTextChanged: root.newRepoOwner = text
+                    Layout.preferredHeight: Style.buttonHeightStandard
+                    editable: true
+                    model: ["Laerdal-Medical", "Laerdal"]
+                    currentIndex: -1
+                    onActivated: function(index) {
+                        root.newRepoOwner = model[index]
+                    }
+                    onEditTextChanged: root.newRepoOwner = editText
+
+                    font.pixelSize: Style.fontSizeFormLabel
+                    font.family: Style.fontFamily
+
+                    background: Rectangle {
+                        color: Style.mainBackgroundColor
+                        border.color: ownerCombo.activeFocus ? Style.laerdalBlue : Style.popupBorderColor
+                        border.width: 1
+                        radius: 4
+                    }
                 }
             }
 
@@ -356,12 +380,27 @@ BaseDialog {
                     color: Style.textDescriptionColor
                 }
 
-                ImTextField {
-                    id: repoField
+                ComboBox {
+                    id: repoCombo
                     Layout.fillWidth: true
-                    placeholderText: qsTr("e.g., simserver-images")
-                    text: root.newRepoName
-                    onTextChanged: root.newRepoName = text
+                    Layout.preferredHeight: Style.buttonHeightStandard
+                    editable: true
+                    model: ["simpad-plus-top", "simserver-mcbapp", "simpad-app-next"]
+                    currentIndex: -1
+                    onActivated: function(index) {
+                        root.newRepoName = model[index]
+                    }
+                    onEditTextChanged: root.newRepoName = editText
+
+                    font.pixelSize: Style.fontSizeFormLabel
+                    font.family: Style.fontFamily
+
+                    background: Rectangle {
+                        color: Style.mainBackgroundColor
+                        border.color: repoCombo.activeFocus ? Style.laerdalBlue : Style.popupBorderColor
+                        border.width: 1
+                        radius: 4
+                    }
                 }
             }
 
@@ -379,13 +418,15 @@ BaseDialog {
                 ImTextField {
                     id: branchField
                     Layout.fillWidth: true
-                    placeholderText: "main"
+                    Layout.preferredHeight: Style.buttonHeightStandard
+                    placeholderText: qsTr("(auto)")
                     text: root.newRepoBranch
                     onTextChanged: root.newRepoBranch = text
                 }
             }
         }
 
+        // Buttons row below form fields
         RowLayout {
             Layout.fillWidth: true
             spacing: Style.spacingSmall
@@ -394,29 +435,44 @@ BaseDialog {
 
             ImButton {
                 text: qsTr("Cancel")
+                Layout.preferredHeight: Style.buttonHeightStandard
                 onClicked: {
                     root.showAddForm = false
                     root.newRepoOwner = ""
                     root.newRepoName = ""
-                    root.newRepoBranch = "main"
+                    root.newRepoBranch = ""
+                    ownerCombo.currentIndex = -1
+                    repoCombo.currentIndex = -1
                 }
             }
 
             ImButtonRed {
                 text: qsTr("Add")
+                Layout.preferredHeight: Style.buttonHeightStandard
                 enabled: root.newRepoOwner.length > 0 && root.newRepoName.length > 0
                 onClicked: {
                     if (root.repoManager && root.newRepoOwner && root.newRepoName) {
-                        root.repoManager.addGitHubRepo(
-                            root.newRepoOwner,
-                            root.newRepoName,
-                            root.newRepoBranch || "main"
-                        )
-                        root.repos = root.repoManager.githubRepos
+                        // If branch is empty or "main", auto-detect from GitHub
+                        if (root.newRepoBranch.length === 0 || root.newRepoBranch === "main") {
+                            root.repoManager.addGitHubRepoWithAutoDetect(
+                                root.newRepoOwner,
+                                root.newRepoName
+                            )
+                            // Note: repos list will be updated via Connections when reposChanged fires
+                        } else {
+                            // Use the specified branch (synchronous add)
+                            root.repoManager.addGitHubRepo(
+                                root.newRepoOwner,
+                                root.newRepoName,
+                                root.newRepoBranch
+                            )
+                        }
                         root.showAddForm = false
                         root.newRepoOwner = ""
                         root.newRepoName = ""
-                        root.newRepoBranch = "main"
+                        root.newRepoBranch = ""
+                        ownerCombo.currentIndex = -1
+                        repoCombo.currentIndex = -1
                     }
                 }
             }

@@ -64,6 +64,7 @@ public:
                WRITE setArtifactBranchFilter NOTIFY artifactBranchFilterChanged)
     Q_PROPERTY(QStringList availableBranches READ availableBranches
                NOTIFY availableBranchesChanged)
+    Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
 
     // Getters
     Environment currentEnvironment() const { return _environment; }
@@ -72,6 +73,7 @@ public:
     QString errorMessage() const { return _errorMessage; }
     QString artifactBranchFilter() const { return _artifactBranchFilter; }
     QStringList availableBranches() const { return _availableBranches; }
+    QString statusMessage() const { return _statusMessage; }
 
     /**
      * @brief Set the current CDN environment
@@ -106,6 +108,13 @@ public:
      */
     Q_INVOKABLE void addGitHubRepo(const QString &owner, const QString &repo,
                                     const QString &defaultBranch = "main");
+
+    /**
+     * @brief Add a GitHub repository and fetch its default branch from GitHub
+     * @param owner Repository owner (organization or user)
+     * @param repo Repository name
+     */
+    Q_INVOKABLE void addGitHubRepoWithAutoDetect(const QString &owner, const QString &repo);
 
     /**
      * @brief Remove a GitHub repository
@@ -197,6 +206,7 @@ signals:
     void errorMessageChanged();
     void artifactBranchFilterChanged();
     void availableBranchesChanged();
+    void statusMessageChanged();
     void osListReady();
     void cdnListReady(const QJsonArray &list);
     void githubListReady(const QJsonArray &list);
@@ -212,6 +222,7 @@ private slots:
 private:
     void setLoading(bool loading);
     void setError(const QString &message);
+    void setStatusMessage(const QString &message);
     void checkRefreshComplete();
 
     struct GitHubRepoInfo {
@@ -232,6 +243,7 @@ private:
     QSettings _settings;
     bool _isLoading = false;
     QString _errorMessage;
+    QString _statusMessage;
     QString _artifactBranchFilter;
     QStringList _availableBranches;
 
