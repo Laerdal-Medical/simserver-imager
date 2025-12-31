@@ -141,36 +141,5 @@ add_custom_command(TARGET ${PROJECT_NAME}
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/laerdal-simserver-imager.manifest"
     COMMENT "Copying generated manifest for resource compilation")
 
-add_custom_command(TARGET ${PROJECT_NAME}
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${MINGW64_ROOT}/bin/libgcc_s_seh-1.dll"
-        "${MINGW64_ROOT}/bin/libstdc++-6.dll"
-        "${MINGW64_ROOT}/bin/libwinpthread-1.dll"
-        "${CMAKE_BINARY_DIR}/deploy")
-
-# Copy Brotli DLLs required by Qt's network module (HTTP compression)
-# These may be in Qt's bin directory or MinGW's bin directory
-foreach(brotli_dll libbrotlidec libbrotlicommon)
-    # Try Qt directory first
-    if(EXISTS "${Qt6_ROOT}/bin/${brotli_dll}.dll")
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${Qt6_ROOT}/bin/${brotli_dll}.dll"
-                "${CMAKE_BINARY_DIR}/deploy")
-    # Fall back to MinGW directory
-    elseif(EXISTS "${MINGW64_ROOT}/bin/${brotli_dll}.dll")
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW64_ROOT}/bin/${brotli_dll}.dll"
-                "${CMAKE_BINARY_DIR}/deploy")
-    # Try with -1 suffix (common in MSYS2)
-    elseif(EXISTS "${MINGW64_ROOT}/bin/${brotli_dll}-1.dll")
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW64_ROOT}/bin/${brotli_dll}-1.dll"
-                "${CMAKE_BINARY_DIR}/deploy")
-    endif()
-endforeach()
 
 

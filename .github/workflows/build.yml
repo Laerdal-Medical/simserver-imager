@@ -183,6 +183,7 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: windows
           arch: win64_mingw
+          tools: 'tools_mingw1310'
           cache: true
 
       - name: Install Inno Setup
@@ -193,19 +194,31 @@ jobs:
       - name: Configure CMake
         shell: msys2 {0}
         run: |
+          # Use Qt's MinGW toolchain for consistent DLL dependencies
+          QT_MINGW_ROOT="${QT_ROOT_DIR}/../Tools/mingw1310_64"
+          export PATH="${QT_MINGW_ROOT}/bin:${PATH}"
           cmake -B build -S src \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DQt6_ROOT="$QT_ROOT_DIR" \
+            -DMINGW64_ROOT="$QT_MINGW_ROOT" \
+            -DCMAKE_C_COMPILER="${QT_MINGW_ROOT}/bin/gcc.exe" \
+            -DCMAKE_CXX_COMPILER="${QT_MINGW_ROOT}/bin/g++.exe" \
             -DENABLE_INNO_INSTALLER=ON
 
       - name: Build
         shell: msys2 {0}
-        run: cmake --build build --parallel
+        run: |
+          QT_MINGW_ROOT="${QT_ROOT_DIR}/../Tools/mingw1310_64"
+          export PATH="${QT_MINGW_ROOT}/bin:${PATH}"
+          cmake --build build --parallel
 
       - name: Build Inno Setup installer
         shell: msys2 {0}
-        run: cmake --build build --target inno_installer
+        run: |
+          QT_MINGW_ROOT="${QT_ROOT_DIR}/../Tools/mingw1310_64"
+          export PATH="${QT_MINGW_ROOT}/bin:${PATH}"
+          cmake --build build --target inno_installer
 
       - name: Create ZIP archive
         run: |
