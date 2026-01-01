@@ -96,61 +96,31 @@ jobs:
           path: 'Laerdal_SimServer_Imager-*-desktop-${{ matrix.arch }}.AppImage'
           if-no-files-found: error
 
-  # ============================================================================
-  # Linux Debian Packages (Desktop only - CLI requires separate AppImage build)
-  # ============================================================================
-  build-debian:
-    name: Debian Package (desktop)
-    runs-on: ubuntu-24.04
-    needs: build-linux
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Download AppImage artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-appimage-x86_64
-          path: .
-
-      - name: Prepare AppImage for packaging
+      # Build Debian package (x86_64 only) - done here so CMake-generated metainfo.xml is available
+      - name: Prepare AppImage for Debian packaging
+        if: matrix.arch == 'x86_64'
         run: |
-          # List downloaded files
-          ls -la *.AppImage
-
-          # The debian packaging expects: laerdal-simserver-imager-x86_64.AppImage
-          for f in *desktop*.AppImage Laerdal_SimServer_Imager*.AppImage; do
+          for f in Laerdal_SimServer_Imager-*-desktop-x86_64.AppImage; do
             if [ -f "$f" ]; then
               cp "$f" "laerdal-simserver-imager-x86_64.AppImage"
               break
             fi
           done
 
-          ls -la *.AppImage
-
-      - name: Install build dependencies
+      - name: Install Debian build dependencies
+        if: matrix.arch == 'x86_64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            cmake \
-            libgnutls28-dev \
-            devscripts \
-            debhelper \
-            dh-exec \
-            fakeroot
+          sudo apt-get install -y devscripts debhelper dh-exec fakeroot
 
       - name: Build Debian package
+        if: matrix.arch == 'x86_64'
         run: |
-          # Build the debian package with desktop profile
           dpkg-buildpackage -uc -us -b -Pdesktop
-          # Copy deb files to workspace (upload-artifact doesn't allow ../)
           cp ../*.deb .
 
       - name: Upload Debian package
+        if: matrix.arch == 'x86_64'
         uses: actions/upload-artifact@v4
         with:
           name: debian-desktop
@@ -291,7 +261,7 @@ jobs:
   # ============================================================================
   release:
     name: Create Release
-    needs: [build-linux, build-debian, build-windows, build-macos]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -311,21 +281,9 @@ jobs:
       - name: Get tag message
         id: tag_message
         run: |
-          # Debug: show tag info
-          echo "Tag name: ${{ github.ref_name }}"
-          echo "Tag type:"
-          git cat-file -t "${{ github.ref_name }}" || echo "Tag not found"
-
-          # Get the annotated tag message (excluding the tag name line)
+          # Get the annotated tag message
           TAG_MESSAGE=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
-
-          # Debug: show first few lines
-          echo "Tag message preview:"
-          echo "$TAG_MESSAGE" | head -10
-
-          # Write to file for multiline handling
           echo "$TAG_MESSAGE" > tag_message.txt
-          echo "Retrieved tag message for ${{ github.ref_name }}"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

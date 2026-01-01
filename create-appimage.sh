@@ -325,6 +325,8 @@ echo "Deploying Qt dependencies using $QT_DIR..."
 export QML_SOURCES_PATHS="$QML_SOURCES_PATH"
 # Enable FUSE to run the AppImages without extraction
 export APPIMAGE_EXTRACT_AND_RUN=1
+# Suppress linuxdeploy DEBUG messages
+export DEBUG=0
 # Set Qt path for linuxdeploy-plugin-qt
 export QMAKE="$QT_DIR/bin/qmake"
 # Set library paths to include Qt libraries (both runtime and linker search paths)
