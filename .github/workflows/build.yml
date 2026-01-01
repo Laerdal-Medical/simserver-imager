@@ -303,12 +303,26 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          fetch-tags: true
+
+      - name: Fetch tags
+        run: git fetch --tags --force
 
       - name: Get tag message
         id: tag_message
         run: |
+          # Debug: show tag info
+          echo "Tag name: ${{ github.ref_name }}"
+          echo "Tag type:"
+          git cat-file -t "${{ github.ref_name }}" || echo "Tag not found"
+
           # Get the annotated tag message (excluding the tag name line)
           TAG_MESSAGE=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+
+          # Debug: show first few lines
+          echo "Tag message preview:"
+          echo "$TAG_MESSAGE" | head -10
+
           # Write to file for multiline handling
           echo "$TAG_MESSAGE" > tag_message.txt
           echo "Retrieved tag message for ${{ github.ref_name }}"
