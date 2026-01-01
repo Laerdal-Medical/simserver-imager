@@ -331,6 +331,7 @@ public:
     Q_INVOKABLE bool hasMouse();
     Q_INVOKABLE void reboot();
     Q_INVOKABLE void openUrl(const QUrl &url);
+    Q_INVOKABLE void copyToClipboard(const QString &text);
     Q_INVOKABLE bool isScreenReaderActive() const;
     Q_INVOKABLE void handleIncomingUrl(const QUrl &url);
     Q_INVOKABLE void overwriteConnectToken(const QString &token);

@@ -4094,6 +4094,22 @@ void ImageWriter::openUrl(const QUrl &url)
     }
 }
 
+void ImageWriter::copyToClipboard(const QString &text)
+{
+#ifndef CLI_ONLY_BUILD
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    if (clipboard) {
+        clipboard->setText(text);
+        qDebug() << "Copied to clipboard:" << text;
+    } else {
+        qWarning() << "Failed to access clipboard";
+    }
+#else
+    qWarning() << "Clipboard not available in CLI mode";
+    Q_UNUSED(text)
+#endif
+}
+
 bool ImageWriter::verifyAuthKey(const QString &s, bool strict) const
 {
     // Base58 (no 0 O I l)

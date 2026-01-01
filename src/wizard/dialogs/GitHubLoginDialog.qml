@@ -135,23 +135,16 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    // Loading state
-    ColumnLayout {
+    // Loading state - use explicit height calculation since Layout.fillHeight doesn't work in BaseDialog
+    Item {
         Layout.fillWidth: true
-        spacing: Style.spacingMedium
+        // Calculate height: dialog height - title height - footer height - padding
+        Layout.preferredHeight: root.height - titleLabel.height - root.footerHeight - (Style.cardPadding * 3) - Style.spacingMedium
         visible: root.authState === "idle"
 
         BusyIndicator {
-            Layout.alignment: Qt.AlignHCenter
+            anchors.centerIn: parent
             running: root.authState === "idle"
-        }
-
-        Text {
-            text: qsTr("Connecting to GitHub...")
-            font.pixelSize: Style.fontSizeFormLabel
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            Layout.alignment: Qt.AlignHCenter
         }
     }
 

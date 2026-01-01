@@ -268,11 +268,8 @@ BaseDialog {
                             popup.githubAuth.logout()
                         }
                     } else {
-                        // Open GitHub login dialog
-                        popup.close()
-                        Qt.callLater(function() {
-                            githubLoginDialog.open()
-                        })
+                        // Open GitHub login dialog as overlay
+                        githubLoginDialog.open()
                     }
                 }
             }
@@ -288,10 +285,8 @@ BaseDialog {
                     focusItem.activeFocusOnTab = true
                 }
                 onClicked: {
-                    popup.close()
-                    Qt.callLater(function() {
-                        repoSelectionDialog.open()
-                    })
+                    // Open as overlay on top of AppOptionsDialog
+                    repoSelectionDialog.open()
                 }
             }
 
@@ -384,6 +379,13 @@ BaseDialog {
         parent: popup.parent
         imageWriter: popup.imageWriter
         wizardContainer: popup.wizardContainer
+
+        onClosed: {
+            // Reopen AppOptionsDialog when repository dialog closes
+            Qt.callLater(function() {
+                popup.open()
+            })
+        }
     }
 
     // File dialog for RSA key selection (embedded mode)
@@ -421,7 +423,7 @@ BaseDialog {
         }
     }
 
-    // GitHub Login Dialog
+    // GitHub Login Dialog (opens as overlay on top of AppOptionsDialog)
     GitHubLoginDialog {
         id: githubLoginDialog
         imageWriter: popup.imageWriter
@@ -430,7 +432,7 @@ BaseDialog {
         anchors.centerIn: parent
     }
 
-    // Repository Selection Dialog
+    // Repository Selection Dialog (opens as overlay on top of AppOptionsDialog)
     RepositorySelectionDialog {
         id: repoSelectionDialog
         repoManager: popup.repoManager
