@@ -82,6 +82,9 @@ jobs:
 
       - name: Create AppImage
         run: |
+          # Restore any tracked files modified by the build process so git describe is clean
+          # This only affects tracked files, not the build/ output directory
+          git checkout -- src/ || true
           chmod +x create-appimage.sh
           ./create-appimage.sh --arch=${{ matrix.arch }} --qt-root="${QT_ROOT_DIR}" --no-clean
 
