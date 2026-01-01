@@ -1,7 +1,11 @@
 ==
-Raspberry Pi Imaging Utility main code license terms
+Laerdal SimServer Imager license terms
 ==
 
+Laerdal SimServer Imager
+Copyright (C) 2025 Laerdal Medical
+
+This application is based on Raspberry Pi Imager.
 Copyright (C) 2020 Raspberry Pi Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");

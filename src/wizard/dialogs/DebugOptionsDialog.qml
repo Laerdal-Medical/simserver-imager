@@ -6,16 +6,15 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "../../qmlcomponents"
 
 import RpiImager
 
 BaseDialog {
     id: popup
-    
-    // Height based on window size minus padding - content scrolls within
+
+    width: 700
     height: parent ? Math.min(500, parent.height - Style.cardPadding * 2) : 500
-    
+
     // imageWriter is inherited from BaseDialog
     property var wizardContainer: null
     
@@ -60,38 +59,28 @@ BaseDialog {
         activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
     }
 
-    // Warning text
-    Text {
-        id: warningText
-        text: qsTr("⚠️ These options are for debugging and testing. Changing them may affect performance and data integrity.")
-        font.pixelSize: Style.fontSizeDescription
-        font.family: Style.fontFamily
-        color: Style.formLabelErrorColor
-        wrapMode: Text.WordWrap
-        Layout.fillWidth: true
-        horizontalAlignment: Text.AlignHCenter
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
-        Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
+    // Warning banner
+    ImBanner {
+        id: warningBanner
+        bannerType: ImBanner.Type.Warning
+        text: qsTr("These options are for debugging and testing. Changing them may affect performance and data integrity.")
     }
 
     // Scrollable options section
     ScrollView {
         id: scrollView
         Layout.fillWidth: true
-        Layout.fillHeight: true
+        Layout.preferredHeight: popup.height - headerText.implicitHeight - warningBanner.Layout.preferredHeight - popup.footer.height - (Style.cardPadding * 2)
         clip: true
-        contentWidth: availableWidth  // Ensure content uses full width
-        
-        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+        contentWidth: availableWidth // Ensure content uses full width
+
+        //ScrollBar.vertical.policy: ScrollBar
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
         ColumnLayout {
             id: optionsLayout
             width: scrollView.availableWidth  // Use ScrollView's available width directly
-            spacing: Style.spacingMedium
+            spacing: Style.spacingSmall
 
             // Section header for I/O options
             Text {
@@ -345,45 +334,44 @@ BaseDialog {
         }
     }
 
-    // Buttons section with background
-    Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: buttonRow.implicitHeight + Style.cardPadding
-        color: Style.titleBackgroundColor
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
+        spacing: Style.spacingMedium
 
-        RowLayout {
-            id: buttonRow
-            anchors.fill: parent
-            anchors.margins: Style.cardPadding / 2
-            spacing: Style.spacingMedium
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
 
-            Item {
-                Layout.fillWidth: true
-            }
+        Item { Layout.fillWidth: true }
 
-            ImButton {
-                id: cancelButton
-                text: CommonStrings.cancel
-                accessibleDescription: qsTr("Close the debug options dialog without saving any changes")
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                activeFocusOnTab: true
-                onClicked: {
-                    popup.close();
-                }
-            }
-
-            ImButtonRed {
-                id: applyButton
-                text: qsTr("Apply")
-                accessibleDescription: qsTr("Apply the selected debug options")
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                activeFocusOnTab: true
-                onClicked: {
-                    popup.applySettings();
-                    popup.close();
-                }
+        ImButton {
+            id: cancelButton
+            text: CommonStrings.cancel
+            accessibleDescription: qsTr("Close the debug options dialog without saving any changes")
+            Layout.minimumWidth: Style.buttonWidthMinimum
+            Layout.preferredHeight: Style.buttonHeightStandard
+            activeFocusOnTab: true
+            onClicked: {
+                popup.close();
             }
         }
+
+        ImButtonRed {
+            id: applyButton
+            text: qsTr("Apply")
+            accessibleDescription: qsTr("Apply the selected debug options")
+            Layout.minimumWidth: Style.buttonWidthMinimum
+            Layout.preferredHeight: Style.buttonHeightStandard
+            activeFocusOnTab: true
+            onClicked: {
+                popup.applySettings();
+                popup.close();
+            }
+        }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 
     function initialize() {

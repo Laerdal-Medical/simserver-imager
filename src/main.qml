@@ -8,9 +8,6 @@ import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Controls.Material
-import "qmlcomponents"
-import "wizard"
-import "wizard/dialogs"
 
 import RpiImager
 
@@ -517,18 +514,26 @@ ApplicationWindow {
             Layout.fillWidth: true
         }
 
-        RowLayout {
-            Layout.fillWidth: true
+        // Footer with action buttons
+        footer: RowLayout {
+            width: parent.width
+            height: Style.buttonHeightStandard + (Style.cardPadding * 2)
             spacing: Style.spacingMedium
-            Item {
-                Layout.fillWidth: true
-            }
+
+            // Left padding
+            Item { Layout.preferredWidth: Style.cardPadding }
+
+            Item { Layout.fillWidth: true }
 
             ImButton {
                 text: qsTr("OK")
+                Layout.preferredHeight: Style.buttonHeightStandard
                 activeFocusOnTab: true
                 onClicked: permissionWarningDialog.close()
             }
+
+            // Right padding
+            Item { Layout.preferredWidth: Style.cardPadding }
         }
     }
 

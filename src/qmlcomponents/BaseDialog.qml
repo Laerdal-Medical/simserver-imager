@@ -31,14 +31,18 @@ Dialog {
     
     // Dynamic width based on content, with min/max bounds
     // Grows to fit content (especially for long translated strings) but stays within window
-    readonly property int minDialogWidth: 400
-    readonly property int maxDialogWidth: parent ? Math.max(minDialogWidth, parent.width - Style.cardPadding * 2) : 700
+    readonly property real minDialogWidth: 400
+    readonly property real maxDialogWidth: parent ? Math.max(minDialogWidth, parent.width - Style.cardPadding * 2) : 700
     // Use the largest of: minDialogWidth, explicit implicitWidth, or content-based width
-    readonly property int contentBasedWidth: contentLayout ? (contentLayout.implicitWidth + Style.cardPadding * 2) : minDialogWidth
+    readonly property real contentBasedWidth: contentLayout ? (contentLayout.implicitWidth + Style.cardPadding * 2) : minDialogWidth
     width: Math.min(maxDialogWidth, Math.max(minDialogWidth, implicitWidth, contentBasedWidth))
     
-    // Dynamic height based on content (can be overridden)
-    height: Math.max(200, contentLayout ? (contentLayout.implicitHeight + Style.cardPadding * 2) : 200)
+    // Dynamic height based on content (can be overridden by child dialogs)
+    // contentLayout.y is top padding, and we need equal bottom padding
+    // Also add footer height if a footer is defined
+    readonly property real footerHeight: footer ? footer.height : 0
+    readonly property real calculatedHeight: Math.max(200, contentLayout ? (contentLayout.y + contentLayout.implicitHeight + Style.cardPadding + footerHeight) : 200)
+    implicitHeight: calculatedHeight
     
     // Positioning - only set if no anchors are used
     x: anchors.centerIn ? 0 : (parent ? (parent.width - width) / 2 : 0)
@@ -150,10 +154,12 @@ Dialog {
         // Main content layout
         ColumnLayout {
             id: contentLayout
-            anchors.fill: parent
-            anchors.margins: Style.cardPadding
+            // Use explicit positioning instead of anchors.fill to preserve implicitHeight
+            x: Style.cardPadding
+            y: Style.cardPadding
+            width: parent.width - Style.cardPadding * 2
             spacing: Style.spacingMedium
-            
+
             // Make imageWriter available to all children via parent lookup
             property var imageWriter: root.imageWriter
         }

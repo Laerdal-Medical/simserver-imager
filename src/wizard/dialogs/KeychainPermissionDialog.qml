@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "../../qmlcomponents"
 import RpiImager
 
 BaseDialog {
@@ -85,10 +84,15 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    RowLayout {
-        id: buttonRow
-        Layout.fillWidth: true
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
         spacing: Style.spacingMedium
+
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
+
         Item { Layout.fillWidth: true }
 
         ImButton {
@@ -96,6 +100,7 @@ BaseDialog {
             text: CommonStrings.no
             accessibleDescription: qsTr("Skip keychain access and manually enter the Wi-Fi password")
             Layout.preferredWidth: 80
+            Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
             onClicked: {
                 root.userAccepted = false
@@ -108,12 +113,16 @@ BaseDialog {
             text: CommonStrings.yes
             accessibleDescription: qsTr("Retrieve the Wi-Fi password from the system keychain using administrator authentication")
             Layout.preferredWidth: 80
+            Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
             onClicked: {
                 root.userAccepted = true
                 root.accept()
             }
         }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 
     onClosed: {

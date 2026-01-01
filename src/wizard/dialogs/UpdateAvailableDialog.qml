@@ -6,7 +6,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "../../qmlcomponents"
 import RpiImager
 
 BaseDialog {
@@ -67,15 +66,22 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    RowLayout {
-        Layout.fillWidth: true
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
         spacing: Style.spacingMedium
+
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
+
         Item { Layout.fillWidth: true }
 
         ImButton {
             id: noButton
             text: CommonStrings.no
             accessibleDescription: qsTr("Continue using the current version of Laerdal SimServer Imager")
+            Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
             onClicked: {
                 root.reject()
@@ -86,6 +92,7 @@ BaseDialog {
             id: yesButton
             text: CommonStrings.yes
             accessibleDescription: qsTr("Open the Laerdal website in your browser to download the latest version")
+            Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
             onClicked: {
                 if (root.url && root.url.toString && root.url.toString().length > 0) {
@@ -98,5 +105,8 @@ BaseDialog {
                 root.accept()
             }
         }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 }

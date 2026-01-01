@@ -5,7 +5,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import RpiImager
-import "../../qmlcomponents"
 
 BaseDialog {
     id: root
@@ -61,20 +60,25 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    RowLayout {
-        Layout.fillWidth: true
-        // Ensure minimum width accommodates buttons
-        Layout.minimumWidth: keepFilterButton.implicitWidth + showSystemButton.implicitWidth + Style.spacingMedium * 2
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
         spacing: Style.spacingMedium
+
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
+
         Item { Layout.fillWidth: true }
 
         ImButtonRed {
             id: keepFilterButton
             text: qsTr("KEEP FILTER ON")
             accessibleDescription: qsTr("Keep system drives hidden to prevent accidental damage to your operating system")
-            activeFocusOnTab: true
+            Layout.preferredHeight: Style.buttonHeightStandard
             // Allow button to grow to fit text for this important warning dialog
             implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
+            activeFocusOnTab: true
             onClicked: {
                 root.close()
                 root.cancelled()
@@ -85,13 +89,17 @@ BaseDialog {
             id: showSystemButton
             text: qsTr("SHOW SYSTEM DRIVES")
             accessibleDescription: qsTr("Remove the safety filter and display system drives in the storage device list")
-            activeFocusOnTab: true
+            Layout.preferredHeight: Style.buttonHeightStandard
             // Allow button to grow to fit text for this important warning dialog
             implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
+            activeFocusOnTab: true
             onClicked: {
                 root.close()
                 root.confirmed()
             }
         }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 }

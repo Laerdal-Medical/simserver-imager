@@ -8,7 +8,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
-import "../../qmlcomponents"
 
 import RpiImager
 
@@ -187,68 +186,60 @@ BaseDialog {
         }
     }
 
-    // Spacer
-    Item {
-        Layout.fillHeight: true
-    }
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
+        spacing: Style.spacingMedium
 
-    // Buttons section with background
-    Rectangle {
-        Layout.fillWidth: true
-        // Ensure minimum width accommodates buttons
-        Layout.minimumWidth: cancelButton.implicitWidth + saveButton.implicitWidth + Style.spacingMedium * 2 + Style.cardPadding
-        Layout.preferredHeight: buttonRow.implicitHeight + Style.cardPadding
-        color: Style.titleBackgroundColor
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
 
-        RowLayout {
-            id: buttonRow
-            anchors.fill: parent
-            anchors.margins: Style.cardPadding / 2
-            spacing: Style.spacingMedium
+        Item { Layout.fillWidth: true }
 
-            Item {
-                Layout.fillWidth: true
-            }
-
-            ImButton {
-                id: cancelButton
-                text: CommonStrings.cancel
-                accessibleDescription: qsTr("Close the repository dialog without changing the content source")
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                activeFocusOnTab: true
-                onClicked: {
-                    popup.initialized = false
-                    popup.close();
-                }
-            }
-
-            ImButtonRed {
-                id: saveButton
-                enabled: (radioOfficial.checked
-                         || (radioCustomFile.checked && popup.selectedRepo.toString() !== "")
-                         || (radioCustomUri.checked && fieldCustomUri.isValid))
-                         // Disable while write is in progress to prevent restarting during write
-                         && (imageWriter.writeState === ImageWriter.Idle ||
-                             imageWriter.writeState === ImageWriter.Succeeded ||
-                             imageWriter.writeState === ImageWriter.Failed ||
-                             imageWriter.writeState === ImageWriter.Cancelled)
-                // TODO: only show or enable when settings changed
-                text: qsTr("Apply & Restart")
-                accessibleDescription: qsTr("Apply the new content repository and restart the wizard from the beginning")
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                // Allow button to grow to fit text
-                implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
-                activeFocusOnTab: true
-                onClicked: {
-                    popup.applySettings();
-                    popup.close();
-                }
-                onEnabledChanged: {
-                    // Rebuild focus order when button becomes enabled/disabled
-                    Qt.callLater(popup.rebuildFocusOrder)
-                }
+        ImButton {
+            id: cancelButton
+            text: CommonStrings.cancel
+            accessibleDescription: qsTr("Close the repository dialog without changing the content source")
+            Layout.minimumWidth: Style.buttonWidthMinimum
+            Layout.preferredHeight: Style.buttonHeightStandard
+            activeFocusOnTab: true
+            onClicked: {
+                popup.initialized = false
+                popup.close();
             }
         }
+
+        ImButtonRed {
+            id: saveButton
+            enabled: (radioOfficial.checked
+                     || (radioCustomFile.checked && popup.selectedRepo.toString() !== "")
+                     || (radioCustomUri.checked && fieldCustomUri.isValid))
+                     // Disable while write is in progress to prevent restarting during write
+                     && (imageWriter.writeState === ImageWriter.Idle ||
+                         imageWriter.writeState === ImageWriter.Succeeded ||
+                         imageWriter.writeState === ImageWriter.Failed ||
+                         imageWriter.writeState === ImageWriter.Cancelled)
+            // TODO: only show or enable when settings changed
+            text: qsTr("Apply & Restart")
+            accessibleDescription: qsTr("Apply the new content repository and restart the wizard from the beginning")
+            Layout.minimumWidth: Style.buttonWidthMinimum
+            Layout.preferredHeight: Style.buttonHeightStandard
+            // Allow button to grow to fit text
+            implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
+            activeFocusOnTab: true
+            onClicked: {
+                popup.applySettings();
+                popup.close();
+            }
+            onEnabledChanged: {
+                // Rebuild focus order when button becomes enabled/disabled
+                Qt.callLater(popup.rebuildFocusOrder)
+            }
+        }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 
     Connections {

@@ -8,15 +8,11 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
-import "../../qmlcomponents"
 
 import RpiImager
 
 BaseDialog {
     id: popup
-    
-    // Override default height for this more complex dialog
-    height: Math.max(280, contentLayout ? (contentLayout.implicitHeight + Style.cardPadding * 2) : 280)
     
     // imageWriter is inherited from BaseDialog
     // Optional reference to the wizard container for ephemeral flags
@@ -330,11 +326,6 @@ BaseDialog {
         }
     }
 
-    // Spacer
-    Item {
-        Layout.fillHeight: true
-    }
-
     // Version display - only shown when window has no decorations (no title bar)
     Text {
         id: versionText
@@ -348,47 +339,44 @@ BaseDialog {
         Layout.bottomMargin: Style.spacingSmall
     }
 
-    // Buttons section with background
-    Rectangle {
-        Layout.fillWidth: true
-        // Ensure minimum width accommodates buttons
-        Layout.minimumWidth: cancelButton.implicitWidth + saveButton.implicitWidth + Style.spacingMedium * 2 + Style.cardPadding
-        Layout.preferredHeight: buttonRow.implicitHeight + Style.cardPadding
-        color: Style.titleBackgroundColor
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
+        spacing: Style.spacingMedium
 
-        RowLayout {
-            id: buttonRow
-            anchors.fill: parent
-            anchors.margins: Style.cardPadding / 2
-            spacing: Style.spacingMedium
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
 
-            Item {
-                Layout.fillWidth: true
-            }
+        Item { Layout.fillWidth: true }
 
-            ImButton {
-                id: cancelButton
-                text: CommonStrings.cancel
-                accessibleDescription: qsTr("Close the options dialog without saving any changes")
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                activeFocusOnTab: true
-                onClicked: {
-                    popup.close();
-                }
-            }
-
-            ImButtonRed {
-                id: saveButton
-                text: qsTr("Save")
-                accessibleDescription: qsTr("Save the selected options and apply them to Laerdal SimServer Imager")
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                activeFocusOnTab: true
-                onClicked: {
-                    popup.applySettings();
-                    popup.close();
-                }
+        ImButton {
+            id: cancelButton
+            text: CommonStrings.cancel
+            accessibleDescription: qsTr("Close the options dialog without saving any changes")
+            Layout.minimumWidth: Style.buttonWidthMinimum
+            Layout.preferredHeight: Style.buttonHeightStandard
+            activeFocusOnTab: true
+            onClicked: {
+                popup.close();
             }
         }
+
+        ImButtonRed {
+            id: saveButton
+            text: qsTr("Save")
+            accessibleDescription: qsTr("Save the selected options and apply them to Laerdal SimServer Imager")
+            Layout.minimumWidth: Style.buttonWidthMinimum
+            Layout.preferredHeight: Style.buttonHeightStandard
+            activeFocusOnTab: true
+            onClicked: {
+                popup.applySettings();
+                popup.close();
+            }
+        }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 
     RepositoryDialog {
@@ -470,10 +458,6 @@ BaseDialog {
             initialized = true;
             // Clear initialization flag
             isInitializing = false;
-            
-            // Pre-compute final height before opening to avoid first-show reflow
-            var desired = contentLayout ? (contentLayout.implicitHeight + Style.cardPadding * 2) : 280;
-            popup.height = Math.max(280, desired);
         }
     }
 
@@ -561,17 +545,22 @@ BaseDialog {
             activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
         }
 
-        RowLayout {
-            Layout.fillWidth: true
+        // Footer with action buttons
+        footer: RowLayout {
+            width: parent.width
+            height: Style.buttonHeightStandard + (Style.cardPadding * 2)
             spacing: Style.spacingMedium
-            Item {
-                Layout.fillWidth: true
-            }
+
+            // Left padding
+            Item { Layout.preferredWidth: Style.cardPadding }
+
+            Item { Layout.fillWidth: true }
 
             ImButton {
                 id: confirmCancelButton
                 text: CommonStrings.cancel
                 accessibleDescription: qsTr("Keep warnings enabled and return to the options dialog")
+                Layout.preferredHeight: Style.buttonHeightStandard
                 activeFocusOnTab: true
                 onClicked: confirmDisableWarnings.close()
             }
@@ -580,6 +569,7 @@ BaseDialog {
                 id: confirmDisableButton
                 text: qsTr("Disable warnings")
                 accessibleDescription: qsTr("Disable confirmation prompts before writing images, requiring only exact name entry for system drives")
+                Layout.preferredHeight: Style.buttonHeightStandard
                 activeFocusOnTab: true
                 onClicked: {
                     confirmDisableWarnings.confirmAccepted = true;
@@ -588,6 +578,9 @@ BaseDialog {
                     confirmDisableWarnings.close();
                 }
             }
+
+            // Right padding
+            Item { Layout.preferredWidth: Style.cardPadding }
         }
     }
 }

@@ -8,7 +8,6 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtCore
-import "../qmlcomponents"
 import "components"
 
 import RpiImager

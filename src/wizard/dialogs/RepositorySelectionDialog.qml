@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "../../qmlcomponents"
 
 import RpiImager
 
@@ -495,12 +494,15 @@ BaseDialog {
         visible: !root.showAddForm
     }
 
-    // Footer buttons
-    RowLayout {
-        Layout.fillWidth: true
-        Layout.topMargin: Style.spacingMedium
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
         spacing: Style.spacingMedium
         visible: !root.showAddForm
+
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
 
         ImButton {
             text: qsTr("Add Repository...")
@@ -517,5 +519,8 @@ BaseDialog {
             accessibleDescription: qsTr("Close the repository selection dialog")
             Layout.preferredHeight: Style.buttonHeightStandard
         }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 }

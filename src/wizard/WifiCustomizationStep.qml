@@ -6,7 +6,6 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import "../qmlcomponents"
 import "components"
 
 import RpiImager

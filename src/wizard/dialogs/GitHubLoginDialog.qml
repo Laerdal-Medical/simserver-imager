@@ -6,7 +6,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "../../qmlcomponents"
 
 import RpiImager
 
@@ -17,6 +16,7 @@ BaseDialog {
 
     title: qsTr("Sign in with GitHub")
     width: 480
+    height: 320
 
     // OAuth Device Flow states
     property string userCode: ""
@@ -38,6 +38,7 @@ BaseDialog {
 
         registerFocusGroup("dialog_buttons", function() {
             var buttons = []
+            if (tryAgainButton.visible && tryAgainButton.enabled) buttons.push(tryAgainButton)
             if (copyCodeButton.visible && copyCodeButton.enabled) buttons.push(copyCodeButton)
             if (openGitHubButton.visible && openGitHubButton.enabled) buttons.push(openGitHubButton)
             if (cancelButton.visible) buttons.push(cancelButton)
@@ -208,42 +209,6 @@ BaseDialog {
             wrapMode: Text.WordWrap
         }
 
-        // Buttons row
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-
-            ImButton {
-                id: copyCodeButton
-                text: qsTr("Copy Code")
-                accessibleDescription: qsTr("Copy the authorization code to clipboard")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                activeFocusOnTab: true
-
-                onClicked: {
-                    if (root.imageWriter) {
-                        root.imageWriter.copyToClipboard(root.userCode)
-                    }
-                }
-            }
-
-            ImButtonRed {
-                id: openGitHubButton
-                text: qsTr("Open GitHub")
-                accessibleDescription: qsTr("Open GitHub authorization page in your browser")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                activeFocusOnTab: true
-
-                onClicked: {
-                    Qt.openUrlExternally(root.verificationUrl)
-                    // Start polling after user opens GitHub
-                    root.authState = "polling"
-                }
-            }
-
-            Item { Layout.fillWidth: true }
-        }
-
         // Polling indicator
         RowLayout {
             Layout.fillWidth: true
@@ -272,6 +237,7 @@ BaseDialog {
         visible: root.authState === "success"
 
         RowLayout {
+            id: successRow
             Layout.alignment: Qt.AlignHCenter
             spacing: Style.spacingSmall
 
@@ -314,11 +280,26 @@ BaseDialog {
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
+    }
 
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: tryAgainButton.implicitHeight + (Style.cardPadding * 2)
+        Layout.margins: Style.cardPadding
+        spacing: Style.spacingMedium
+
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding / 2 }
+
+        // Try Again button (only in error state)
         ImButton {
+            id: tryAgainButton
             text: qsTr("Try Again")
-            Layout.preferredHeight: Style.buttonHeightStandard
             accessibleDescription: qsTr("Retry GitHub sign-in")
+            Layout.preferredHeight: Style.buttonHeightStandard
+            visible: root.authState === "error"
+            activeFocusOnTab: true
 
             onClicked: {
                 root.authState = "idle"
@@ -329,26 +310,56 @@ BaseDialog {
                 }
             }
         }
-    }
 
-    // Cancel button (always visible except on success)
-    RowLayout {
-        Layout.fillWidth: true
-        Layout.topMargin: Style.spacingSmall
-        visible: root.authState !== "success"
+        // Copy Code button (in waiting_for_code or polling states)
+        ImButton {
+            id: copyCodeButton
+            text: qsTr("Copy Code")
+            accessibleDescription: qsTr("Copy the authorization code to clipboard")
+            Layout.preferredHeight: Style.buttonHeightStandard
+            visible: root.authState === "waiting_for_code" || root.authState === "polling"
+            activeFocusOnTab: true
+
+            onClicked: {
+                if (root.imageWriter) {
+                    root.imageWriter.copyToClipboard(root.userCode)
+                }
+            }
+        }
+
+        // Open GitHub button (in waiting_for_code or polling states)
+        ImButtonRed {
+            id: openGitHubButton
+            text: qsTr("Open GitHub")
+            accessibleDescription: qsTr("Open GitHub authorization page in your browser")
+            Layout.preferredHeight: Style.buttonHeightStandard
+            visible: root.authState === "waiting_for_code" || root.authState === "polling"
+            activeFocusOnTab: true
+
+            onClicked: {
+                Qt.openUrlExternally(root.verificationUrl)
+                // Start polling after user opens GitHub
+                root.authState = "polling"
+            }
+        }
 
         Item { Layout.fillWidth: true }
 
+        // Cancel button (always visible except on success)
         ImButton {
             id: cancelButton
             text: qsTr("Cancel")
             accessibleDescription: qsTr("Cancel GitHub sign-in")
             Layout.preferredHeight: Style.buttonHeightStandard
+            visible: root.authState !== "success"
             activeFocusOnTab: true
 
             onClicked: {
                 root.close()
             }
         }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding / 2 }
     }
 }

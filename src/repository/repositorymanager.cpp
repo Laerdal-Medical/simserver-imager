@@ -127,6 +127,9 @@ void RepositoryManager::addGitHubRepo(const QString &owner, const QString &repo,
     emit reposChanged();
 
     qDebug() << "RepositoryManager: Added repo:" << owner << "/" << repo;
+
+    // Trigger a refresh to fetch CI images from the new repo
+    refreshAllSources();
 }
 
 void RepositoryManager::addGitHubRepoWithAutoDetect(const QString &owner, const QString &repo)

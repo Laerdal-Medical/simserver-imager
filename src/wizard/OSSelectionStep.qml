@@ -8,7 +8,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import QtCore
-import "../qmlcomponents"
 
 import RpiImager
 
@@ -247,113 +246,37 @@ WizardStepBase {
         spacing: 0
 
         // CI images loading banner
-        Rectangle {
+        ImLoadingBanner {
             id: loadingBanner
-            Layout.fillWidth: true
-            Layout.preferredHeight: visible ? loadingContent.implicitHeight + Style.spacingSmall * 2 : 0
-            visible: root.isLoadingCIImages
-            color: Style.buttonFocusedBackgroundColor
-
-            RowLayout {
-                id: loadingContent
-                anchors.fill: parent
-                anchors.leftMargin: Style.spacingMedium
-                anchors.rightMargin: Style.spacingMedium
-                anchors.topMargin: Style.spacingSmall
-                anchors.bottomMargin: Style.spacingSmall
-                spacing: Style.spacingSmall
-
-                BusyIndicator {
-                    running: root.isLoadingCIImages
-                    Layout.preferredWidth: Style.fontSizeFormLabel
-                    Layout.preferredHeight: Style.fontSizeFormLabel
-                }
-
-                Text {
-                    text: qsTr("Loading CI images from GitHub...")
-                    font.pixelSize: Style.fontSizeDescription
-                    font.family: Style.fontFamily
-                    color: Style.formLabelColor
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.StaticText
-                    Accessible.name: text
-                }
-            }
+            active: root.isLoadingCIImages
+            text: qsTr("Loading CI images from GitHub...")
+            visible: !offlineBanner.visible && !ciStatusBanner. visible && root.isLoadingCIImages
         }
 
         // CI images status banner (shown after loading completes)
-        Rectangle {
+        ImBanner {
             id: ciStatusBanner
-            Layout.fillWidth: true
-            Layout.preferredHeight: visible ? ciStatusContent.implicitHeight + Style.spacingSmall * 2 : 0
             visible: !root.isLoadingCIImages && root.repoManager && root.repoManager.statusMessage.length > 0
-            color: root.repoManager && root.repoManager.statusMessage.indexOf("found") >= 0 &&
-                   root.repoManager.statusMessage.indexOf("No") < 0
-                   ? Style.buttonFocusedBackgroundColor : Style.titleBackgroundColor
-
-            RowLayout {
-                id: ciStatusContent
-                anchors.fill: parent
-                anchors.leftMargin: Style.spacingMedium
-                anchors.rightMargin: Style.spacingMedium
-                anchors.topMargin: Style.spacingSmall
-                anchors.bottomMargin: Style.spacingSmall
-                spacing: Style.spacingSmall
-
-                Text {
-                    text: root.repoManager ? root.repoManager.statusMessage : ""
-                    font.pixelSize: Style.fontSizeDescription
-                    font.family: Style.fontFamily
-                    color: Style.formLabelColor
-                    Layout.fillWidth: true
-                    Accessible.role: Accessible.StaticText
-                    Accessible.name: text
-                }
-            }
+            text: root.repoManager ? root.repoManager.statusMessage : ""
+            // Success if images found, Info otherwise
+            bannerType: root.repoManager && root.repoManager.statusMessage.indexOf("found") >= 0 &&
+                        root.repoManager.statusMessage.indexOf("No") < 0
+                        ? ImBanner.Type.Success : ImBanner.Type.Info
         }
 
         // Offline banner (shown when OS list fetch failed)
-        Rectangle {
+        ImBanner {
             id: offlineBanner
-            Layout.fillWidth: true
-            Layout.preferredHeight: visible ? bannerContent.implicitHeight + Style.spacingMedium * 2 : 0
             visible: root.osListUnavailable
-            color: Style.titleBackgroundColor
-            
-            RowLayout {
-                id: bannerContent
-                anchors.fill: parent
-                anchors.leftMargin: Style.spacingMedium
-                anchors.rightMargin: Style.spacingMedium
-                anchors.topMargin: Style.spacingSmall
-                anchors.bottomMargin: Style.spacingSmall
-                spacing: Style.spacingMedium
-                
-                Text {
-                    text: "⚠"
-                    font.pixelSize: Style.fontSizeFormLabel
-                    color: Style.formLabelColor
-                    Accessible.ignored: true
-                }
-                
-                Text {
-                    text: qsTr("Unable to download OS list. You can still use a local image file.")
-                    font.pixelSize: Style.fontSizeDescription
-                    font.family: Style.fontFamily
-                    color: Style.formLabelColor
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    Accessible.role: Accessible.StaticText
-                    Accessible.name: text
-                }
-                
-                ImButton {
-                    id: retryButton
-                    text: qsTr("Retry")
-                    accessibleDescription: qsTr("Retry downloading the OS list")
-                    onClicked: {
-                        imageWriter.beginOSListFetch()
-                    }
+            bannerType: ImBanner.Type.Warning
+            text: qsTr("Unable to download OS list. You can still use a local image file.")
+
+            ImButton {
+                id: retryButton
+                text: qsTr("Retry")
+                accessibleDescription: qsTr("Retry downloading the OS list")
+                onClicked: {
+                    imageWriter.beginOSListFetch()
                 }
             }
         }

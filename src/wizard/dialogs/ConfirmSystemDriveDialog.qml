@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import RpiImager
-import "../../qmlcomponents"
 
 BaseDialog {
     id: root
@@ -154,15 +153,22 @@ BaseDialog {
         }
     }
 
-    RowLayout {
-        Layout.fillWidth: true
+    // Footer with action buttons
+    footer: RowLayout {
+        width: parent.width
+        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
         spacing: Style.spacingMedium
+
+        // Left padding
+        Item { Layout.preferredWidth: Style.cardPadding }
+
         Item { Layout.fillWidth: true }
 
         ImButtonRed {
             id: cancelButton
             text: qsTr("CANCEL")
             accessibleDescription: qsTr("Cancel operation and return to storage selection to choose a different device")
+            Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
             onClicked: {
                 root.close()
@@ -175,6 +181,7 @@ BaseDialog {
             text: qsTr("CONTINUE")
             accessibleDescription: qsTr("Proceed to write the image to this system drive after confirming the drive name")
             enabled: nameInput.text === root.driveName
+            Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
             onClicked: {
                 if (!enabled) return
@@ -187,13 +194,16 @@ BaseDialog {
                 Qt.callLater(function() {
                     if (root.registerFocusGroup) {
                         // Re-register the buttons focus group to update the focus navigation
-                        root.registerFocusGroup("buttons", function(){ 
-                            return [cancelButton, continueButton] 
+                        root.registerFocusGroup("buttons", function(){
+                            return [cancelButton, continueButton]
                         }, 1)
                     }
                 })
             }
         }
+
+        // Right padding
+        Item { Layout.preferredWidth: Style.cardPadding }
     }
 
 }
