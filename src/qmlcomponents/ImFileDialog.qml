@@ -204,11 +204,91 @@ BaseDialog {
     // Places model for left pane
     ListModel { id: placesModel }
 
+    // Parent path model for folder breadcrumb navigation
+    ListModel { id: parentPathModel }
+
+    // Rebuild folder tree model - shows parent path + current folder + subfolders
+    function _rebuildFolderTreeModel() {
+        parentPathModel.clear()
+        var path = _toDisplayPath(dialog.currentFolder)
+        if (!path || path.length === 0) return
+
+        // Split path into components
+        var parts = path.split("/").filter(function(p) { return p.length > 0 })
+
+        // Build cumulative paths - start from root
+        var cumulative = ""
+
+        // Add root
+        parentPathModel.append({
+            label: "/",
+            url: "file:///",
+            isCurrentFolder: parts.length === 0,
+            isSubfolder: false,
+            depth: 0
+        })
+
+        // Add each path component (parent folders + current)
+        for (var i = 0; i < parts.length; i++) {
+            cumulative += "/" + parts[i]
+            var isLast = (i === parts.length - 1)
+            parentPathModel.append({
+                label: parts[i],
+                url: "file://" + cumulative,
+                isCurrentFolder: isLast,
+                isSubfolder: false,
+                depth: i + 1
+            })
+        }
+
+        // Add subfolders from dirsOnlyModel (will be populated async)
+        _addSubfoldersToModel()
+    }
+
+    // Add subfolders to the folder tree model
+    function _addSubfoldersToModel() {
+        var path = _toDisplayPath(dialog.currentFolder)
+        var parts = path.split("/").filter(function(p) { return p.length > 0 })
+        var subfolderDepth = parts.length + 1
+
+        // Remove existing subfolders first
+        for (var i = parentPathModel.count - 1; i >= 0; i--) {
+            if (parentPathModel.get(i).isSubfolder) {
+                parentPathModel.remove(i)
+            }
+        }
+
+        // Add subfolders from the FolderListModel
+        for (var j = 0; j < dirsOnlyModel.count; j++) {
+            var folderName = dirsOnlyModel.get(j, "fileName")
+            var folderUrl = dirsOnlyModel.get(j, "fileUrl")
+            parentPathModel.append({
+                label: folderName,
+                url: String(folderUrl),
+                isCurrentFolder: false,
+                isSubfolder: true,
+                depth: subfolderDepth
+            })
+        }
+    }
+
+    // Watch for dirsOnlyModel changes to update subfolders
+    Connections {
+        target: dirsOnlyModel
+        function onStatusChanged() {
+            if (dirsOnlyModel.status === FolderListModel.Ready) {
+                _addSubfoldersToModel()
+            }
+        }
+    }
+
     onCurrentFolderChanged: {
         // Ensure address bar follows folder changes
         pathField.text = dialog._toDisplayPath(dialog.currentFolder)
         // Reset selection when navigating
         dialog.selectedFile = ""
+        // Rebuild folder tree (parents + current + subfolders)
+        _rebuildFolderTreeModel()
     }
 
     // Override escape handler to call rejected signal
@@ -219,8 +299,9 @@ BaseDialog {
     
     // Initialize and register focus groups when component is ready
     Component.onCompleted: {
-        // Override contentLayout padding to maximize space
+        // Override contentLayout to fill dialog and maximize space
         if (contentLayout) {
+            contentLayout.anchors.fill = contentLayout.parent
             contentLayout.anchors.margins = 10
             contentLayout.spacing = 4
         }
@@ -230,17 +311,17 @@ BaseDialog {
             // Save dialogs get common save locations
             var docsPath = String(StandardPaths.writableLocation(StandardPaths.DocumentsLocation))
             if (docsPath && docsPath.length > 0) {
-                placesModel.append({ label: qsTr("Documents"), url: "file://" + docsPath })
+                placesModel.append({ label: "📄 " + qsTr("Documents"), url: "file://" + docsPath })
             }
-            
+
             var downloadPath = String(StandardPaths.writableLocation(StandardPaths.DownloadLocation))
             if (downloadPath && downloadPath.length > 0) {
-                placesModel.append({ label: qsTr("Downloads"), url: "file://" + downloadPath })
+                placesModel.append({ label: "📥 " + qsTr("Downloads"), url: "file://" + downloadPath })
             }
-            
+
             var homePath = String(StandardPaths.writableLocation(StandardPaths.HomeLocation))
             if (homePath && homePath.length > 0) {
-                placesModel.append({ label: qsTr("Home"), url: "file://" + homePath })
+                placesModel.append({ label: "🏠 " + qsTr("Home"), url: "file://" + homePath })
             }
         } else {
             // Open dialogs get removable drives shortcut based on platform
@@ -256,12 +337,13 @@ BaseDialog {
                 // Fallback to root for other platforms
                 removableDrivesPath = "file:///"
             }
-            placesModel.append({ label: qsTr("Removable drives"), url: removableDrivesPath })
+            placesModel.append({ label: "💾 " + qsTr("Removable drives"), url: removableDrivesPath })
         }
         
-        // Initialize path field text
+        // Initialize path field text and parent path model
         pathField.text = dialog._toDisplayPath(dialog.currentFolder)
-        
+        _rebuildFolderTreeModel()
+
         // Register focus groups - different order for save vs open dialogs
         if (dialog.isSaveDialog) {
             registerFocusGroup("filename", function(){ 
@@ -274,7 +356,7 @@ BaseDialog {
                 return [placesList] 
             }, 2)
             registerFocusGroup("folders", function(){ 
-                return [subfoldersList] 
+                return [parentPathList] 
             }, 3)
             registerFocusGroup("buttons", function(){ 
                 return [cancelButton, openButton] 
@@ -287,7 +369,7 @@ BaseDialog {
                 return [placesList] 
             }, 1)
             registerFocusGroup("folders", function(){ 
-                return [subfoldersList] 
+                return [parentPathList] 
             }, 2)
             registerFocusGroup("navigation", function(){ 
                 return [upEntry] 
@@ -304,6 +386,7 @@ BaseDialog {
     // Title and address bar on same row
     RowLayout {
         Layout.fillWidth: true
+        Layout.topMargin: 4
         Layout.bottomMargin: 6
         spacing: 12
         
@@ -396,6 +479,17 @@ BaseDialog {
                 anchors.fill: parent
                 spacing: 4
 
+                // Places header
+                Text {
+                    text: qsTr("Places")
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamilyBold
+                    font.bold: true
+                    color: Style.textDescriptionColor
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 2
+                }
+
                 ListView {
                     id: placesList
                     Layout.fillWidth: true
@@ -466,96 +560,81 @@ BaseDialog {
                     }
                 }
 
+                // Separator line between places and folders
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    Layout.topMargin: 8
+                    Layout.bottomMargin: 4
+                    color: Style.popupBorderColor
+                }
+
                 Text {
                     text: qsTr("Folders")
                     font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamilyBold
+                    font.bold: true
                     color: Style.textDescriptionColor
                     Layout.fillWidth: true
-                    Layout.topMargin: 8
                     Layout.bottomMargin: 2
                 }
 
-                // Go up one folder button
-                ItemDelegate {
-                    id: goUpButton
-                    Layout.fillWidth: true
-                    text: "⬆ " + qsTr("Go up a folder")
-                    visible: {
-                        // Hide if we're at root
-                        var path = dialog._toDisplayPath(dialog.currentFolder)
-                        return path !== "/" && path !== ""
-                    }
-                    Accessible.role: Accessible.Button
-                    Accessible.name: qsTr("Go up to parent folder")
-                    background: Rectangle {
-                        color: goUpButton.hovered ? Style.listViewHoverRowBackgroundColor : "transparent"
-                        radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
-                        antialiasing: true
-                    }
-                    onClicked: {
-                        var currentPath = dialog._toDisplayPath(dialog.currentFolder)
-                        // Remove trailing slash if present
-                        if (currentPath.endsWith("/") && currentPath.length > 1) {
-                            currentPath = currentPath.slice(0, -1)
-                        }
-                        // Find last slash
-                        var lastSlash = currentPath.lastIndexOf("/")
-                        if (lastSlash > 0) {
-                            var parentPath = currentPath.substring(0, lastSlash)
-                            dialog.currentFolder = dialog._toFileUrl(parentPath)
-                        } else if (lastSlash === 0) {
-                            // Go to root
-                            dialog.currentFolder = "file:///"
-                        }
-                    }
-                }
-
+                // Parent path breadcrumb list - shows path hierarchy with current folder highlighted
                 ListView {
-                    id: subfoldersList
+                    id: parentPathList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
                     activeFocusOnTab: true
-                    model: dirsOnlyModel
+                    model: parentPathModel
                     spacing: 2
-                    currentIndex: -1  // No item selected by default
+                    currentIndex: -1
                     highlightFollowsCurrentItem: true
                     highlight: Rectangle {
-                        color: subfoldersList.activeFocus ? Style.listViewHighlightColor : Qt.rgba(0, 0, 0, 0.05)
+                        color: parentPathList.activeFocus ? Style.listViewHighlightColor : Qt.rgba(0, 0, 0, 0.05)
                         radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
                         antialiasing: true
-                        visible: subfoldersList.currentIndex >= 0
+                        visible: parentPathList.currentIndex >= 0
                     }
-                    
-                    // Set focus to first item when list receives focus
+
+                    // Set focus to current folder item when list receives focus
                     onActiveFocusChanged: {
-                        if (activeFocus && currentIndex < 0 && count > 0) {
-                            currentIndex = 0
-                        }
-                    }
-                    
-                    // Reset to first item when folder changes while we have focus
-                    onCountChanged: {
                         if (activeFocus && count > 0) {
-                            currentIndex = 0
+                            // Focus on the current folder (last item)
+                            currentIndex = count - 1
                         }
                     }
-                    
+
                     delegate: ItemDelegate {
+                        id: pathDelegate
                         required property int index
-                        required property string fileName
-                        required property url fileUrl
+                        required property string label
+                        required property string url
+                        required property bool isCurrentFolder
+                        required property bool isSubfolder
+                        required property int depth
 
                         width: (ListView.view ? ListView.view.width : 0)
-                        text: "📁 " + fileName
+                        // Current folder: open folder icon, subfolders: closed folder, parents: closed folder
+                        text: (pathDelegate.isCurrentFolder ? "📂 " : "📁 ") + pathDelegate.label
+                        leftPadding: 8 + (pathDelegate.depth * 12)  // Indent based on depth
                         highlighted: ListView.isCurrentItem
                         Accessible.role: Accessible.ListItem
-                        Accessible.name: qsTr("Folder: %1").arg(fileName)
+                        Accessible.name: {
+                            if (pathDelegate.isCurrentFolder)
+                                return qsTr("Current folder: %1").arg(pathDelegate.label)
+                            else if (pathDelegate.isSubfolder)
+                                return qsTr("Subfolder: %1").arg(pathDelegate.label)
+                            else
+                                return qsTr("Parent folder: %1").arg(pathDelegate.label)
+                        }
                         background: Rectangle {
                             color: {
-                                if (ListView.isCurrentItem && subfoldersList.activeFocus)
+                                if (pathDelegate.isCurrentFolder)
                                     return Style.listViewHighlightColor
-                                else if (hovered)
+                                else if (pathDelegate.ListView.isCurrentItem && pathDelegate.ListView.view.activeFocus)
+                                    return Style.listViewHighlightColor
+                                else if (pathDelegate.hovered)
                                     return Style.listViewHoverRowBackgroundColor
                                 else
                                     return "transparent"
@@ -563,9 +642,20 @@ BaseDialog {
                             radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
                             antialiasing: true
                         }
+                        contentItem: Text {
+                            text: pathDelegate.text
+                            font.pixelSize: Style.fontSizeDescription
+                            font.family: Style.fontFamily
+                            font.bold: pathDelegate.isCurrentFolder
+                            color: Style.formLabelColor
+                            elide: Text.ElideMiddle
+                            verticalAlignment: Text.AlignVCenter
+                        }
                         onClicked: {
-                            subfoldersList.currentIndex = index
-                            dialog.currentFolder = fileUrl
+                            if (!pathDelegate.isCurrentFolder) {
+                                parentPathList.currentIndex = pathDelegate.index
+                                dialog.currentFolder = pathDelegate.url
+                            }
                         }
                     }
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: Style.scrollBarWidth }
@@ -580,13 +670,13 @@ BaseDialog {
                         }
                     }
                     Keys.onEnterPressed: {
-                        if (currentIndex >= 0) {
-                            dialog.currentFolder = model.get(currentIndex, "fileUrl")
+                        if (currentIndex >= 0 && !model.get(currentIndex).isCurrentFolder) {
+                            dialog.currentFolder = model.get(currentIndex).url
                         }
                     }
                     Keys.onReturnPressed: {
-                        if (currentIndex >= 0) {
-                            dialog.currentFolder = model.get(currentIndex, "fileUrl")
+                        if (currentIndex >= 0 && !model.get(currentIndex).isCurrentFolder) {
+                            dialog.currentFolder = model.get(currentIndex).url
                         }
                     }
                 }
@@ -730,8 +820,8 @@ BaseDialog {
                     ListView {
                         id: filesList
                         width: fileColumn.width
-                        height: dialog.isSaveDialog ? 0 : Math.max(contentHeight, filesOnlyModel.count === 0 ? 60 : 0)
-                        visible: !dialog.isSaveDialog
+                        height: dialog.isSaveDialog ? 0 : contentHeight
+                        visible: !dialog.isSaveDialog && filesOnlyModel.count > 0
                         model: filesOnlyModel
                         activeFocusOnTab: !dialog.isSaveDialog && filesOnlyModel.count > 0
                         currentIndex: -1
@@ -812,19 +902,21 @@ BaseDialog {
                                 dialog.accepted()
                             }
                         }
-                        
-                        // Show message when no files are available (only in open mode)
-                        Text {
-                            anchors.centerIn: parent
-                            visible: !dialog.isSaveDialog && filesOnlyModel.count === 0
-                            text: qsTr("No files in this folder")
-                            font.pixelSize: Style.fontSizeDescription
-                            font.family: Style.fontFamily
-                            font.italic: true
-                            color: Style.textDescriptionColor
-                        }
                     }
-                    
+
+                    // Show message when no files are available (only in open mode)
+                    Text {
+                        width: fileColumn.width
+                        visible: !dialog.isSaveDialog && filesOnlyModel.count === 0
+                        text: qsTr("No files in this folder")
+                        font.pixelSize: Style.fontSizeDescription
+                        font.family: Style.fontFamily
+                        font.italic: true
+                        color: Style.textDescriptionColor
+                        horizontalAlignment: Text.AlignHCenter
+                        topPadding: 20
+                    }
+
                     // Message for save dialogs - shown instead of file list
                     Text {
                         width: fileColumn.width

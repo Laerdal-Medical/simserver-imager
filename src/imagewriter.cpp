@@ -3931,7 +3931,9 @@ void MountUtilsLog(std::string msg) {
 void ImageWriter::reboot()
 {
     qDebug() << "Rebooting system.";
-    (void)system("reboot");
+    if (system("reboot") != 0) {
+        qWarning() << "Failed to execute reboot command";
+    }
 }
 
 void ImageWriter::openUrl(const QUrl &url)
