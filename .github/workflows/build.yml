@@ -97,16 +97,6 @@ jobs:
           if-no-files-found: error
 
       # Build Debian package (x86_64 only) - done here so CMake-generated metainfo.xml is available
-      - name: Prepare AppImage for Debian packaging
-        if: matrix.arch == 'x86_64'
-        run: |
-          for f in Laerdal_SimServer_Imager-*-desktop-x86_64.AppImage; do
-            if [ -f "$f" ]; then
-              cp "$f" "laerdal-simserver-imager-x86_64.AppImage"
-              break
-            fi
-          done
-
       - name: Install Debian build dependencies
         if: matrix.arch == 'x86_64'
         run: |
