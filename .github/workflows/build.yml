@@ -299,6 +299,20 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get tag message
+        id: tag_message
+        run: |
+          # Get the annotated tag message (excluding the tag name line)
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+          # Write to file for multiline handling
+          echo "$TAG_MESSAGE" > tag_message.txt
+          echo "Retrieved tag message for ${{ github.ref_name }}"
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -311,7 +325,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          generate_release_notes: true
+          body_path: tag_message.txt
           files: |
             artifacts/**/*.AppImage
             artifacts/**/*.deb
