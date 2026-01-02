@@ -96,24 +96,27 @@ jobs:
           path: 'Laerdal_SimServer_Imager-*-desktop-${{ matrix.arch }}.AppImage'
           if-no-files-found: error
 
-      # Build Debian package (x86_64 only) - done here so CMake-generated metainfo.xml is available
+      # Build Debian package - done here so CMake-generated metainfo.xml is available
+      - name: Prepare AppImage for Debian packaging
+        run: |
+          # dh-exec doesn't support globs, create expected symlink
+          ln -sf Laerdal_SimServer_Imager-*-desktop-${{ matrix.arch }}.AppImage \
+            laerdal-simserver-imager-${{ matrix.arch }}.AppImage
+
       - name: Install Debian build dependencies
-        if: matrix.arch == 'x86_64'
         run: |
           sudo apt-get update
           sudo apt-get install -y devscripts debhelper dh-exec fakeroot
 
       - name: Build Debian package
-        if: matrix.arch == 'x86_64'
         run: |
           dpkg-buildpackage -uc -us -b -Pdesktop
           cp ../*.deb .
 
       - name: Upload Debian package
-        if: matrix.arch == 'x86_64'
         uses: actions/upload-artifact@v4
         with:
-          name: debian-desktop
+          name: debian-${{ matrix.arch }}
           path: '*.deb'
           if-no-files-found: error
 
