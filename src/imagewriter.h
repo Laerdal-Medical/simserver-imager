@@ -72,6 +72,7 @@ public:
 
     Q_PROPERTY(WriteState writeState READ writeState NOTIFY writeStateChanged)
     Q_PROPERTY(bool isOsListUnavailable READ isOsListUnavailable NOTIFY osListUnavailableChanged)
+    Q_PROPERTY(QUrl startupImageUrl READ startupImageUrl WRITE setStartupImageUrl NOTIFY startupImageUrlChanged)
 
     /* Set URL to download from, and if known download length and uncompressed length */
     Q_INVOKABLE void setSrc(const QUrl &url, quint64 downloadLen = 0, quint64 extrLen = 0, QByteArray expectedHash = "", bool multifilesinzip = false, QString parentcategory = "", QString osname = "", QByteArray initFormat = "", QString releaseDate = "");
@@ -388,6 +389,10 @@ public:
     /* Laerdal-specific: Check if GitHub is authenticated */
     Q_INVOKABLE bool isGitHubAuthenticated() const;
 
+    /* Startup image URL - set from command line argument */
+    QUrl startupImageUrl() const { return _startupImageUrl; }
+    void setStartupImageUrl(const QUrl &url);
+
     /* Laerdal-specific: Initialize GitHub authentication with client ID */
     void initializeGitHubAuth();
 
@@ -426,6 +431,7 @@ signals:
     void elevationNeeded();  // Emitted when write requires elevation (Windows)
     void locationPermissionGranted();
     void performanceSaveDialogNeeded(const QString &suggestedFilename, const QString &initialDir);
+    void startupImageUrlChanged();
 
 protected slots:
     void startProgressPolling();
@@ -471,7 +477,7 @@ private:
     QString parseTokenFromUrl(const QUrl &url, bool strictAuthKey = false) const;
 
 protected:
-    QUrl _src, _repo;
+    QUrl _src, _repo, _startupImageUrl;
     QString _dst, _parentCategory, _osName, _osReleaseDate, _currentLang, _currentLangcode, _currentKeyboard;
     QByteArray _expectedHash, _cmdline, _config, _firstrun, _cloudinit, _cloudinitNetwork, _initFormat;
     ImageOptions::AdvancedOptions _advancedOptions;

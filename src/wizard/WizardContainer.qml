@@ -42,6 +42,9 @@ Item {
     
     // Track if we're in "write another" flow (skip to writing step after storage selection)
     property bool writeAnotherMode: false
+
+    // Track if a startup image was provided via command line
+    property bool hasStartupImage: false
     
     // Track selections for display in summary
     property string selectedDeviceName: ""
@@ -165,20 +168,31 @@ Item {
         } else {
             currentStep = stepOSSelection
         }
-        
+
         // Default to disabling warnings in embedded mode (per-run, non-persistent)
         if (imageWriter && imageWriter.isEmbeddedMode()) {
             disableWarnings = true
         }
-        
+
         // Initialize customizationSettings from persistent storage
         // Each step can then read from this and update it as needed
         if (imageWriter) {
             customizationSettings = imageWriter.getSavedCustomisationSettings()
-            
+
             // Check if secure boot RSA key is configured
             var rsaKeyPath = imageWriter.getStringSetting("secureboot_rsa_key")
             secureBootKeyConfigured = (rsaKeyPath && rsaKeyPath.length > 0)
+
+            // Check if a startup image was passed via command line
+            // Set the flag immediately to prevent auto-navigation, then use Qt.callLater
+            // to actually process the image after the UI is fully initialized
+            var startupUrl = imageWriter.startupImageUrl
+            if (startupUrl && startupUrl.toString().length > 0) {
+                root.hasStartupImage = true
+                Qt.callLater(function() {
+                    root.handleStartupImage(startupUrl)
+                })
+            }
         }
     }
     
@@ -188,8 +202,10 @@ Item {
         function onOsListUnavailableChanged() {
             // When OS list becomes available after starting offline, navigate to device
             // selection so the user can choose their target device (now that the list is available).
-            // Guard: don't interrupt an active write operation.
-            if (root.hasNetworkConnectivity && root.currentStep === root.stepOSSelection && !root.isWriting) {
+            // Guard: don't interrupt an active write operation or if a startup image was provided.
+            // Check both hasStartupImage flag AND imageWriter.startupImageUrl to handle race conditions.
+            var hasStartup = root.hasStartupImage || (imageWriter.startupImageUrl && imageWriter.startupImageUrl.toString().length > 0)
+            if (root.hasNetworkConnectivity && root.currentStep === root.stepOSSelection && !root.isWriting && !hasStartup) {
                 console.log("OS list now available - navigating to device selection")
                 root.jumpToStep(root.stepDeviceSelection)
             }
@@ -765,6 +781,23 @@ Item {
             root.selectedOsName = root.imageWriter.srcFileName()
             root.customizationSupported = false  // Disabled for Laerdal SimServer Imager
             // Skip Source and OS steps, go directly to Storage
+            root.jumpToStep(root.stepStorageSelection)
+        }
+    }
+
+    // Handle startup image file passed as command line argument
+    function handleStartupImage(fileUrl) {
+        if (fileUrl && fileUrl.toString().length > 0) {
+            // Mark that we have a startup image to prevent auto-navigation
+            root.hasStartupImage = true
+            // Set the source to the startup image file
+            root.imageWriter.setSrc(fileUrl)
+            root.selectedOsName = root.imageWriter.srcFileName()
+            root.customizationSupported = false  // Disabled for Laerdal SimServer Imager
+            // Mark previous steps as permissible so user can navigate back
+            root.permissibleStepsBitmap |= (1 << root.stepSourceSelection)
+            root.permissibleStepsBitmap |= (1 << root.stepOSSelection)
+            // Go directly to Storage selection
             root.jumpToStep(root.stepStorageSelection)
         }
     }

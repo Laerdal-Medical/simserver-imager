@@ -1512,6 +1512,14 @@ void ImageWriter::setCustomOsListUrl(const QUrl &url)
     _repo = url;
 }
 
+void ImageWriter::setStartupImageUrl(const QUrl &url)
+{
+    if (_startupImageUrl != url) {
+        _startupImageUrl = url;
+        emit startupImageUrlChanged();
+    }
+}
+
 namespace {
     QJsonArray findAndInsertJsonResult(QJsonArray parent_list, QJsonArray incomingBody, QUrl referenceUrl, uint8_t count) {
         if (count > MAX_SUBITEMS_DEPTH) {

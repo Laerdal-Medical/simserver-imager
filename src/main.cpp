@@ -434,8 +434,8 @@ int main(int argc, char *argv[])
         ImageWriter::setForceSecureBootEnabled(true);
     }
 
-    // Accept rpi-imager:// callback URLs or manifest files (.rpi-imager-manifest, .json) as positional argument
-    // Image files/URLs should be passed via --cli mode, not the desktop GUI
+    // Accept rpi-imager:// callback URLs, manifest files, or image files as positional argument
+    QUrl startupImageUrl;
     const QStringList posArgs = parser.positionalArguments();
     if (!posArgs.isEmpty())
     {
@@ -455,10 +455,25 @@ int main(int argc, char *argv[])
                 cerr << "Manifest file not found: " << firstPos << endl;
             }
         }
+        else if (firstPos.endsWith(".wic", Qt::CaseInsensitive) ||
+                 firstPos.endsWith(".wic.xz", Qt::CaseInsensitive) ||
+                 firstPos.endsWith(".wic.gz", Qt::CaseInsensitive) ||
+                 firstPos.endsWith(".wic.zst", Qt::CaseInsensitive) ||
+                 firstPos.endsWith(".wic.bz2", Qt::CaseInsensitive))
+        {
+            // Image file passed as argument - pre-select it in the GUI
+            QFileInfo fi(firstPos);
+            if (fi.isFile()) {
+                startupImageUrl = QUrl::fromLocalFile(fi.absoluteFilePath());
+                qDebug() << "Image file argument:" << startupImageUrl;
+            } else {
+                cerr << "Image file not found: " << firstPos << endl;
+            }
+        }
         else
         {
             cerr << "Unknown positional argument ignored: " << firstPos << endl;
-            cerr << "Note: To write an image file, use --cli mode instead." << endl;
+            cerr << "Supported file types: .wic, .wic.xz, .wic.gz, .wic.zst, .wic.bz2, ." MANIFEST_EXTENSION ", .json" << endl;
         }
     }
 
@@ -648,6 +663,11 @@ int main(int argc, char *argv[])
 
     const bool showLanguageSelection = enableLanguageSelection || !couldDetermineLanguage || imageWriter.isEmbeddedMode() || hasSavedLanguagePreference;
 
+    // Set startup image URL before QML loads so it's available in Component.onCompleted
+    if (!startupImageUrl.isEmpty()) {
+        imageWriter.setStartupImageUrl(startupImageUrl);
+    }
+
     engine.setInitialProperties(QVariantMap{
         {"imageWriter", QVariant::fromValue(&imageWriter)},
         {"showLanguageSelection", showLanguageSelection}
@@ -695,6 +715,7 @@ int main(int argc, char *argv[])
     if (!callbackUrl.isEmpty()) {
         imageWriter.handleIncomingUrl(callbackUrl);
     }
+    // Note: startupImageUrl is set before QML engine loads (see above)
     // Forward platform URL open events to QML via ImageWriter (no-ops, kept for future use)
     QObject::connect(&app, &QGuiApplication::applicationStateChanged, &imageWriter, [](Qt::ApplicationState){ /* no-op */ });
     QObject::connect(&app, &QGuiApplication::commitDataRequest, &imageWriter, [](QSessionManager&){ /* no-op */ });
