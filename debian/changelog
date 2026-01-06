@@ -1,3 +1,21 @@
+laerdal-simserver-imager (1.0.1) unstable; urgency=medium
+
+  * Artifact Inspection: CI build artifacts are now inspected to detect
+    multiple installable images, allowing users to select which WIC file
+    to flash
+  * WIC File Extraction: Direct extraction of WIC files from cached
+    artifact ZIPs with progress indication
+  * Startup Image URL: Support for passing image URL via command line
+    argument for automated workflows
+  * Download Progress Dialog: New progress dialog with cancel support
+    for artifact downloads
+  * Artifact Caching: Downloaded CI artifacts are cached locally with
+    validation and cache management in settings
+  * Cache Management: Added cache size display and clear cache option
+    in Application Options
+
+ -- Laerdal Medical <support@laerdal.com>  Mon, 06 Jan 2025 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.0) unstable; urgency=medium
 
   * Initial release of Laerdal SimServer Imager
