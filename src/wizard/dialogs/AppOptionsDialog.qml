@@ -74,6 +74,8 @@ BaseDialog {
             items.push(githubSignInButton.focusItem)
             if (githubReposButton.visible)
                 items.push(githubReposButton.focusItem)
+            // Cache button
+            items.push(clearCacheButton.focusItem)
             return items
         }, 1)
         registerFocusGroup("buttons", function(){ 
@@ -98,15 +100,19 @@ BaseDialog {
         activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
     }
 
-    // Options section
-    Item {
+    // Scrollable options section
+    ScrollView {
         Layout.fillWidth: true
-        Layout.preferredHeight: optionsLayout.implicitHeight + Style.cardPadding
+        Layout.fillHeight: true
+        Layout.preferredHeight: Math.min(optionsLayout.implicitHeight + Style.cardPadding * 2, 400)
+        clip: true
+
+        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+        ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
         ColumnLayout {
             id: optionsLayout
-            anchors.fill: parent
-            anchors.margins: Style.cardPadding
+            width: parent.width
             spacing: Style.spacingMedium
 
             ImOptionPill {
@@ -318,6 +324,50 @@ BaseDialog {
                     color: Style.textDescriptionColor
                 }
             }
+
+            // Section separator for Cache options
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.topMargin: Style.spacingSmall
+                height: 1
+                color: Style.titleSeparatorColor
+            }
+
+            // Cache section header
+            Text {
+                text: qsTr("Cache")
+                font.pixelSize: Style.fontSizeFormLabel
+                font.family: Style.fontFamilyBold
+                font.bold: true
+                color: Style.formLabelColor
+                Layout.fillWidth: true
+                Layout.topMargin: Style.spacingSmall
+            }
+
+            ImOptionButton {
+                id: clearCacheButton
+                text: qsTr("CI Artifact Cache")
+                btnText: qsTr("Clear")
+                accessibleDescription: qsTr("Clear cached CI build artifacts to free disk space")
+                Layout.fillWidth: true
+                Component.onCompleted: {
+                    focusItem.activeFocusOnTab = true
+                }
+                onClicked: {
+                    var freed = imageWriter.clearArtifactCache()
+                    popup.updateCacheSize()
+                }
+            }
+
+            // Cache size indicator
+            Text {
+                id: cacheSizeText
+                text: qsTr("Cache size: %1").arg(popup.formatBytes(imageWriter.getArtifactCacheSize()))
+                font.pixelSize: Style.fontSizeCaption
+                font.family: Style.fontFamily
+                color: Style.textDescriptionColor
+                Layout.fillWidth: true
+            }
         }
     }
 
@@ -474,8 +524,20 @@ BaseDialog {
             popup.wizardContainer.disableWarnings = chkDisableWarnings.checked;
     }
 
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + " B"
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB"
+    }
+
+    function updateCacheSize() {
+        cacheSizeText.text = qsTr("Cache size: %1").arg(formatBytes(imageWriter.getArtifactCacheSize()))
+    }
+
     onOpened: {
         initialize();
+        updateCacheSize();
         // BaseDialog handles the focus management automatically
     }
 

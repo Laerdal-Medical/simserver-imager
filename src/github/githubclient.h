@@ -170,7 +170,31 @@ public:
      */
     QString authToken() const { return _authToken; }
 
+    /**
+     * @brief Download an artifact and inspect its contents for WIC files
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param artifactId Artifact ID
+     * @param artifactName Original artifact name for display
+     * @param branch Branch name the artifact came from
+     *
+     * Downloads the artifact ZIP to a temporary location and emits
+     * artifactContentsReady with the list of WIC files found.
+     */
+    Q_INVOKABLE void inspectArtifactContents(const QString &owner, const QString &repo,
+                                              qint64 artifactId, const QString &artifactName,
+                                              const QString &branch);
+
+    /**
+     * @brief Cancel any ongoing artifact inspection download
+     */
+    Q_INVOKABLE void cancelArtifactInspection();
+
 signals:
+    /**
+     * @brief Emitted when artifact inspection is cancelled
+     */
+    void artifactInspectionCancelled();
     /**
      * @brief Emitted when artifact download is complete
      * @param localPath Path to the downloaded ZIP file
@@ -241,6 +265,21 @@ signals:
     void artifactWicFilesReady(const QJsonArray &wicFiles);
 
     /**
+     * @brief Emitted when artifact contents have been inspected
+     * @param artifactId The artifact ID that was inspected
+     * @param artifactName The original artifact name
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param branch Branch name
+     * @param wicFiles Array of WIC file info objects found in the artifact
+     * @param zipPath Path to the downloaded ZIP file (for later extraction)
+     */
+    void artifactContentsReady(qint64 artifactId, const QString &artifactName,
+                                const QString &owner, const QString &repo,
+                                const QString &branch, const QJsonArray &wicFiles,
+                                const QString &zipPath);
+
+    /**
      * @brief Emitted on API error
      * @param message Error message
      */
@@ -271,6 +310,10 @@ private:
                                    const QString &owner, const QString &repo,
                                    const QString &branch, const QString &runCreatedAt);
     void downloadArtifactFromUrl(const QUrl &url, const QString &destinationPath);
+    void inspectArtifactFromUrl(const QUrl &url, const QString &owner, const QString &repo,
+                                 qint64 artifactId, const QString &artifactName,
+                                 const QString &branch, const QString &zipPath);
+    QJsonArray listWicFilesInZip(const QString &zipPath);
 
     static constexpr const char* API_BASE_URL = "https://api.github.com";
     static constexpr const char* RAW_BASE_URL = "https://raw.githubusercontent.com";
@@ -313,6 +356,10 @@ private:
         qint64 runId;
     };
     QHash<QNetworkReply*, RunInfo> _artifactRunInfo;
+
+    // Track ongoing artifact inspection download for cancellation
+    QNetworkReply *_activeInspectionReply = nullptr;
+    QString _activeInspectionZipPath;  // Path to delete on cancellation
 };
 
 #endif // GITHUBCLIENT_H

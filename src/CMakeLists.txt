@@ -590,6 +590,8 @@ if(NOT BUILD_CLI_ONLY)
       wizard/dialogs/RepositorySelectionDialog.qml
       wizard/LanguageSelectionStep.qml
       qmlcomponents/BaseDialog.qml
+      qmlcomponents/ArtifactFileSelectionDialog.qml
+      qmlcomponents/ArtifactDownloadProgressDialog.qml
       qmlcomponents/ImButton.qml
       qmlcomponents/ImButtonRed.qml
       qmlcomponents/ImCheckBox.qml

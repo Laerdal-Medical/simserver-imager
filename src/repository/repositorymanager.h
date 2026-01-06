@@ -199,7 +199,31 @@ public:
      */
     void loadReposFromJson(const QString &json);
 
+    /**
+     * @brief Request inspection of an artifact's contents to check for multiple WIC files
+     * @param artifactId The GitHub artifact ID
+     * @param artifactName The artifact display name
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param branch Branch the artifact came from
+     *
+     * This will download the artifact ZIP and scan for WIC files.
+     * Emits artifactContentsReady when complete.
+     */
+    Q_INVOKABLE void inspectArtifact(qint64 artifactId, const QString &artifactName,
+                                      const QString &owner, const QString &repo,
+                                      const QString &branch);
+
+    /**
+     * @brief Cancel any ongoing artifact inspection download
+     */
+    Q_INVOKABLE void cancelArtifactInspection();
+
 signals:
+    /**
+     * @brief Emitted when artifact inspection is cancelled
+     */
+    void artifactInspectionCancelled();
     void environmentChanged();
     void reposChanged();
     void loadingChanged();
@@ -211,6 +235,28 @@ signals:
     void cdnListReady(const QJsonArray &list);
     void githubListReady(const QJsonArray &list);
     void refreshError(const QString &message);
+
+    /**
+     * @brief Emitted when artifact contents have been inspected
+     * @param artifactId The artifact ID that was inspected
+     * @param artifactName The original artifact name
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param branch Branch name
+     * @param wicFiles Array of WIC file info objects found in the artifact
+     * @param zipPath Path to the downloaded ZIP file (for extraction)
+     */
+    void artifactContentsReady(qint64 artifactId, const QString &artifactName,
+                                const QString &owner, const QString &repo,
+                                const QString &branch, const QJsonArray &wicFiles,
+                                const QString &zipPath);
+
+    /**
+     * @brief Emitted during artifact download with progress info
+     * @param bytesReceived Bytes downloaded so far
+     * @param bytesTotal Total bytes to download (-1 if unknown)
+     */
+    void artifactDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
 
 private slots:
     void onCdnListReady(const QJsonArray &list);

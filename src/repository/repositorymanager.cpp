@@ -677,3 +677,57 @@ void RepositoryManager::checkRefreshComplete()
                  << getMergedOsList().size();
     }
 }
+
+void RepositoryManager::inspectArtifact(qint64 artifactId, const QString &artifactName,
+                                         const QString &owner, const QString &repo,
+                                         const QString &branch)
+{
+    if (!_githubClient) {
+        emit refreshError(tr("GitHub client not configured"));
+        return;
+    }
+
+    qDebug() << "RepositoryManager: Requesting artifact inspection for" << artifactName
+             << "id:" << artifactId;
+
+    setStatusMessage(tr("Downloading artifact to inspect contents..."));
+    setLoading(true);
+
+    // Connect to the artifact contents ready signal (single-shot)
+    connect(_githubClient, &GitHubClient::artifactContentsReady, this,
+            [this](qint64 id, const QString &name, const QString &own, const QString &rep,
+                   const QString &br, const QJsonArray &wicFiles, const QString &zipPath) {
+                setLoading(false);
+                setStatusMessage(tr("Found %1 installable file(s) in artifact").arg(wicFiles.size()));
+                emit artifactContentsReady(id, name, own, rep, br, wicFiles, zipPath);
+            }, Qt::SingleShotConnection);
+
+    connect(_githubClient, &GitHubClient::error, this,
+            [this](const QString &message) {
+                setLoading(false);
+                setStatusMessage(tr("Failed to inspect artifact"));
+                emit refreshError(message);
+            }, Qt::SingleShotConnection);
+
+    connect(_githubClient, &GitHubClient::artifactDownloadProgress, this,
+            [this](qint64 bytesReceived, qint64 bytesTotal) {
+                if (bytesTotal > 0) {
+                    int percent = static_cast<int>((bytesReceived * 100) / bytesTotal);
+                    setStatusMessage(tr("Downloading artifact... %1%").arg(percent));
+                }
+                emit artifactDownloadProgress(bytesReceived, bytesTotal);
+            });
+
+    _githubClient->inspectArtifactContents(owner, repo, artifactId, artifactName, branch);
+}
+
+void RepositoryManager::cancelArtifactInspection()
+{
+    if (_githubClient) {
+        qDebug() << "RepositoryManager: Cancelling artifact inspection";
+        _githubClient->cancelArtifactInspection();
+        setLoading(false);
+        setStatusMessage(tr("Download cancelled"));
+        emit artifactInspectionCancelled();
+    }
+}

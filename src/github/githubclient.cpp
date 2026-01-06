@@ -10,6 +10,11 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QFile>
+#include <QFileInfo>
+#include <QStandardPaths>
+#include <QDir>
+#include <archive.h>
+#include <archive_entry.h>
 
 GitHubClient::GitHubClient(QObject *parent)
     : QObject(parent)
@@ -24,6 +29,34 @@ GitHubClient::~GitHubClient()
         reply->deleteLater();
     }
     _pendingRequests.clear();
+
+    // Cancel active inspection reply
+    if (_activeInspectionReply) {
+        _activeInspectionReply->abort();
+        _activeInspectionReply->deleteLater();
+        _activeInspectionReply = nullptr;
+    }
+}
+
+void GitHubClient::cancelArtifactInspection()
+{
+    if (_activeInspectionReply) {
+        qDebug() << "GitHubClient: Cancelling artifact inspection download";
+
+        // Delete the partial cache file if it exists
+        if (!_activeInspectionZipPath.isEmpty() && QFile::exists(_activeInspectionZipPath)) {
+            qDebug() << "GitHubClient: Deleting partial cache file:" << _activeInspectionZipPath;
+            QFile::remove(_activeInspectionZipPath);
+        }
+        _activeInspectionZipPath.clear();
+
+        // Just abort - the finished handler will clean up the reply
+        // and check for OperationCanceledError
+        _activeInspectionReply->abort();
+        // Don't deleteLater here - the finished signal handler does that
+        // Don't set to nullptr here - the finished handler does that
+        emit artifactInspectionCancelled();
+    }
 }
 
 void GitHubClient::setAuthToken(const QString &token)
@@ -357,6 +390,192 @@ void GitHubClient::downloadArtifactFromUrl(const QUrl &url, const QString &desti
 
         emit artifactDownloadComplete(destinationPath);
     });
+}
+
+void GitHubClient::inspectArtifactContents(const QString &owner, const QString &repo,
+                                            qint64 artifactId, const QString &artifactName,
+                                            const QString &branch)
+{
+    qDebug() << "GitHubClient: Inspecting artifact contents for" << artifactName << "id:" << artifactId;
+
+    // Create cache directory for artifact download (persistent across sessions)
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QString artifactCacheDir = cacheDir + "/artifacts";
+    QDir().mkpath(artifactCacheDir);
+    QString zipPath = artifactCacheDir + QString("/artifact_%1.zip").arg(artifactId);
+
+    // Check if artifact is already cached and valid
+    if (QFile::exists(zipPath)) {
+        qDebug() << "GitHubClient: Checking cached artifact:" << zipPath;
+        QJsonArray wicFiles = listWicFilesInZip(zipPath);
+        if (!wicFiles.isEmpty()) {
+            qDebug() << "GitHubClient: Using valid cached artifact:" << zipPath;
+            emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath);
+            return;
+        } else {
+            // Cached file is invalid or corrupt - delete it and re-download
+            qDebug() << "GitHubClient: Cached artifact is invalid, deleting:" << zipPath;
+            QFile::remove(zipPath);
+        }
+    }
+
+    // Download the artifact
+    QString urlStr = getArtifactDownloadUrl(owner, repo, artifactId);
+    QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
+
+    // Don't auto-follow redirects - we need to manually handle them to add auth headers
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
+
+    QNetworkReply *reply = _networkManager.get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
+        reply->deleteLater();
+
+        // Check for redirect (302)
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 302 || statusCode == 301 || statusCode == 307 || statusCode == 308) {
+            QUrl redirectUrl = reply->header(QNetworkRequest::LocationHeader).toUrl();
+            if (redirectUrl.isValid()) {
+                qDebug() << "GitHubClient: Following redirect for artifact inspection";
+                inspectArtifactFromUrl(redirectUrl, owner, repo, artifactId, artifactName, branch, zipPath);
+                return;
+            }
+        }
+
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "GitHubClient: Artifact inspection download failed:" << reply->errorString();
+            emit error(tr("Failed to inspect artifact: %1").arg(reply->errorString()));
+            return;
+        }
+
+        // Save and inspect
+        QFile file(zipPath);
+        if (!file.open(QIODevice::WriteOnly)) {
+            emit error(tr("Failed to save artifact for inspection: %1").arg(file.errorString()));
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        file.write(data);
+        file.close();
+
+        qDebug() << "GitHubClient: Artifact cached to:" << zipPath;
+
+        // Now scan the ZIP for WIC files
+        QJsonArray wicFiles = listWicFilesInZip(zipPath);
+        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath);
+    });
+}
+
+void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner, const QString &repo,
+                                           qint64 artifactId, const QString &artifactName,
+                                           const QString &branch, const QString &zipPath)
+{
+    // Check if this is a GitHub URL or an external URL
+    bool isGitHubUrl = url.host().endsWith("github.com") || url.host().endsWith("githubusercontent.com");
+
+    QNetworkRequest request;
+    if (isGitHubUrl) {
+        request = createAuthenticatedRequest(url);
+    } else {
+        request.setUrl(url);
+        request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
+    }
+
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    QNetworkReply *reply = _networkManager.get(request);
+    _activeInspectionReply = reply;
+    _activeInspectionZipPath = zipPath;
+
+    connect(reply, &QNetworkReply::downloadProgress, this, [this](qint64 bytesReceived, qint64 bytesTotal) {
+        emit artifactDownloadProgress(bytesReceived, bytesTotal);
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
+        _activeInspectionReply = nullptr;
+        _activeInspectionZipPath.clear();
+        reply->deleteLater();
+
+        // Check if cancelled (OperationCanceledError)
+        if (reply->error() == QNetworkReply::OperationCanceledError) {
+            qDebug() << "GitHubClient: Artifact inspection cancelled by user";
+            return;
+        }
+
+        if (reply->error() != QNetworkReply::NoError) {
+            emit error(tr("Failed to download artifact for inspection: %1").arg(reply->errorString()));
+            return;
+        }
+
+        QFile file(zipPath);
+        if (!file.open(QIODevice::WriteOnly)) {
+            emit error(tr("Failed to save artifact for inspection: %1").arg(file.errorString()));
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        file.write(data);
+        file.close();
+
+        qDebug() << "GitHubClient: Artifact downloaded for inspection, size:" << data.size();
+
+        // Scan the ZIP for WIC files
+        QJsonArray wicFiles = listWicFilesInZip(zipPath);
+        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath);
+    });
+}
+
+QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
+{
+    qDebug() << "GitHubClient: Listing WIC files in ZIP:" << zipPath;
+    QJsonArray wicFiles;
+
+    struct archive *a = archive_read_new();
+    struct archive_entry *entry;
+
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+        qWarning() << "GitHubClient: Failed to open ZIP for listing:" << archive_error_string(a);
+        archive_read_free(a);
+        return wicFiles;
+    }
+
+    // WIC file extensions to look for
+    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
+        qint64 entrySize = archive_entry_size(entry);
+
+        // Check if this is a WIC file
+        for (const QString &ext : wicExtensions) {
+            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+                QJsonObject wicFile;
+                wicFile["filename"] = entryName;
+                wicFile["size"] = entrySize;
+
+                // Extract a display name from the filename
+                QString displayName = QFileInfo(entryName).fileName();
+                wicFile["display_name"] = displayName;
+
+                wicFiles.append(wicFile);
+                qDebug() << "GitHubClient: Found WIC file in ZIP:" << entryName << "size:" << entrySize;
+                break;
+            }
+        }
+        archive_read_data_skip(a);
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+
+    qDebug() << "GitHubClient: Found" << wicFiles.size() << "WIC files in ZIP";
+    return wicFiles;
 }
 
 void GitHubClient::checkRateLimit()

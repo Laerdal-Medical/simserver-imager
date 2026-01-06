@@ -216,6 +216,128 @@ WizardStepBase {
     
     // No-op (previous auto-focus/auto-select logic removed to avoid stealing click timing)
     function _focusFirstItemInCurrentView() {}
+
+    // Dialog for selecting a specific file from a multi-file CI artifact
+    ArtifactFileSelectionDialog {
+        id: artifactFileSelectionDialog
+        imageWriter: root.imageWriter
+        parent: root.wizardContainer && root.wizardContainer.overlayRootRef ? root.wizardContainer.overlayRootRef : (root.Window.window ? root.Window.window.overlayRootItem : null)
+        anchors.centerIn: parent
+
+        onFileSelected: function(filename, displayName, size) {
+            // User selected a specific file from the artifact
+            console.log("User selected file from artifact:", filename, "display:", displayName, "cached ZIP:", artifactFileSelectionDialog.zipPath)
+
+            // Set the artifact source with the target filename and cached ZIP path
+            imageWriter.setSrcArtifactWithTargetAndCache(
+                artifactFileSelectionDialog.artifactId,
+                artifactFileSelectionDialog.owner,
+                artifactFileSelectionDialog.repo,
+                artifactFileSelectionDialog.branch,
+                size,
+                displayName,
+                filename,
+                artifactFileSelectionDialog.zipPath  // Pass the cached ZIP path
+            )
+
+            // Update UI state
+            root.wizardContainer.selectedOsName = displayName
+            root.wizardContainer.customizationSupported = false
+            root.wizardContainer.piConnectAvailable = false
+            root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
+            root.wizardContainer.ccRpiAvailable = false
+            root.wizardContainer.ifAndFeaturesAvailable = false
+            root.customSelected = false
+            root.nextButtonEnabled = true
+        }
+
+        onCancelled: {
+            // User cancelled file selection
+            root.nextButtonEnabled = false
+        }
+    }
+
+    // Pending artifact selection data (stored while waiting for inspection)
+    property var pendingArtifactModel: null
+
+    // Download progress dialog for artifact inspection
+    ArtifactDownloadProgressDialog {
+        id: artifactDownloadProgressDialog
+        imageWriter: root.imageWriter
+        parent: root.wizardContainer && root.wizardContainer.overlayRootRef ? root.wizardContainer.overlayRootRef : (root.Window.window ? root.Window.window.contentItem : null)
+
+        onCancelled: {
+            // Cancel the download in progress
+            var repoManager = imageWriter.getRepositoryManager()
+            if (repoManager) {
+                repoManager.cancelArtifactInspection()
+            }
+            root.pendingArtifactModel = null
+            root.nextButtonEnabled = false
+        }
+    }
+
+    // Connection to handle artifact contents ready signal
+    Connections {
+        target: imageWriter.getRepositoryManager()
+
+        function onArtifactDownloadProgress(bytesReceived, bytesTotal) {
+            if (bytesTotal > 0) {
+                artifactDownloadProgressDialog.indeterminate = false
+                artifactDownloadProgressDialog.progress = bytesReceived / bytesTotal
+            } else {
+                artifactDownloadProgressDialog.indeterminate = true
+            }
+        }
+
+        function onArtifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath) {
+            console.log("Artifact contents ready:", artifactId, "files:", wicFiles.length)
+
+            // Close the progress dialog
+            artifactDownloadProgressDialog.close()
+
+            if (wicFiles.length === 0) {
+                // No WIC files found in artifact
+                root.wizardContainer.showError(qsTr("No installable images found in the CI build artifact."))
+                root.nextButtonEnabled = false
+            } else if (wicFiles.length === 1) {
+                // Only one file - select it directly using the cached ZIP
+                var file = wicFiles[0]
+                imageWriter.setSrcArtifactWithTargetAndCache(
+                    artifactId,
+                    owner,
+                    repo,
+                    branch,
+                    file.size || 0,
+                    file.display_name || file.filename,
+                    file.filename,
+                    zipPath  // Pass the cached ZIP path
+                )
+
+                // Update UI state
+                root.wizardContainer.selectedOsName = file.display_name || file.filename
+                root.wizardContainer.customizationSupported = false
+                root.wizardContainer.piConnectAvailable = false
+                root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
+                root.wizardContainer.ccRpiAvailable = false
+                root.wizardContainer.ifAndFeaturesAvailable = false
+                root.customSelected = false
+                root.nextButtonEnabled = true
+            } else {
+                // Multiple files - show selection dialog
+                artifactFileSelectionDialog.artifactId = artifactId
+                artifactFileSelectionDialog.artifactName = artifactName
+                artifactFileSelectionDialog.owner = owner
+                artifactFileSelectionDialog.repo = repo
+                artifactFileSelectionDialog.branch = branch
+                artifactFileSelectionDialog.zipPath = zipPath
+                artifactFileSelectionDialog.wicFiles = wicFiles
+                artifactFileSelectionDialog.open()
+            }
+
+            root.pendingArtifactModel = null
+        }
+    }
     
     // Ensure the clicked selection is visually highlighted in the current list view
     function _highlightMatchingEntryInCurrentView(selectedModel) {
@@ -746,15 +868,36 @@ WizardStepBase {
                 // Normal OS selection - check if this is a GitHub artifact
                 if (typeof(model.source_type) === "string" && model.source_type === "artifact" &&
                     typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0) {
-                    // GitHub CI artifact - use setSrcArtifact
-                    imageWriter.setSrcArtifact(
+                    // GitHub CI artifact - inspect contents to check for multiple files
+                    console.log("Inspecting artifact:", model.artifact_id, model.name)
+                    root.pendingArtifactModel = model
+
+                    // Show download progress dialog
+                    artifactDownloadProgressDialog.artifactName = model.name
+                    artifactDownloadProgressDialog.progress = 0
+                    artifactDownloadProgressDialog.indeterminate = true
+                    artifactDownloadProgressDialog.open()
+
+                    // Request artifact inspection - this will download and scan the ZIP
+                    var repoManager = imageWriter.getRepositoryManager()
+                    repoManager.inspectArtifact(
                         model.artifact_id,
+                        model.name,
                         model.source_owner,
                         model.source_repo,
-                        typeof(model.branch) !== "undefined" ? model.branch : "",
-                        model.image_download_size,
-                        model.name
+                        typeof(model.branch) !== "undefined" ? model.branch : ""
                     )
+
+                    // If artifact was cached, the signal fires synchronously and clears pendingArtifactModel.
+                    // In that case, onArtifactContentsReady has already set the source and selectedOsName.
+                    if (root.pendingArtifactModel === null) {
+                        return  // Already handled by the signal
+                    }
+
+                    // Don't enable next button yet - wait for inspection to complete
+                    root.wizardContainer.selectedOsName = model.name
+                    root.nextButtonEnabled = false
+                    return  // Exit early - the Connections handler will complete the selection
                 } else {
                     // Regular OS (CDN or GitHub release)
                     imageWriter.setSrc(

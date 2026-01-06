@@ -87,6 +87,22 @@ public:
     /* Extract WIC file from a ZIP archive and return the path to the extracted file */
     Q_INVOKABLE QString extractWicFromZip(const QString &zipPath);
 
+    /* List all WIC files in a ZIP archive (returns JSON array with name and size) */
+    Q_INVOKABLE QJsonArray listWicFilesInZip(const QString &zipPath);
+
+    /* Set the target WIC filename to extract from artifact ZIP (for multi-file artifacts) */
+    Q_INVOKABLE void setTargetWicFilename(const QString &filename);
+
+    /* Set GitHub artifact as source with a specific target file to extract */
+    Q_INVOKABLE void setSrcArtifactWithTarget(qint64 artifactId, const QString &owner, const QString &repo,
+                                               const QString &branch, quint64 downloadLen, QString osname,
+                                               const QString &targetFilename);
+
+    /* Set GitHub artifact as source with a specific target file and cached ZIP path */
+    Q_INVOKABLE void setSrcArtifactWithTargetAndCache(qint64 artifactId, const QString &owner, const QString &repo,
+                                                       const QString &branch, quint64 downloadLen, QString osname,
+                                                       const QString &targetFilename, const QString &cachedZipPath);
+
     /* Set device to write to */
     Q_INVOKABLE void setDst(const QString &device, quint64 deviceSize = 0);
 
@@ -389,6 +405,12 @@ public:
     /* Laerdal-specific: Check if GitHub is authenticated */
     Q_INVOKABLE bool isGitHubAuthenticated() const;
 
+    /* Laerdal-specific: Clear artifact cache and return bytes freed */
+    Q_INVOKABLE qint64 clearArtifactCache();
+
+    /* Laerdal-specific: Get artifact cache size in bytes */
+    Q_INVOKABLE qint64 getArtifactCacheSize();
+
     /* Startup image URL - set from command line argument */
     QUrl startupImageUrl() const { return _startupImageUrl; }
     void setStartupImageUrl(const QUrl &url);
@@ -500,6 +522,8 @@ protected:
     QString _artifactOwner;
     QString _artifactRepo;
     QString _artifactBranch;
+    QString _targetWicFilename;  // Target WIC file to extract from multi-file artifacts
+    QString _cachedArtifactZipPath;  // Path to cached artifact ZIP (from inspection)
     QSettings _settings;
     QMap<QString,QString> _translations;
     QTranslator *_trans;

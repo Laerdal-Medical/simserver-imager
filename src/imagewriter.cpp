@@ -577,6 +577,17 @@ QString ImageWriter::extractWicFromZip(const QString &zipPath)
         }
 
         if (isWic) {
+            // If a target filename is set, only extract that specific file
+            if (!_targetWicFilename.isEmpty()) {
+                QString baseName = QFileInfo(entryName).fileName();
+                if (baseName != _targetWicFilename && entryName != _targetWicFilename) {
+                    qDebug() << "ImageWriter: Skipping WIC file (not target):" << entryName;
+                    archive_read_data_skip(a);
+                    continue;
+                }
+                qDebug() << "ImageWriter: Found target WIC file:" << entryName;
+            }
+
             // Extract this file
             QString destPath = QDir(extractDir).filePath(entryName);
 
@@ -618,6 +629,99 @@ QString ImageWriter::extractWicFromZip(const QString &zipPath)
     }
 
     return wicPath;
+}
+
+/* List all WIC files in a ZIP archive without extracting */
+QJsonArray ImageWriter::listWicFilesInZip(const QString &zipPath)
+{
+    qDebug() << "ImageWriter: Listing WIC files in ZIP:" << zipPath;
+    QJsonArray wicFiles;
+
+    struct archive *a = archive_read_new();
+    struct archive_entry *entry;
+
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+        qWarning() << "ImageWriter: Failed to open ZIP for listing:" << archive_error_string(a);
+        archive_read_free(a);
+        return wicFiles;
+    }
+
+    // WIC file extensions to look for
+    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
+        qint64 entrySize = archive_entry_size(entry);
+
+        // Check if this is a WIC file
+        for (const QString &ext : wicExtensions) {
+            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+                QJsonObject wicFile;
+                wicFile["filename"] = entryName;
+                wicFile["size"] = entrySize;
+
+                // Extract a display name from the filename
+                QString displayName = QFileInfo(entryName).fileName();
+                wicFile["display_name"] = displayName;
+
+                wicFiles.append(wicFile);
+                qDebug() << "ImageWriter: Found WIC file in ZIP:" << entryName << "size:" << entrySize;
+                break;
+            }
+        }
+        archive_read_data_skip(a);
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+
+    qDebug() << "ImageWriter: Found" << wicFiles.size() << "WIC files in ZIP";
+    return wicFiles;
+}
+
+/* Set the target WIC filename to extract from artifact ZIP */
+void ImageWriter::setTargetWicFilename(const QString &filename)
+{
+    _targetWicFilename = filename;
+    qDebug() << "ImageWriter: Target WIC filename set to:" << filename;
+}
+
+/* Set GitHub artifact as source with a specific target file to extract */
+void ImageWriter::setSrcArtifactWithTarget(qint64 artifactId, const QString &owner, const QString &repo,
+                                            const QString &branch, quint64 downloadLen, QString osname,
+                                            const QString &targetFilename)
+{
+    // Call the base setSrcArtifact
+    setSrcArtifact(artifactId, owner, repo, branch, downloadLen, osname);
+
+    // Set the target filename for selective extraction
+    _targetWicFilename = targetFilename;
+    _cachedArtifactZipPath.clear();  // No cached ZIP
+    qDebug() << "ImageWriter: Set artifact source with target file:" << targetFilename;
+}
+
+/* Set GitHub artifact as source with a specific target file and cached ZIP path */
+void ImageWriter::setSrcArtifactWithTargetAndCache(qint64 artifactId, const QString &owner, const QString &repo,
+                                                    const QString &branch, quint64 downloadLen, QString osname,
+                                                    const QString &targetFilename, const QString &cachedZipPath)
+{
+    // Call the base setSrcArtifact
+    setSrcArtifact(artifactId, owner, repo, branch, downloadLen, osname);
+
+    // Set the target filename for selective extraction
+    _targetWicFilename = targetFilename;
+
+    // Set the cached ZIP path if it exists
+    if (!cachedZipPath.isEmpty() && QFile::exists(cachedZipPath)) {
+        _cachedArtifactZipPath = cachedZipPath;
+        qDebug() << "ImageWriter: Set artifact source with cached ZIP:" << cachedZipPath;
+    } else {
+        _cachedArtifactZipPath.clear();
+        qDebug() << "ImageWriter: Set artifact source with target file:" << targetFilename << "(no valid cache)";
+    }
 }
 
 /* Set device to write to */
@@ -726,6 +830,41 @@ void ImageWriter::startWrite()
     // Handle GitHub artifact source - download and extract WIC file first
     if (_isArtifactSource)
     {
+        // Check if we have a cached ZIP from artifact inspection
+        if (!_cachedArtifactZipPath.isEmpty() && QFile::exists(_cachedArtifactZipPath)) {
+            qDebug() << "Using cached artifact ZIP:" << _cachedArtifactZipPath;
+            emit preparationStatusUpdate(tr("Extracting WIC file from cached artifact..."));
+
+            // Extract WIC file from cached ZIP
+            QString wicPath = extractWicFromZip(_cachedArtifactZipPath);
+            if (wicPath.isEmpty()) {
+                onError(tr("Failed to extract WIC file from artifact ZIP"));
+                return;
+            }
+
+            qDebug() << "Extracted WIC file:" << wicPath;
+
+            // Update source to the extracted WIC file
+            _src = QUrl::fromLocalFile(wicPath);
+            _isArtifactSource = false;  // No longer an artifact source
+
+            // Get file size
+            QFileInfo wicInfo(wicPath);
+            if (wicInfo.exists()) {
+                _downloadLen = wicInfo.size();
+                _extrLen = wicInfo.size();  // WIC files are not compressed
+            }
+
+            // Clean up the cached ZIP file
+            QFile::remove(_cachedArtifactZipPath);
+            _cachedArtifactZipPath.clear();
+
+            // Continue with normal write flow
+            startWrite();
+            return;
+        }
+
+        // No cached ZIP - need to download
         qDebug() << "Starting artifact download for artifact ID:" << _artifactId;
         emit preparationStatusUpdate(tr("Downloading CI build artifact..."));
 
@@ -4470,4 +4609,56 @@ RepositoryManager* ImageWriter::getRepositoryManager()
 bool ImageWriter::isGitHubAuthenticated() const
 {
     return _githubAuth && _githubAuth->isAuthenticated();
+}
+
+qint64 ImageWriter::clearArtifactCache()
+{
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QString artifactCacheDir = cacheDir + "/artifacts";
+
+    QDir dir(artifactCacheDir);
+    if (!dir.exists()) {
+        qDebug() << "ImageWriter: Artifact cache directory does not exist";
+        return 0;
+    }
+
+    qint64 totalFreed = 0;
+    QStringList filters;
+    filters << "*.zip";
+
+    QFileInfoList files = dir.entryInfoList(filters, QDir::Files);
+    for (const QFileInfo &fileInfo : files) {
+        totalFreed += fileInfo.size();
+        if (QFile::remove(fileInfo.absoluteFilePath())) {
+            qDebug() << "ImageWriter: Removed cached artifact:" << fileInfo.fileName();
+        } else {
+            qWarning() << "ImageWriter: Failed to remove cached artifact:" << fileInfo.fileName();
+            totalFreed -= fileInfo.size();  // Don't count failed removals
+        }
+    }
+
+    qDebug() << "ImageWriter: Cleared artifact cache, freed" << totalFreed << "bytes";
+    return totalFreed;
+}
+
+qint64 ImageWriter::getArtifactCacheSize()
+{
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QString artifactCacheDir = cacheDir + "/artifacts";
+
+    QDir dir(artifactCacheDir);
+    if (!dir.exists()) {
+        return 0;
+    }
+
+    qint64 totalSize = 0;
+    QStringList filters;
+    filters << "*.zip";
+
+    QFileInfoList files = dir.entryInfoList(filters, QDir::Files);
+    for (const QFileInfo &fileInfo : files) {
+        totalSize += fileInfo.size();
+    }
+
+    return totalSize;
 }
