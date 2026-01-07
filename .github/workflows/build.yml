@@ -230,14 +230,24 @@ jobs:
       - name: Create DMG
         run: |
           cd build
-          # Deploy Qt frameworks to the app bundle
-          # The CMake creates laerdal-simserver-imager.app
-          macdeployqt laerdal-simserver-imager.app -qmldir=../src
+          APP_BUNDLE="laerdal-simserver-imager.app"
+
+          # macdeployqt is already run by CMake post-build, but run again to be safe
+          macdeployqt "${APP_BUNDLE}" -qmldir=../src
+
+          # Ad-hoc sign the app bundle (required for Gatekeeper on macOS)
+          # This allows the app to run without a paid Apple Developer certificate
+          echo "Ad-hoc signing the app bundle..."
+          codesign --force --deep --sign - "${APP_BUNDLE}"
+
+          # Verify the signature
+          echo "Verifying signature..."
+          codesign --verify --verbose "${APP_BUNDLE}" || echo "Warning: Signature verification had issues"
 
           # Create DMG
           VERSION=$(git describe --tags --always)
           hdiutil create -volname "Laerdal SimServer Imager" \
-            -srcfolder laerdal-simserver-imager.app \
+            -srcfolder "${APP_BUNDLE}" \
             -ov -format UDZO \
             "laerdal-simserver-imager-${VERSION}-macos-${{ matrix.arch }}.dmg"
 
