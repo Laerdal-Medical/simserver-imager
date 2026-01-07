@@ -1,3 +1,16 @@
+laerdal-simserver-imager (1.0.3) unstable; urgency=medium
+
+  * Source Selection: Fixed source type radio selection to properly show
+    CDN or GitHub CI images
+  * Status Display: Shows filtered image count "X images available, Y for
+    this device"
+  * Lazy Loading: CI images are only fetched when clicking Next after
+    selecting GitHub source
+  * Date Sorting: GitHub CI images are now sorted by date (newest first)
+  * API Timeout: Added 30 second timeout for GitHub API calls
+
+ -- Laerdal Medical <support@laerdal.com>  Tue, 07 Jan 2025 18:00:00 +0000
+
 laerdal-simserver-imager (1.0.2) unstable; urgency=medium
 
   * Direct ZIP Streaming: Stream WIC files directly from artifact ZIPs
