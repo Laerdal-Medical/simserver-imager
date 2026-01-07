@@ -58,6 +58,10 @@
 #include "curlfetcher.h"
 #include "curlnetworkconfig.h"
 #include <QDebug>
+#include <QtConcurrent/QtConcurrent>
+#include <QFutureWatcher>
+#include "archiveentryiodevice.h"
+#include "archiveentryextractthread.h"
 #include <QJsonObject>
 #include <QTranslator>
 #include <QPasswordDigestor>
@@ -537,99 +541,6 @@ void ImageWriter::setSrcArtifact(qint64 artifactId, const QString &owner, const 
              << "repo:" << repo << "branch:" << branch << "name:" << osname;
 }
 
-QString ImageWriter::extractWicFromZip(const QString &zipPath)
-{
-    qDebug() << "ImageWriter: Extracting WIC from ZIP:" << zipPath;
-
-    struct archive *a = archive_read_new();
-    struct archive_entry *entry;
-
-    archive_read_support_filter_all(a);
-    archive_read_support_format_all(a);
-
-    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
-        qWarning() << "ImageWriter: Failed to open ZIP:" << archive_error_string(a);
-        archive_read_free(a);
-        return QString();
-    }
-
-    QString wicPath;
-    QDir tempDir = QDir::temp();
-    QString extractDir = tempDir.filePath("simserver-imager-artifact");
-
-    // Create extraction directory if it doesn't exist
-    QDir().mkpath(extractDir);
-
-    // WIC file extensions to look for
-    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
-
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
-        qDebug() << "ImageWriter: Found entry in ZIP:" << entryName;
-
-        // Check if this is a WIC file
-        bool isWic = false;
-        for (const QString &ext : wicExtensions) {
-            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
-                isWic = true;
-                break;
-            }
-        }
-
-        if (isWic) {
-            // If a target filename is set, only extract that specific file
-            if (!_targetWicFilename.isEmpty()) {
-                QString baseName = QFileInfo(entryName).fileName();
-                if (baseName != _targetWicFilename && entryName != _targetWicFilename) {
-                    qDebug() << "ImageWriter: Skipping WIC file (not target):" << entryName;
-                    archive_read_data_skip(a);
-                    continue;
-                }
-                qDebug() << "ImageWriter: Found target WIC file:" << entryName;
-            }
-
-            // Extract this file
-            QString destPath = QDir(extractDir).filePath(entryName);
-
-            // Ensure parent directory exists
-            QFileInfo fi(destPath);
-            QDir().mkpath(fi.absolutePath());
-
-            QFile destFile(destPath);
-            if (!destFile.open(QIODevice::WriteOnly)) {
-                qWarning() << "ImageWriter: Failed to create output file:" << destPath;
-                archive_read_data_skip(a);
-                continue;
-            }
-
-            // Read and write the file content
-            const void *buff;
-            size_t size;
-            la_int64_t offset;
-
-            while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
-                destFile.write(static_cast<const char*>(buff), size);
-            }
-
-            destFile.close();
-            wicPath = destPath;
-
-            qDebug() << "ImageWriter: Extracted WIC file to:" << wicPath;
-            break;  // Found and extracted the WIC file
-        } else {
-            archive_read_data_skip(a);
-        }
-    }
-
-    archive_read_close(a);
-    archive_read_free(a);
-
-    if (wicPath.isEmpty()) {
-        qWarning() << "ImageWriter: No WIC file found in ZIP archive";
-    }
-
-    return wicPath;
-}
 
 /* List all WIC files in a ZIP archive without extracting */
 QJsonArray ImageWriter::listWicFilesInZip(const QString &zipPath)
@@ -827,39 +738,43 @@ void ImageWriter::startWrite()
 
     setWriteState(WriteState::Preparing);
 
-    // Handle GitHub artifact source - download and extract WIC file first
+    // Handle GitHub artifact source - stream directly from cached ZIP
     if (_isArtifactSource)
     {
         // Check if we have a cached ZIP from artifact inspection
         if (!_cachedArtifactZipPath.isEmpty() && QFile::exists(_cachedArtifactZipPath)) {
-            qDebug() << "Using cached artifact ZIP:" << _cachedArtifactZipPath;
-            emit preparationStatusUpdate(tr("Extracting WIC file from cached artifact..."));
+            qDebug() << "Using cached artifact ZIP for direct streaming:" << _cachedArtifactZipPath;
+            emit preparationStatusUpdate(tr("Preparing to write from artifact..."));
 
-            // Extract WIC file from cached ZIP
-            QString wicPath = extractWicFromZip(_cachedArtifactZipPath);
-            if (wicPath.isEmpty()) {
-                onError(tr("Failed to extract WIC file from artifact ZIP"));
+            QString zipPath = _cachedArtifactZipPath;
+            QString targetFilename = _targetWicFilename;
+
+            // Get the entry size from the archive
+            ArchiveEntryIODevice *archiveDevice = new ArchiveEntryIODevice(zipPath, targetFilename, this);
+            if (!archiveDevice->open(QIODevice::ReadOnly)) {
+                delete archiveDevice;
+                onError(tr("Failed to open WIC file in artifact ZIP"));
                 return;
             }
 
-            qDebug() << "Extracted WIC file:" << wicPath;
+            qint64 wicSize = archiveDevice->size();
+            archiveDevice->close();
+            delete archiveDevice;
 
-            // Update source to the extracted WIC file
-            _src = QUrl::fromLocalFile(wicPath);
-            _isArtifactSource = false;  // No longer an artifact source
+            qDebug() << "WIC file size in archive:" << wicSize;
 
-            // Get file size
-            QFileInfo wicInfo(wicPath);
-            if (wicInfo.exists()) {
-                _downloadLen = wicInfo.size();
-                _extrLen = wicInfo.size();  // WIC files are not compressed
-            }
+            // Set up the source as a special archive:// URL
+            QString archiveUrl = QString("archive://%1#%2").arg(zipPath, targetFilename);
+            _src = QUrl(archiveUrl);
+            _isArtifactSource = false;
+            _downloadLen = wicSize;
+            _extrLen = wicSize;  // Will be decompressed by ArchiveEntryExtractThread if needed
 
-            // Clean up the cached ZIP file
-            QFile::remove(_cachedArtifactZipPath);
-            _cachedArtifactZipPath.clear();
+            // Store the archive info for the streaming thread
+            _artifactZipForStreaming = zipPath;
+            _artifactEntryForStreaming = targetFilename;
 
-            // Continue with normal write flow
+            // Continue with write flow (will use ArchiveEntryExtractThread)
             startWrite();
             return;
         }
@@ -874,34 +789,37 @@ void ImageWriter::startWrite()
 
         // Connect to download completion
         connect(_githubClient, &GitHubClient::artifactDownloadComplete, this,
-                [this, zipPath](const QString &localPath) {
+                [this](const QString &localPath) {
                     qDebug() << "Artifact download complete:" << localPath;
-                    emit preparationStatusUpdate(tr("Extracting WIC file from artifact..."));
+                    emit preparationStatusUpdate(tr("Preparing to write from artifact..."));
 
-                    // Extract WIC file from ZIP
-                    QString wicPath = extractWicFromZip(localPath);
-                    if (wicPath.isEmpty()) {
-                        onError(tr("Failed to extract WIC file from artifact ZIP"));
+                    // Use direct streaming from the downloaded ZIP
+                    QString targetFilename = _targetWicFilename;
+
+                    // Get the entry size from the archive
+                    ArchiveEntryIODevice *archiveDevice = new ArchiveEntryIODevice(localPath, targetFilename, this);
+                    if (!archiveDevice->open(QIODevice::ReadOnly)) {
+                        delete archiveDevice;
+                        onError(tr("Failed to open WIC file in artifact ZIP"));
                         return;
                     }
 
-                    qDebug() << "Extracted WIC file:" << wicPath;
+                    qint64 wicSize = archiveDevice->size();
+                    archiveDevice->close();
+                    delete archiveDevice;
 
-                    // Update source to the extracted WIC file
-                    _src = QUrl::fromLocalFile(wicPath);
-                    _isArtifactSource = false;  // No longer an artifact source
+                    // Set up the source as a special archive:// URL
+                    QString archiveUrl = QString("archive://%1#%2").arg(localPath, targetFilename);
+                    _src = QUrl(archiveUrl);
+                    _isArtifactSource = false;
+                    _downloadLen = wicSize;
+                    _extrLen = wicSize;
 
-                    // Get file size
-                    QFileInfo wicInfo(wicPath);
-                    if (wicInfo.exists()) {
-                        _downloadLen = wicInfo.size();
-                        _extrLen = wicInfo.size();  // WIC files are not compressed
-                    }
+                    // Store the archive info for the streaming thread
+                    _artifactZipForStreaming = localPath;
+                    _artifactEntryForStreaming = targetFilename;
 
-                    // Clean up the ZIP file
-                    QFile::remove(localPath);
-
-                    // Continue with normal write flow
+                    // Continue with write flow (will use ArchiveEntryExtractThread)
                     startWrite();
                 }, Qt::SingleShotConnection);
 
@@ -1127,7 +1045,17 @@ void ImageWriter::startWrite()
         }
     }
 
-    if (QUrl(urlstr).isLocalFile())
+    if (_src.scheme() == "archive" && !_artifactZipForStreaming.isEmpty())
+    {
+        // Direct streaming from archive entry (uncompressed WIC)
+        qDebug() << "Using ArchiveEntryExtractThread for direct streaming from:" << _artifactZipForStreaming;
+        _thread = new ArchiveEntryExtractThread(_artifactZipForStreaming, _artifactEntryForStreaming,
+                                                 writeDevicePath.toLatin1(), this);
+        // Clear the streaming info after use
+        _artifactZipForStreaming.clear();
+        _artifactEntryForStreaming.clear();
+    }
+    else if (QUrl(urlstr).isLocalFile())
     {
         _thread = new LocalFileExtractThread(urlstr, writeDevicePath.toLatin1(), _expectedHash, this);
     }

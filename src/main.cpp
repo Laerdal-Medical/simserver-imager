@@ -223,6 +223,7 @@ int main(int argc, char *argv[])
     app.setOrganizationDomain("laerdal.com");
     app.setApplicationName("Laerdal SimServer Imager");
     app.setApplicationVersion(ImageWriter::staticVersion());
+    app.setDesktopFileName("com.laerdal.simserver-imager");
     app.setWindowIcon(QIcon(":/icons/laerdal-simserver-imager.ico"));
 
     // Log display scaling information for debugging (embedded mode only)

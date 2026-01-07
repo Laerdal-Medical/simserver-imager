@@ -299,6 +299,8 @@ set(SOURCES_BASE
     "devicewrapperfatpartition.cpp"
     "driveformatthread.cpp"
     "localfileextractthread.cpp"
+    "archiveentryiodevice.cpp"
+    "archiveentryextractthread.cpp"
     "downloadstatstelemetry.cpp"
     "dependencies/sha256crypt/sha256crypt.c"
     "cli.cpp"

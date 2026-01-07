@@ -369,8 +369,33 @@ QJsonArray RepositoryManager::getCdnOsList() const
 
 QJsonArray RepositoryManager::getGitHubOsList() const
 {
-    // Return all GitHub items (filtering is done at fetch time via setArtifactBranchFilter)
-    return _githubOsList;
+    // Filter artifacts by current branch filter (if set)
+    // Releases are always shown, artifacts are filtered by branch
+    if (_artifactBranchFilter.isEmpty()) {
+        // No filter - return all items (artifacts were fetched from default branches)
+        return _githubOsList;
+    }
+
+    QJsonArray filtered;
+    for (const auto &item : _githubOsList) {
+        QJsonObject obj = item.toObject();
+        QString sourceType = obj["source_type"].toString();
+
+        if (sourceType == "release") {
+            // Releases are always shown
+            filtered.append(item);
+        } else if (sourceType == "artifact") {
+            // Filter artifacts by branch
+            QString artifactBranch = obj["branch"].toString();
+            if (artifactBranch == _artifactBranchFilter) {
+                filtered.append(item);
+            }
+        } else {
+            // Unknown type - include it
+            filtered.append(item);
+        }
+    }
+    return filtered;
 }
 
 void RepositoryManager::setGitHubClient(GitHubClient *client)

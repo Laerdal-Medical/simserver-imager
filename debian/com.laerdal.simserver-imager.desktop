@@ -7,4 +7,5 @@ Icon=laerdal-simserver-imager
 Exec=pkexec /usr/bin/laerdal-simserver-imager %u
 Categories=Utility;
 StartupNotify=false
+StartupWMClass=com.laerdal.simserver-imager
 MimeType=x-scheme-handler/laerdal-simserver-imager;

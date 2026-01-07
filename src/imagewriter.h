@@ -84,9 +84,6 @@ public:
     /* Check if current source is a GitHub artifact */
     Q_INVOKABLE bool isArtifactSource() const { return _isArtifactSource; }
 
-    /* Extract WIC file from a ZIP archive and return the path to the extracted file */
-    Q_INVOKABLE QString extractWicFromZip(const QString &zipPath);
-
     /* List all WIC files in a ZIP archive (returns JSON array with name and size) */
     Q_INVOKABLE QJsonArray listWicFilesInZip(const QString &zipPath);
 
@@ -524,6 +521,8 @@ protected:
     QString _artifactBranch;
     QString _targetWicFilename;  // Target WIC file to extract from multi-file artifacts
     QString _cachedArtifactZipPath;  // Path to cached artifact ZIP (from inspection)
+    QString _artifactZipForStreaming;  // ZIP path for direct streaming (uncompressed WIC)
+    QString _artifactEntryForStreaming;  // Entry name for direct streaming
     QSettings _settings;
     QMap<QString,QString> _translations;
     QTranslator *_trans;
