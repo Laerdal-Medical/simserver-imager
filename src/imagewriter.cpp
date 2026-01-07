@@ -2033,29 +2033,50 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
         _deviceFilter = _device_info->getHardwareTags();
     }
 
-    {
-        if (!_completeOsList.isEmpty()) {
-            if (!_deviceFilter.isEmpty()) {
-                reference_os_list_array = filterOsListWithHWTags(_completeOsList.object().value("os_list").toArray(), _deviceFilter, _deviceFilterIsInclusive, 1);
-            } else {
-                // The device filter can be an empty array when a device filter has not been selected, or has explicitly been selected as
-                // "no filtering". In that case, avoid walking the tree and use the unfiltered list.
-                reference_os_list_array = _completeOsList.object().value("os_list").toArray();
-            }
+    // Get the selected source type from repository manager
+    QString sourceType = _repositoryManager ? _repositoryManager->selectedSourceType() : "cdn";
 
-            reference_imager_metadata = _completeOsList.object().value("imager").toObject();
+    // Include CDN images if source type is "cdn"
+    if (sourceType == "cdn" && !_completeOsList.isEmpty()) {
+        QJsonArray cdnOsList = _completeOsList.object().value("os_list").toArray();
+        int totalCount = cdnOsList.size();
+        if (!_deviceFilter.isEmpty()) {
+            reference_os_list_array = filterOsListWithHWTags(cdnOsList, _deviceFilter, _deviceFilterIsInclusive, 1);
+        } else {
+            // The device filter can be an empty array when a device filter has not been selected, or has explicitly been selected as
+            // "no filtering". In that case, avoid walking the tree and use the unfiltered list.
+            reference_os_list_array = cdnOsList;
         }
+        int filteredCount = reference_os_list_array.size();
+
+        // Update status message with filtered count
+        if (_repositoryManager) {
+            _repositoryManager->setFilteredImageCount(filteredCount, totalCount);
+        }
+
+        reference_imager_metadata = _completeOsList.object().value("imager").toObject();
     }
 
-    // Append GitHub artifacts if authenticated and available (also filter by device)
-    if (_repositoryManager && _githubAuth && _githubAuth->isAuthenticated()) {
+    // Include GitHub artifacts if source type is "github" and authenticated
+    if (sourceType == "github" && _repositoryManager && _githubAuth && _githubAuth->isAuthenticated()) {
         QJsonArray githubOsList = _repositoryManager->getGitHubOsList();
+        int totalCount = githubOsList.size();
         if (!_deviceFilter.isEmpty()) {
             // Filter GitHub artifacts by device tags
             githubOsList = filterOsListWithHWTags(githubOsList, _deviceFilter, _deviceFilterIsInclusive, 1);
         }
+        int filteredCount = githubOsList.size();
+
+        // Update status message with filtered count
+        _repositoryManager->setFilteredImageCount(filteredCount, totalCount);
+
         for (const auto &item : githubOsList) {
             reference_os_list_array.append(item);
+        }
+
+        // Use CDN imager metadata if available (for device info, etc.)
+        if (!_completeOsList.isEmpty()) {
+            reference_imager_metadata = _completeOsList.object().value("imager").toObject();
         }
     }
 
@@ -4484,8 +4505,10 @@ void ImageWriter::initializeGitHubAuth()
         if (_githubAuth->isAuthenticated()) {
             _githubClient->setAuthToken(_githubAuth->accessToken());
             qDebug() << "GitHub client configured with auth token";
-            // Fetch GitHub artifacts now that we're authenticated
-            _repositoryManager->refreshAllSources();
+            // Fetch branches for the branch selector (but not CI images yet)
+            _repositoryManager->fetchAvailableBranches();
+            // Re-emit osListPrepared to refresh UI (show GitHub option enabled)
+            emit osListPrepared();
         } else {
             _githubClient->setAuthToken(QString());
             // Re-emit osListPrepared to refresh UI without GitHub items
@@ -4512,8 +4535,8 @@ void ImageWriter::initializeGitHubAuth()
     if (_githubAuth->loadStoredToken()) {
         _githubClient->setAuthToken(_githubAuth->accessToken());
         qDebug() << "Loaded stored GitHub token";
-        // Fetch GitHub artifacts since we have a stored token
-        _repositoryManager->refreshAllSources();
+        // Fetch branches for the branch selector (but not CI images until user selects a branch)
+        _repositoryManager->fetchAvailableBranches();
     }
 
     qDebug() << "Laerdal components initialized";

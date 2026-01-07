@@ -184,6 +184,16 @@ public:
     Q_INVOKABLE QJsonArray getGitHubOsList() const;
 
     /**
+     * @brief Update the status message with the filtered image count
+     * @param filteredCount Number of images visible after device filtering
+     * @param totalCount Total number of images before filtering
+     *
+     * This should be called by ImageWriter after applying device filtering
+     * so the status message reflects the actual visible count.
+     */
+    Q_INVOKABLE void setFilteredImageCount(int filteredCount, int totalCount);
+
+    /**
      * @brief Set the GitHub client for API access
      */
     void setGitHubClient(GitHubClient *client);
@@ -279,6 +289,7 @@ private:
     void setLoading(bool loading);
     void setError(const QString &message);
     void setStatusMessage(const QString &message);
+    void updateStatusMessage();
     void checkRefreshComplete();
 
     struct GitHubRepoInfo {

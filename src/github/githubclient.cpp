@@ -289,6 +289,8 @@ void GitHubClient::downloadArtifact(const QString &owner, const QString &repo,
 {
     QString urlStr = getArtifactDownloadUrl(owner, repo, artifactId);
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
+    // No timeout for downloads - they can take a long time for large files
+    request.setTransferTimeout(0);
 
     // Don't auto-follow redirects - we need to manually handle them to add auth headers
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -351,6 +353,8 @@ void GitHubClient::downloadArtifactFromUrl(const QUrl &url, const QString &desti
         request.setUrl(url);
         request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
     }
+    // No timeout for downloads - they can take a long time for large files
+    request.setTransferTimeout(0);
 
     // Allow redirects from here (the blob storage URL shouldn't redirect further)
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -422,6 +426,8 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
     // Download the artifact
     QString urlStr = getArtifactDownloadUrl(owner, repo, artifactId);
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
+    // No timeout for downloads - they can take a long time for large files
+    request.setTransferTimeout(0);
 
     // Don't auto-follow redirects - we need to manually handle them to add auth headers
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -482,6 +488,8 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
         request.setUrl(url);
         request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
     }
+    // No timeout for downloads - they can take a long time for large files
+    request.setTransferTimeout(0);
 
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -810,12 +818,15 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     }
 }
 
-QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url)
+QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url, int timeoutMs)
 {
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager");
     request.setRawHeader("Accept", "application/vnd.github+json");
     request.setRawHeader("X-GitHub-Api-Version", "2022-11-28");
+
+    // Set connection/transfer timeout (covers connection establishment)
+    request.setTransferTimeout(timeoutMs);
 
     if (!_authToken.isEmpty()) {
         request.setRawHeader("Authorization", QString("Bearer %1").arg(_authToken).toUtf8());

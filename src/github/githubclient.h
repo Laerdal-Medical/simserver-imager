@@ -303,7 +303,7 @@ private slots:
     void handleNetworkReply(QNetworkReply *reply);
 
 private:
-    QNetworkRequest createAuthenticatedRequest(const QUrl &url);
+    QNetworkRequest createAuthenticatedRequest(const QUrl &url, int timeoutMs = API_TIMEOUT_MS);
     void checkRateLimitHeaders(QNetworkReply *reply);
     QJsonArray filterWicAssets(const QJsonArray &releases, const QString &owner, const QString &repo);
     QJsonArray filterWicArtifacts(const QJsonArray &artifacts,
@@ -317,6 +317,9 @@ private:
 
     static constexpr const char* API_BASE_URL = "https://api.github.com";
     static constexpr const char* RAW_BASE_URL = "https://raw.githubusercontent.com";
+
+    // Timeouts in milliseconds
+    static constexpr int API_TIMEOUT_MS = 30000;  // 30 seconds for API calls
 
     QNetworkAccessManager _networkManager;
     QString _authToken;

@@ -252,8 +252,8 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
         emit artifactBranchFilterChanged();
         qDebug() << "RepositoryManager: Artifact branch filter set to:" << branch;
 
-        // Re-fetch artifacts from the new branch
-        if (_githubClient) {
+        // Fetch artifacts from the selected branch
+        if (_githubClient && _selectedSourceType == "github") {
             // Clear existing GitHub artifacts (keep releases)
             QJsonArray releasesOnly;
             for (const auto &item : _githubOsList) {
@@ -292,6 +292,17 @@ void RepositoryManager::setSelectedSourceType(const QString &sourceType)
         _selectedSourceType = sourceType;
         _settings.setValue(SETTINGS_SOURCE_TYPE, sourceType);
         emit selectedSourceTypeChanged();
+
+        // When switching to GitHub, fetch branches but don't fetch CI images yet
+        // CI images will be fetched when user clicks Next on the Source Selection step
+        if (sourceType == "github" && _githubClient) {
+            qDebug() << "RepositoryManager: Source type set to github, fetching branches...";
+            fetchAvailableBranches();
+        }
+
+        // Notify that the OS list source has changed - this triggers the UI to reload
+        // and call setFilteredImageCount() with the correct filtered count
+        emit osListReady();
         qDebug() << "RepositoryManager: Source type set to:" << sourceType;
     }
 }
@@ -393,31 +404,50 @@ QJsonArray RepositoryManager::getGitHubOsList() const
 {
     // Filter artifacts by current branch filter (if set)
     // Releases are always shown, artifacts are filtered by branch
-    if (_artifactBranchFilter.isEmpty()) {
-        // No filter - return all items (artifacts were fetched from default branches)
-        return _githubOsList;
-    }
-
     QJsonArray filtered;
-    for (const auto &item : _githubOsList) {
-        QJsonObject obj = item.toObject();
-        QString sourceType = obj["source_type"].toString();
+    if (_artifactBranchFilter.isEmpty()) {
+        // No filter - use all items
+        filtered = _githubOsList;
+    } else {
+        for (const auto &item : _githubOsList) {
+            QJsonObject obj = item.toObject();
+            QString sourceType = obj["source_type"].toString();
 
-        if (sourceType == "release") {
-            // Releases are always shown
-            filtered.append(item);
-        } else if (sourceType == "artifact") {
-            // Filter artifacts by branch
-            QString artifactBranch = obj["branch"].toString();
-            if (artifactBranch == _artifactBranchFilter) {
+            if (sourceType == "release") {
+                // Releases are always shown
+                filtered.append(item);
+            } else if (sourceType == "artifact") {
+                // Filter artifacts by branch
+                QString artifactBranch = obj["branch"].toString();
+                if (artifactBranch == _artifactBranchFilter) {
+                    filtered.append(item);
+                }
+            } else {
+                // Unknown type - include it
                 filtered.append(item);
             }
-        } else {
-            // Unknown type - include it
-            filtered.append(item);
         }
     }
-    return filtered;
+
+    // Sort by release_date descending (newest first)
+    QList<QJsonValue> sortedList;
+    for (const auto &item : filtered) {
+        sortedList.append(item);
+    }
+
+    std::sort(sortedList.begin(), sortedList.end(), [](const QJsonValue &a, const QJsonValue &b) {
+        QString dateA = a.toObject()["release_date"].toString();
+        QString dateB = b.toObject()["release_date"].toString();
+        // ISO 8601 dates can be compared lexicographically
+        return dateA > dateB;  // Descending order (newest first)
+    });
+
+    QJsonArray sorted;
+    for (const auto &item : sortedList) {
+        sorted.append(item);
+    }
+
+    return sorted;
 }
 
 void RepositoryManager::setGitHubClient(GitHubClient *client)
@@ -704,9 +734,24 @@ void RepositoryManager::checkRefreshComplete()
         emit osListReady();
         emit githubListReady(_githubOsList);
 
-        // Set status message based on results
-        int githubCount = _githubOsList.size();
-        if (githubCount == 0) {
+        // Note: Status message is set by setFilteredImageCount() which is called
+        // from ImageWriter::getFilteredOSlistDocument() when the OS list model reloads.
+        // This happens through the osListReady -> osListPrepared signal chain.
+
+        qDebug() << "RepositoryManager: Refresh complete, total items:"
+                 << getMergedOsList().size();
+    }
+}
+
+void RepositoryManager::updateStatusMessage()
+{
+    if (_selectedSourceType == "cdn") {
+        // CDN selected - clear the status message (CDN doesn't need a count banner)
+        setStatusMessage(QString());
+    } else if (_selectedSourceType == "github") {
+        // GitHub selected - show CI image count
+        int imageCount = _githubOsList.size();
+        if (imageCount == 0) {
             // Check if there are any enabled repos
             bool hasEnabledRepos = false;
             for (const auto &repo : _githubRepos) {
@@ -716,16 +761,50 @@ void RepositoryManager::checkRefreshComplete()
                 }
             }
             if (hasEnabledRepos) {
-                setStatusMessage(tr("No CI builds found for selected repositories"));
+                setStatusMessage(tr("No CI images found for selected repositories"));
             } else {
                 setStatusMessage(tr("No GitHub repositories enabled"));
             }
         } else {
-            setStatusMessage(tr("%1 CI build(s) found").arg(githubCount));
+            // Show total CI image count - will be updated with filtered count
+            // by ImageWriter after device filtering is applied
+            setStatusMessage(tr("%1 CI image(s) available").arg(imageCount));
         }
+    }
+}
 
-        qDebug() << "RepositoryManager: Refresh complete, total items:"
-                 << getMergedOsList().size();
+void RepositoryManager::setFilteredImageCount(int filteredCount, int totalCount)
+{
+    if (_selectedSourceType == "cdn") {
+        // CDN source
+        if (filteredCount == 0 && totalCount == 0) {
+            setStatusMessage(tr("No CDN images available"));
+        } else if (filteredCount == totalCount) {
+            setStatusMessage(tr("%1 CDN image(s) available").arg(totalCount));
+        } else {
+            setStatusMessage(tr("%1 CDN images available, %2 for this device").arg(totalCount).arg(filteredCount));
+        }
+    } else if (_selectedSourceType == "github") {
+        // GitHub source
+        if (filteredCount == 0 && totalCount == 0) {
+            // Check if there are any enabled repos
+            bool hasEnabledRepos = false;
+            for (const auto &repo : _githubRepos) {
+                if (repo.enabled) {
+                    hasEnabledRepos = true;
+                    break;
+                }
+            }
+            if (hasEnabledRepos) {
+                setStatusMessage(tr("No CI images found for selected repositories"));
+            } else {
+                setStatusMessage(tr("No GitHub repositories enabled"));
+            }
+        } else if (filteredCount == totalCount) {
+            setStatusMessage(tr("%1 CI image(s) available").arg(totalCount));
+        } else {
+            setStatusMessage(tr("%1 CI images available, %2 for this device").arg(totalCount).arg(filteredCount));
+        }
     }
 }
 

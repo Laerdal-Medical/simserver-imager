@@ -23,6 +23,14 @@ WizardStepBase {
     showNextButton: true
     nextButtonEnabled: true
 
+    // Fetch CI images when navigating to next step with GitHub selected
+    onNextClicked: {
+        if (root.selectedSourceType === "github" && root.repoManager) {
+            console.log("SourceSelectionStep: GitHub selected, fetching CI images before proceeding...")
+            root.repoManager.refreshAllSources()
+        }
+    }
+
     // Properties for repository manager access
     property var repoManager: imageWriter ? imageWriter.getRepositoryManager() : null
     property var githubAuth: imageWriter ? imageWriter.getGitHubAuth() : null
