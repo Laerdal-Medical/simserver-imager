@@ -286,6 +286,16 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
     }
 }
 
+void RepositoryManager::setSelectedSourceType(const QString &sourceType)
+{
+    if (_selectedSourceType != sourceType) {
+        _selectedSourceType = sourceType;
+        _settings.setValue(SETTINGS_SOURCE_TYPE, sourceType);
+        emit selectedSourceTypeChanged();
+        qDebug() << "RepositoryManager: Source type set to:" << sourceType;
+    }
+}
+
 void RepositoryManager::fetchAvailableBranches()
 {
     if (!_githubClient) {
@@ -348,15 +358,27 @@ QJsonArray RepositoryManager::getMergedOsList() const
 {
     QJsonArray merged;
 
-    // Add CDN items first
-    for (const auto &item : _cdnOsList) {
-        merged.append(item);
-    }
-
-    // Add GitHub items (filtered by branch if applicable)
-    QJsonArray githubItems = getGitHubOsList();
-    for (const auto &item : githubItems) {
-        merged.append(item);
+    // Filter based on selected source type
+    if (_selectedSourceType == "cdn") {
+        // CDN only
+        for (const auto &item : _cdnOsList) {
+            merged.append(item);
+        }
+    } else if (_selectedSourceType == "github") {
+        // GitHub only (filtered by branch if applicable)
+        QJsonArray githubItems = getGitHubOsList();
+        for (const auto &item : githubItems) {
+            merged.append(item);
+        }
+    } else {
+        // Default: show both (shouldn't happen with UI)
+        for (const auto &item : _cdnOsList) {
+            merged.append(item);
+        }
+        QJsonArray githubItems = getGitHubOsList();
+        for (const auto &item : githubItems) {
+            merged.append(item);
+        }
     }
 
     return merged;
@@ -448,9 +470,13 @@ void RepositoryManager::loadSettings()
         }
     }
 
+    // Load source type
+    _selectedSourceType = _settings.value(SETTINGS_SOURCE_TYPE, "cdn").toString();
+
     qDebug() << "RepositoryManager: Loaded settings, environment:"
              << environmentName(_environment)
-             << ", repos:" << _githubRepos.size();
+             << ", repos:" << _githubRepos.size()
+             << ", source type:" << _selectedSourceType;
 }
 
 void RepositoryManager::saveSettings()

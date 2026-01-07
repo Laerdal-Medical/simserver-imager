@@ -65,6 +65,8 @@ public:
     Q_PROPERTY(QStringList availableBranches READ availableBranches
                NOTIFY availableBranchesChanged)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
+    Q_PROPERTY(QString selectedSourceType READ selectedSourceType
+               WRITE setSelectedSourceType NOTIFY selectedSourceTypeChanged)
 
     // Getters
     Environment currentEnvironment() const { return _environment; }
@@ -74,6 +76,7 @@ public:
     QString artifactBranchFilter() const { return _artifactBranchFilter; }
     QStringList availableBranches() const { return _availableBranches; }
     QString statusMessage() const { return _statusMessage; }
+    QString selectedSourceType() const { return _selectedSourceType; }
 
     /**
      * @brief Set the current CDN environment
@@ -147,6 +150,12 @@ public:
      * @param branch The branch to filter/fetch artifacts from (empty = use default branches)
      */
     Q_INVOKABLE void setArtifactBranchFilter(const QString &branch);
+
+    /**
+     * @brief Set the selected source type (cdn or github)
+     * @param sourceType "cdn" or "github"
+     */
+    Q_INVOKABLE void setSelectedSourceType(const QString &sourceType);
 
     /**
      * @brief Fetch available branches from all enabled repositories
@@ -231,6 +240,7 @@ signals:
     void artifactBranchFilterChanged();
     void availableBranchesChanged();
     void statusMessageChanged();
+    void selectedSourceTypeChanged();
     void osListReady();
     void cdnListReady(const QJsonArray &list);
     void githubListReady(const QJsonArray &list);
@@ -291,6 +301,7 @@ private:
     QString _errorMessage;
     QString _statusMessage;
     QString _artifactBranchFilter;
+    QString _selectedSourceType = "cdn";  // "cdn" or "github"
     QStringList _availableBranches;
 
     int _pendingRefreshCount = 0;
@@ -301,6 +312,7 @@ private:
     static constexpr const char* SETTINGS_GITHUB_REPOS = "laerdal/github_repos";
     static constexpr const char* SETTINGS_REPO_BRANCHES = "laerdal/repo_branches";
     static constexpr const char* SETTINGS_REPO_ENABLED = "laerdal/repo_enabled";
+    static constexpr const char* SETTINGS_SOURCE_TYPE = "laerdal/source_type";
 };
 
 #endif // REPOSITORYMANAGER_H

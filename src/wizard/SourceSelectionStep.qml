@@ -28,6 +28,9 @@ WizardStepBase {
     property var githubAuth: imageWriter ? imageWriter.getGitHubAuth() : null
     property bool isGitHubAuthenticated: githubAuth ? githubAuth.isAuthenticated : false
 
+    // Source type: "cdn" or "github"
+    property string selectedSourceType: repoManager ? repoManager.selectedSourceType : "cdn"
+
     // Listen for GitHub auth changes
     Connections {
         target: root.githubAuth
@@ -62,21 +65,32 @@ WizardStepBase {
 
     Component.onCompleted: {
         // Register focus groups for keyboard navigation
+        root.registerFocusGroup("source_type_section", function(){
+            return [cdnRadio, githubRadio]
+        }, 0)
+
         root.registerFocusGroup("environment_section", function(){
             return [environmentCombo]
-        }, 0)
+        }, 1)
 
         root.registerFocusGroup("branch_filter_section", function(){
             var items = []
             if (branchFilterCombo.visible) items.push(branchFilterCombo)
             return items
-        }, 1)
+        }, 2)
     }
 
     // Update environment when combo changes
     onSelectedEnvironmentChanged: {
         if (repoManager) {
             repoManager.currentEnvironment = selectedEnvironment
+        }
+    }
+
+    // Update source type in repo manager
+    onSelectedSourceTypeChanged: {
+        if (repoManager) {
+            repoManager.selectedSourceType = selectedSourceType
         }
     }
 
@@ -99,12 +113,146 @@ WizardStepBase {
             width: parent.width - Style.scrollBarWidth
             spacing: Style.spacingLarge
 
-            // Environment Selection Section
+            // Source Type Selection
             WizardSectionContainer {
                 Layout.fillWidth: true
 
                 WizardFormLabel {
-                    text: qsTr("Laerdal CDN Environment")
+                    text: qsTr("Image Source")
+                    Layout.fillWidth: true
+                }
+
+                WizardDescriptionText {
+                    text: qsTr("Choose whether to download from Laerdal CDN or GitHub CI artifacts.")
+                    Layout.fillWidth: true
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Style.spacingSmall
+
+                    // CDN Radio Option
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Style.spacingSmall
+
+                        RadioButton {
+                            id: cdnRadio
+                            checked: root.selectedSourceType === "cdn"
+
+                            onCheckedChanged: {
+                                if (checked) {
+                                    root.selectedSourceType = "cdn"
+                                }
+                            }
+
+                            Accessible.role: Accessible.RadioButton
+                            Accessible.name: qsTr("Laerdal CDN source")
+                            Accessible.description: qsTr("Download images from Laerdal CDN")
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: Style.spacingXXSmall
+
+                            Text {
+                                text: qsTr("Laerdal CDN")
+                                font.pixelSize: Style.fontSizeFormLabel
+                                font.family: Style.fontFamilyBold
+                                font.bold: true
+                                color: Style.formLabelColor
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: cdnRadio.checked = true
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+                            }
+
+                            Text {
+                                text: qsTr("Official release images from Laerdal's content delivery network")
+                                font.pixelSize: Style.fontSizeCaption
+                                font.family: Style.fontFamily
+                                color: Style.textDescriptionColor
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: cdnRadio.checked = true
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+                            }
+                        }
+                    }
+
+                    // GitHub Radio Option
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Style.spacingSmall
+
+                        RadioButton {
+                            id: githubRadio
+                            checked: root.selectedSourceType === "github"
+                            enabled: root.isGitHubAuthenticated
+
+                            onCheckedChanged: {
+                                if (checked) {
+                                    root.selectedSourceType = "github"
+                                }
+                            }
+
+                            Accessible.role: Accessible.RadioButton
+                            Accessible.name: qsTr("GitHub CI Artifacts source")
+                            Accessible.description: root.isGitHubAuthenticated
+                                                    ? qsTr("Download images from GitHub CI artifacts")
+                                                    : qsTr("Sign in to GitHub to enable this option")
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: Style.spacingXXSmall
+
+                            Text {
+                                text: qsTr("GitHub CI Artifacts")
+                                font.pixelSize: Style.fontSizeFormLabel
+                                font.family: Style.fontFamilyBold
+                                font.bold: true
+                                color: githubRadio.enabled ? Style.formLabelColor : Style.formLabelDisabledColor
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: githubRadio.enabled
+                                    onClicked: githubRadio.checked = true
+                                    cursorShape: githubRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                }
+                            }
+
+                            Text {
+                                text: root.isGitHubAuthenticated
+                                      ? qsTr("Development builds from GitHub Actions CI pipelines")
+                                      : qsTr("Sign in to GitHub in App Options to enable")
+                                font.pixelSize: Style.fontSizeCaption
+                                font.family: Style.fontFamily
+                                color: githubRadio.enabled ? Style.textDescriptionColor : Style.formLabelDisabledColor
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: githubRadio.enabled
+                                    onClicked: githubRadio.checked = true
+                                    cursorShape: githubRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // CDN Environment Selection Section (visible when CDN is selected)
+            WizardSectionContainer {
+                Layout.fillWidth: true
+                visible: root.selectedSourceType === "cdn"
+
+                WizardFormLabel {
+                    text: qsTr("CDN Environment")
                     Layout.fillWidth: true
                 }
 
@@ -163,18 +311,18 @@ WizardStepBase {
                 }
             }
 
-            // GitHub Artifact Branch Filter Section (visible when authenticated)
+            // GitHub Artifact Branch Filter Section (visible when GitHub is selected)
             WizardSectionContainer {
                 Layout.fillWidth: true
-                visible: root.isGitHubAuthenticated
+                visible: root.selectedSourceType === "github" && root.isGitHubAuthenticated
 
                 WizardFormLabel {
-                    text: qsTr("GitHub Artifact Branch Filter")
+                    text: qsTr("Branch Filter")
                     Layout.fillWidth: true
                 }
 
                 WizardDescriptionText {
-                    text: qsTr("Filter CI build artifacts by branch. Only artifacts from the selected branch will be shown in the image list.")
+                    text: qsTr("Filter CI build artifacts by branch. Only artifacts from the selected branch will be shown.")
                     Layout.fillWidth: true
                 }
 
@@ -191,7 +339,7 @@ WizardStepBase {
                         return branches
                     }
 
-                    displayText: currentIndex === 0 ? qsTr("Default branches") : currentText
+                    displayText: currentIndex === 0 ? qsTr("All branches") : currentText
 
                     currentIndex: {
                         if (!currentFilter || currentFilter === "") return 0
@@ -221,7 +369,7 @@ WizardStepBase {
                         height: Style.buttonHeightStandard
 
                         contentItem: Text {
-                            text: branchDelegate.index === 0 ? qsTr("Default branches") : branchDelegate.modelData
+                            text: branchDelegate.index === 0 ? qsTr("All branches") : branchDelegate.modelData
                             font.pixelSize: Style.fontSizeFormLabel
                             font.family: Style.fontFamily
                             color: Style.formLabelColor
