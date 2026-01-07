@@ -1,3 +1,14 @@
+laerdal-simserver-imager (1.0.2) unstable; urgency=medium
+
+  * Direct ZIP Streaming: Stream WIC files directly from artifact ZIPs
+    to disk without intermediate extraction, saving disk space
+  * Branch Filtering Fix: Cached CI artifacts now correctly appear only
+    under their respective branches
+  * Compression Support: Handle both compressed (.wic.gz, .wic.xz) and
+    uncompressed (.wic) entries via libarchive streaming
+
+ -- Laerdal Medical <support@laerdal.com>  Tue, 07 Jan 2025 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.1) unstable; urgency=medium
 
   * Artifact Inspection: CI build artifacts are now inspected to detect
