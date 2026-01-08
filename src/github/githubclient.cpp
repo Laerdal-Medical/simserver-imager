@@ -411,10 +411,10 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
     // Check if artifact is already cached and valid
     if (QFile::exists(zipPath)) {
         qDebug() << "GitHubClient: Checking cached artifact:" << zipPath;
-        QJsonArray wicFiles = listWicFilesInZip(zipPath);
-        if (!wicFiles.isEmpty()) {
+        QJsonArray imageFiles = listImageFilesInZip(zipPath);
+        if (!imageFiles.isEmpty()) {
             qDebug() << "GitHubClient: Using valid cached artifact:" << zipPath;
-            emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath);
+            emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
             return;
         } else {
             // Cached file is invalid or corrupt - delete it and re-download
@@ -468,9 +468,9 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
 
         qDebug() << "GitHubClient: Artifact cached to:" << zipPath;
 
-        // Now scan the ZIP for WIC files
-        QJsonArray wicFiles = listWicFilesInZip(zipPath);
-        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath);
+        // Now scan the ZIP for all image files (WIC + SPU)
+        QJsonArray imageFiles = listImageFilesInZip(zipPath);
+        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
     });
 }
 
@@ -530,9 +530,9 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
 
         qDebug() << "GitHubClient: Artifact downloaded for inspection, size:" << data.size();
 
-        // Scan the ZIP for WIC files
-        QJsonArray wicFiles = listWicFilesInZip(zipPath);
-        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath);
+        // Scan the ZIP for all image files (WIC + SPU)
+        QJsonArray imageFiles = listImageFilesInZip(zipPath);
+        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
     });
 }
 
@@ -584,6 +584,211 @@ QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
 
     qDebug() << "GitHubClient: Found" << wicFiles.size() << "WIC files in ZIP";
     return wicFiles;
+}
+
+QJsonArray GitHubClient::listSpuFilesInZip(const QString &zipPath)
+{
+    qDebug() << "GitHubClient: Listing SPU files in ZIP:" << zipPath;
+    QJsonArray spuFiles;
+
+    struct archive *a = archive_read_new();
+    struct archive_entry *entry;
+
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+        qWarning() << "GitHubClient: Failed to open ZIP for SPU listing:" << archive_error_string(a);
+        archive_read_free(a);
+        return spuFiles;
+    }
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
+        qint64 entrySize = archive_entry_size(entry);
+
+        // Check if this is an SPU file
+        if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
+            QJsonObject spuFile;
+            spuFile["filename"] = entryName;
+            spuFile["size"] = entrySize;
+
+            // Extract a display name from the filename
+            QString displayName = QFileInfo(entryName).fileName();
+            spuFile["display_name"] = displayName;
+
+            spuFiles.append(spuFile);
+            qDebug() << "GitHubClient: Found SPU file in ZIP:" << entryName << "size:" << entrySize;
+        }
+        archive_read_data_skip(a);
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+
+    qDebug() << "GitHubClient: Found" << spuFiles.size() << "SPU files in ZIP";
+    return spuFiles;
+}
+
+QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
+{
+    qDebug() << "GitHubClient: Listing all image files (WIC + SPU) in ZIP:" << zipPath;
+    QJsonArray imageFiles;
+
+    struct archive *a = archive_read_new();
+    struct archive_entry *entry;
+
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+        qWarning() << "GitHubClient: Failed to open ZIP for listing:" << archive_error_string(a);
+        archive_read_free(a);
+        return imageFiles;
+    }
+
+    // WIC file extensions to look for
+    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi"};
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
+        qint64 entrySize = archive_entry_size(entry);
+        QString displayName = QFileInfo(entryName).fileName();
+
+        // Check if this is a WIC file
+        bool isWic = false;
+        for (const QString &ext : wicExtensions) {
+            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+                isWic = true;
+                break;
+            }
+        }
+
+        if (isWic) {
+            QJsonObject imageFile;
+            imageFile["filename"] = entryName;
+            imageFile["size"] = entrySize;
+            imageFile["display_name"] = displayName;
+            imageFile["type"] = "wic";
+            imageFiles.append(imageFile);
+            qDebug() << "GitHubClient: Found WIC file:" << entryName;
+        }
+        // Check if this is an SPU file
+        else if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
+            QJsonObject imageFile;
+            imageFile["filename"] = entryName;
+            imageFile["size"] = entrySize;
+            imageFile["display_name"] = displayName;
+            imageFile["type"] = "spu";
+            imageFiles.append(imageFile);
+            qDebug() << "GitHubClient: Found SPU file:" << entryName;
+        }
+
+        archive_read_data_skip(a);
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+
+    qDebug() << "GitHubClient: Found" << imageFiles.size() << "image files in ZIP";
+    return imageFiles;
+}
+
+void GitHubClient::inspectArtifactSpuContents(const QString &owner, const QString &repo,
+                                               qint64 artifactId, const QString &artifactName,
+                                               const QString &branch)
+{
+    qDebug() << "GitHubClient: Inspecting artifact for SPU contents:" << artifactName;
+
+    // Get the download URL
+    QString downloadUrl = getArtifactDownloadUrl(owner, repo, artifactId);
+
+    // Determine cache path for this artifact
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QString artifactCacheDir = cacheDir + "/github-artifacts";
+    QDir().mkpath(artifactCacheDir);
+    QString zipPath = artifactCacheDir + QString("/artifact_%1.zip").arg(artifactId);
+
+    // Check if artifact is already cached and valid
+    if (QFile::exists(zipPath)) {
+        qDebug() << "GitHubClient: Checking cached artifact for SPU:" << zipPath;
+        QJsonArray spuFiles = listSpuFilesInZip(zipPath);
+        if (!spuFiles.isEmpty()) {
+            qDebug() << "GitHubClient: Using valid cached artifact for SPU:" << zipPath;
+            emit artifactSpuContentsReady(artifactId, artifactName, owner, repo, branch, spuFiles, zipPath);
+            return;
+        } else {
+            qDebug() << "GitHubClient: Cached artifact has no SPU files or is invalid, re-downloading";
+            QFile::remove(zipPath);
+        }
+    }
+
+    // Download and inspect
+    inspectArtifactSpuFromUrl(QUrl(downloadUrl), owner, repo, artifactId, artifactName, branch, zipPath);
+}
+
+void GitHubClient::inspectArtifactSpuFromUrl(const QUrl &url, const QString &owner, const QString &repo,
+                                              qint64 artifactId, const QString &artifactName,
+                                              const QString &branch, const QString &zipPath)
+{
+    qDebug() << "GitHubClient: Downloading artifact for SPU inspection:" << url.toString();
+
+    // Check if this is a GitHub URL or an external URL
+    bool isGitHubUrl = url.host().endsWith("github.com") || url.host().endsWith("githubusercontent.com");
+
+    QNetworkRequest request;
+    if (isGitHubUrl) {
+        request = createAuthenticatedRequest(url);
+    } else {
+        request.setUrl(url);
+        request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
+    }
+    // No timeout for downloads - they can take a long time for large files
+    request.setTransferTimeout(0);
+
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    QNetworkReply *reply = _networkManager.get(request);
+    _activeInspectionReply = reply;
+    _activeInspectionZipPath = zipPath;
+
+    connect(reply, &QNetworkReply::downloadProgress, this, [this](qint64 bytesReceived, qint64 bytesTotal) {
+        emit artifactDownloadProgress(bytesReceived, bytesTotal);
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
+        _activeInspectionReply = nullptr;
+        _activeInspectionZipPath.clear();
+        reply->deleteLater();
+
+        // Check if cancelled (OperationCanceledError)
+        if (reply->error() == QNetworkReply::OperationCanceledError) {
+            qDebug() << "GitHubClient: SPU artifact inspection cancelled by user";
+            return;
+        }
+
+        if (reply->error() != QNetworkReply::NoError) {
+            emit error(tr("Failed to download artifact for SPU inspection: %1").arg(reply->errorString()));
+            return;
+        }
+
+        QFile file(zipPath);
+        if (!file.open(QIODevice::WriteOnly)) {
+            emit error(tr("Failed to save artifact for SPU inspection: %1").arg(file.errorString()));
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        file.write(data);
+        file.close();
+
+        qDebug() << "GitHubClient: Artifact downloaded for SPU inspection, size:" << data.size();
+
+        // Scan the ZIP for SPU files
+        QJsonArray spuFiles = listSpuFilesInZip(zipPath);
+        emit artifactSpuContentsReady(artifactId, artifactName, owner, repo, branch, spuFiles, zipPath);
+    });
 }
 
 void GitHubClient::checkRateLimit()

@@ -1213,6 +1213,48 @@ General principals you should follow:
 
 With those principals in mind, you can then fill out the form: https://forms.gle/U6JkxVfhHkn5ok2X7
 
+## Laerdal SimServer Imager Extensions
+
+The Laerdal SimServer Imager extends the standard RPI Imager format with support for additional image types. Image type is determined by the URL file extension (not stored in JSON metadata) to maintain compatibility with the standard schema.
+
+### Supported Image Types
+
+| Type | Extension | Description |
+|------|-----------|-------------|
+| **WIC** | `.wic`, `.wic.xz`, `.wic.gz`, `.wic.bz2`, `.wic.zst` | Standard disk image (full flash) |
+| **VSI** | `.vsi` | Versioned Sparse Image (delta updates) |
+| **SPU** | `.spu` | Software Package Update (firmware files copied to device) |
+
+### Example: Adding an SPU Entry
+
+SPU files use the same JSON structure as WIC images - only the URL extension differs:
+
+```json
+{
+  "os_list": [{
+    "name": "SimPad System Software Update 9.2.0",
+    "description": "Firmware update for SimPad PLUS",
+    "icon": "https://cdn.example.com/icons/simpad.png",
+    "url": "https://cdn.example.com/updates/simpad-9.2.0.spu",
+    "extract_size": 52428800,
+    "extract_sha256": "abc123...",
+    "image_download_size": 52428800,
+    "release_date": "2025-01-08",
+    "devices": ["simpad-plus", "simpad-plus2"]
+  }]
+}
+```
+
+### UI Badge Colors
+
+The application displays badges in the OS selection list based on file type:
+
+| Type | Badge Color | Hex |
+|------|-------------|-----|
+| SPU | Indigo | `#6366f1` |
+| WIC | Emerald | `#10b981` |
+| VSI | Cyan | `#06b6d4` |
+
 ## License
 
 This documentation follows the same license as the Raspberry Pi Imager project.

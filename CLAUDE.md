@@ -131,6 +131,48 @@ Examples of valid name formats:
 - `"Factory Image 2.0.1"`
 - `"My Image v1.0.0.4"` (4-part version)
 
+## Image Types
+
+The application supports three image types, determined by URL file extension:
+
+| Type | Extension | Description | Badge Color |
+|------|-----------|-------------|-------------|
+| **WIC** | `.wic`, `.wic.xz`, `.wic.gz`, `.wic.bz2`, `.wic.zst` | Standard disk image (full flash) | Emerald `#10b981` |
+| **VSI** | `.vsi` | Versioned Sparse Image (delta updates) | Cyan `#06b6d4` |
+| **SPU** | `.spu` | Software Package Update (firmware files copied to device) | Indigo `#6366f1` |
+
+Image type is NOT stored in JSON metadata - it's determined at runtime from the URL extension to maintain RPI Imager JSON compatibility.
+
+## QML Components
+
+Reusable components are in `src/qmlcomponents/`. Key components:
+
+### ImBadge
+
+Badge/label component with predefined color variants:
+
+```qml
+ImBadge {
+    text: "SPU"
+    variant: "indigo"  // or "emerald", "cyan", "purple", "green", etc.
+    accessibleName: "Software Package Update file"
+}
+```
+
+**Variants:**
+- GitHub-style: `purple`, `green`, `blue`, `red`, `yellow`, `gray`
+- Image types: `indigo` (SPU), `emerald` (WIC), `cyan` (VSI)
+
+### Other Components
+
+- `ImButton`, `ImButtonRed` - Styled buttons
+- `ImTextField`, `ImPasswordField` - Input fields
+- `ImCheckBox`, `ImRadioButton` - Selection controls
+- `ImComboBox` - Dropdown selector
+- `ImPopup`, `BaseDialog` - Modal dialogs
+- `SelectionListView`, `OSSelectionListView` - List views
+- `ArtifactFileSelectionDialog` - CI artifact file picker
+
 ## Coding Conventions
 
 - Qt signal/slot architecture with `Q_OBJECT` macro

@@ -415,6 +415,38 @@ public:
     /* Laerdal-specific: Initialize GitHub authentication with client ID */
     void initializeGitHubAuth();
 
+    /* SPU Copy Mode - for copying SPU files to FAT32 USB drives */
+
+    /* Check if currently in SPU copy mode */
+    Q_INVOKABLE bool isSpuCopyMode() const { return _isSpuCopyMode; }
+
+    /* Set SPU source from GitHub artifact (ZIP containing .spu file) */
+    Q_INVOKABLE void setSrcSpuArtifact(qint64 artifactId, const QString &owner,
+                                        const QString &repo, const QString &branch,
+                                        const QString &spuFilename, const QString &zipPath);
+
+    /* Set SPU source from direct file path */
+    Q_INVOKABLE void setSrcSpuFile(const QString &filePath);
+
+    /* Set SPU source from CDN URL (will download and cache) */
+    Q_INVOKABLE void setSrcSpuUrl(const QUrl &url, quint64 downloadSize = 0,
+                                   const QString &displayName = QString());
+
+    /* Clear SPU mode and reset to normal WIC mode */
+    Q_INVOKABLE void clearSpuMode();
+
+    /* Start SPU copy operation */
+    Q_INVOKABLE void startSpuCopy(bool skipFormat = false);
+
+    /* Cancel SPU copy operation */
+    Q_INVOKABLE void cancelSpuCopy();
+
+    /* List all SPU files in a ZIP archive (returns JSON array with name and size) */
+    Q_INVOKABLE QJsonArray listSpuFilesInZip(const QString &zipPath);
+
+    /* Check if the selected drive has a FAT32 filesystem */
+    Q_INVOKABLE bool isDriveFat32();
+
 signals:
     /* We are emiting signals with QVariant as parameters because QML likes it that way */
 
@@ -451,6 +483,12 @@ signals:
     void locationPermissionGranted();
     void performanceSaveDialogNeeded(const QString &suggestedFilename, const QString &initialDir);
     void startupImageUrlChanged();
+
+    /* SPU copy mode signals */
+    void spuCopyProgress(QVariant now, QVariant total);
+    void spuCopySuccess();
+    void spuCopyError(QVariant msg);
+    void spuPreparationStatusUpdate(QVariant msg);
 
 protected slots:
     void startProgressPolling();
@@ -552,6 +590,16 @@ protected:
     GitHubAuth *_githubAuth;
     GitHubClient *_githubClient;
     RepositoryManager *_repositoryManager;
+
+    // SPU copy mode state
+    bool _isSpuCopyMode = false;
+    QString _spuFilePath;           // Direct SPU file path
+    QString _spuArchivePath;        // ZIP archive containing SPU
+    QString _spuEntryName;          // SPU filename within ZIP
+    QUrl _spuUrl;                   // CDN URL for SPU file
+    quint64 _spuDownloadSize = 0;   // Expected download size
+    QString _spuDisplayName;        // Display name for SPU
+    class SPUCopyThread *_spuCopyThread = nullptr;
 
     void _parseCompressedFile();
     void _parseXZFile();

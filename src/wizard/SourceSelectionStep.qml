@@ -35,9 +35,17 @@ WizardStepBase {
     property var repoManager: imageWriter ? imageWriter.getRepositoryManager() : null
     property var githubAuth: imageWriter ? imageWriter.getGitHubAuth() : null
     property bool isGitHubAuthenticated: githubAuth ? githubAuth.isAuthenticated : false
+    property bool hasGitHubRepos: repoManager ? repoManager.githubRepos.length > 0 : false
+    property bool isGitHubAvailable: isGitHubAuthenticated && hasGitHubRepos
 
     // Source type: "cdn" or "github"
     property string selectedSourceType: repoManager ? repoManager.selectedSourceType : "cdn"
+
+    // Button group for radio buttons to make them mutually exclusive
+    ButtonGroup {
+        id: sourceTypeButtonGroup
+        buttons: [cdnRadio, githubRadio]
+    }
 
     // Listen for GitHub auth changes
     Connections {
@@ -200,7 +208,7 @@ WizardStepBase {
                         RadioButton {
                             id: githubRadio
                             checked: root.selectedSourceType === "github"
-                            enabled: root.isGitHubAuthenticated
+                            enabled: root.isGitHubAvailable
 
                             onCheckedChanged: {
                                 if (checked) {
@@ -210,9 +218,11 @@ WizardStepBase {
 
                             Accessible.role: Accessible.RadioButton
                             Accessible.name: qsTr("GitHub CI Artifacts source")
-                            Accessible.description: root.isGitHubAuthenticated
+                            Accessible.description: root.isGitHubAvailable
                                                     ? qsTr("Download images from GitHub CI artifacts")
-                                                    : qsTr("Sign in to GitHub to enable this option")
+                                                    : (!root.isGitHubAuthenticated
+                                                       ? qsTr("Sign in to GitHub to enable this option")
+                                                       : qsTr("No GitHub repositories configured"))
                         }
 
                         ColumnLayout {
@@ -235,9 +245,11 @@ WizardStepBase {
                             }
 
                             Text {
-                                text: root.isGitHubAuthenticated
+                                text: root.isGitHubAvailable
                                       ? qsTr("Development builds from GitHub Actions CI pipelines")
-                                      : qsTr("Sign in to GitHub in App Options to enable")
+                                      : (!root.isGitHubAuthenticated
+                                         ? qsTr("Sign in to GitHub in App Options to enable")
+                                         : qsTr("No GitHub repositories configured"))
                                 font.pixelSize: Style.fontSizeCaption
                                 font.family: Style.fontFamily
                                 color: githubRadio.enabled ? Style.textDescriptionColor : Style.formLabelDisabledColor
@@ -322,7 +334,7 @@ WizardStepBase {
             // GitHub Artifact Branch Filter Section (visible when GitHub is selected)
             WizardSectionContainer {
                 Layout.fillWidth: true
-                visible: root.selectedSourceType === "github" && root.isGitHubAuthenticated
+                visible: root.selectedSourceType === "github" && root.isGitHubAvailable
 
                 WizardFormLabel {
                     text: qsTr("Branch Filter")

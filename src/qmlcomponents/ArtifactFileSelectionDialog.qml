@@ -9,7 +9,8 @@ import QtQuick.Layouts
 import RpiImager
 
 /**
- * Dialog for selecting a specific WIC file from a CI artifact that contains multiple installable files.
+ * Dialog for selecting an image file from a CI artifact that contains multiple installable files.
+ * Supports both WIC (disk images) and SPU (firmware update) files.
  */
 BaseDialog {
     id: root
@@ -26,12 +27,16 @@ BaseDialog {
     property string branch: ""
     property string zipPath: ""
 
-    // List of WIC files found in the artifact
-    // Each item: { filename: string, display_name: string, size: int }
-    property var wicFiles: []
+    // List of image files found in the artifact
+    // Each item: { filename: string, display_name: string, size: int, type: "wic"|"spu" }
+    property var imageFiles: []
+
+    // Legacy alias for backwards compatibility
+    property alias wicFiles: root.imageFiles
 
     // Signal emitted when user selects a file
-    signal fileSelected(string filename, string displayName, int size)
+    // type is "wic" or "spu"
+    signal fileSelected(string filename, string displayName, int size, string fileType)
     signal cancelled()
 
     // Override width for this dialog
@@ -73,7 +78,7 @@ BaseDialog {
                 id: fileListView
                 anchors.fill: parent
                 anchors.margins: 2
-                model: root.wicFiles
+                model: root.imageFiles
                 clip: true
                 currentIndex: 0
 
@@ -96,14 +101,27 @@ BaseDialog {
                     contentItem: ColumnLayout {
                         spacing: 2
 
-                        Text {
-                            text: modelData.display_name || modelData.filename
-                            color: fileDelegate.highlighted ? "white" : Style.formLabelColor
-                            font.pixelSize: Style.fontSizeSm
-                            font.family: Style.fontFamily
-                            font.bold: true
-                            elide: Text.ElideMiddle
+                        RowLayout {
                             Layout.fillWidth: true
+                            spacing: Style.spacingSmall
+
+                            Text {
+                                text: modelData.display_name || modelData.filename
+                                color: fileDelegate.highlighted ? "white" : Style.formLabelColor
+                                font.pixelSize: Style.fontSizeSm
+                                font.family: Style.fontFamily
+                                font.bold: true
+                                elide: Text.ElideMiddle
+                                Layout.fillWidth: true
+                            }
+
+                            // File type badge
+                            ImBadge {
+                                text: modelData.type === "spu" ? "SPU" : (modelData.type === "vsi" ? "VSI" : "WIC")
+                                variant: modelData.type === "spu" ? "indigo" : (modelData.type === "vsi" ? "cyan" : "emerald")
+                                accessibleName: modelData.type === "spu" ? qsTr("Software Package Update file") :
+                                               (modelData.type === "vsi" ? qsTr("Versioned Sparse Image file") : qsTr("Disk image file"))
+                            }
                         }
 
                         Text {
@@ -116,18 +134,32 @@ BaseDialog {
                             visible: text.length > 0
                         }
 
-                        Text {
-                            property string sizeStr: {
-                                var bytes = modelData.size || 0
-                                if (bytes < 1024) return bytes + " B"
-                                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
-                                if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB"
-                                return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Style.spacingSmall
+
+                            Text {
+                                property string sizeStr: {
+                                    var bytes = modelData.size || 0
+                                    if (bytes < 1024) return bytes + " B"
+                                    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+                                    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+                                    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB"
+                                }
+                                text: qsTr("Size: %1").arg(sizeStr)
+                                color: fileDelegate.highlighted ? Qt.rgba(1,1,1,0.7) : Style.textMetadataColor
+                                font.pixelSize: Style.fontSizeXs
+                                font.family: Style.fontFamily
                             }
-                            text: qsTr("Size: %1").arg(sizeStr)
-                            color: fileDelegate.highlighted ? Qt.rgba(1,1,1,0.7) : Style.textMetadataColor
-                            font.pixelSize: Style.fontSizeXs
-                            font.family: Style.fontFamily
+
+                            Text {
+                                text: modelData.type === "spu" ? qsTr("(Firmware Update)") :
+                                      (modelData.type === "vsi" ? qsTr("(Versioned Sparse Image)") : qsTr("(Disk Image)"))
+                                color: fileDelegate.highlighted ? Qt.rgba(1,1,1,0.5) : Style.textDescriptionColor
+                                font.pixelSize: Style.fontSizeXs
+                                font.family: Style.fontFamily
+                                font.italic: true
+                            }
                         }
                     }
 
@@ -163,16 +195,16 @@ BaseDialog {
             ImButton {
                 text: qsTr("Select")
                 highlighted: true
-                enabled: fileListView.currentIndex >= 0 && root.wicFiles.length > 0
+                enabled: fileListView.currentIndex >= 0 && root.imageFiles.length > 0
                 onClicked: root.selectCurrentFile()
             }
         }
     }
 
     function selectCurrentFile() {
-        if (fileListView.currentIndex >= 0 && fileListView.currentIndex < root.wicFiles.length) {
-            var file = root.wicFiles[fileListView.currentIndex]
-            root.fileSelected(file.filename, file.display_name || file.filename, file.size || 0)
+        if (fileListView.currentIndex >= 0 && fileListView.currentIndex < root.imageFiles.length) {
+            var file = root.imageFiles[fileListView.currentIndex]
+            root.fileSelected(file.filename, file.display_name || file.filename, file.size || 0, file.type || "wic")
             root.close()
         }
     }

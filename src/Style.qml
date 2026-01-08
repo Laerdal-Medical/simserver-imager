@@ -17,6 +17,14 @@ Item {
     readonly property color laerdalLightBlue: "#5fa8c4"      // Lighter variant
     readonly property color transparent: "transparent"
 
+    // Semantic colors for status/feedback
+    readonly property color successColor: "#37a851"          // Green for success states
+    readonly property color errorColor: "#d32f2f"            // Red for error states
+    readonly property color warningBackgroundColor: "#fff3cd" // Light yellow background for warnings
+    readonly property color warningTextColor: "#856404"      // Dark yellow/brown text for warnings
+    readonly property color accentColor: laerdalBlue         // Accent color for highlights
+    readonly property color cardBackground: "#f8f9fa"        // Light gray for card backgrounds
+
     // Legacy alias for compatibility
     readonly property color raspberryRed: laerdalBlue
 
@@ -128,7 +136,11 @@ Item {
     readonly property int buttonHeightStandard: 40
     readonly property int buttonWidthMinimum: 120
     readonly property int buttonWidthSkip: 150
-    
+
+    // Border radii
+    readonly property int radiusSmall: 4
+    readonly property int radiusMedium: 8
+
     readonly property int sectionMaxWidth: 500
     readonly property int sectionMargins: 24
     readonly property int sectionPadding: 16

@@ -298,6 +298,7 @@ set(SOURCES_BASE
     "devicewrapperpartition.cpp"
     "devicewrapperfatpartition.cpp"
     "driveformatthread.cpp"
+    "spucopythread.cpp"
     "localfileextractthread.cpp"
     "vsiextractthread.cpp"
     "archiveentryiodevice.cpp"
@@ -610,6 +611,7 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/ImPasswordField.qml
       qmlcomponents/ImToggleTab.qml
       qmlcomponents/MarqueeText.qml
+      qmlcomponents/ImBadge.qml
       qmlcomponents/ImBanner.qml
       qmlcomponents/ImLoadingBanner.qml
       qmlcomponents/SelectionListView.qml
@@ -630,6 +632,8 @@ if(NOT BUILD_CLI_ONLY)
       wizard/PiConnectCustomizationStep.qml
       wizard/WritingStep.qml
       wizard/DoneStep.qml
+      wizard/SPUSelectionStep.qml
+      wizard/SPUCopyStep.qml
       wizard/components/WizardSectionContainer.qml
       wizard/components/WizardFormLabel.qml
       wizard/components/WizardDescriptionText.qml

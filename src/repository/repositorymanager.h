@@ -238,6 +238,21 @@ public:
      */
     Q_INVOKABLE void cancelArtifactInspection();
 
+    /**
+     * @brief Request inspection of an artifact's contents to check for SPU files
+     * @param artifactId The GitHub artifact ID
+     * @param artifactName The artifact display name
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param branch Branch the artifact came from
+     *
+     * This will download the artifact ZIP and scan for SPU files.
+     * Emits artifactSpuContentsReady when complete.
+     */
+    Q_INVOKABLE void inspectSpuArtifact(qint64 artifactId, const QString &artifactName,
+                                         const QString &owner, const QString &repo,
+                                         const QString &branch);
+
 signals:
     /**
      * @brief Emitted when artifact inspection is cancelled
@@ -277,6 +292,21 @@ signals:
      * @param bytesTotal Total bytes to download (-1 if unknown)
      */
     void artifactDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
+
+    /**
+     * @brief Emitted when artifact SPU contents have been inspected
+     * @param artifactId The artifact ID that was inspected
+     * @param artifactName The original artifact name
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param branch Branch name
+     * @param spuFiles Array of SPU file info objects found in the artifact
+     * @param zipPath Path to the downloaded ZIP file (for extraction)
+     */
+    void artifactSpuContentsReady(qint64 artifactId, const QString &artifactName,
+                                   const QString &owner, const QString &repo,
+                                   const QString &branch, const QJsonArray &spuFiles,
+                                   const QString &zipPath);
 
 private slots:
     void onCdnListReady(const QJsonArray &list);

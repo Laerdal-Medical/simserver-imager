@@ -43,7 +43,9 @@ set(PLATFORM_SOURCES
     windows/diskpart_util.h
     windows/file_operations_windows.cpp
     windows/platformquirks_windows.cpp
-    windows/windows_suspend_inhibitor.cpp)
+    windows/windows_suspend_inhibitor.cpp
+    windows/mount_helper.cpp
+    windows/disk_format_helper.cpp)
 
 # Only include GUI-specific components for non-CLI builds
 if(NOT BUILD_CLI_ONLY)

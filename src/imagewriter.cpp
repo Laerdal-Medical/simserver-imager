@@ -4646,3 +4646,207 @@ qint64 ImageWriter::getArtifactCacheSize()
 
     return totalSize;
 }
+
+/* SPU Copy Mode Implementation */
+
+#include "spucopythread.h"
+#include "mount_helper.h"
+
+void ImageWriter::setSrcSpuArtifact(qint64 artifactId, const QString &owner,
+                                     const QString &repo, const QString &branch,
+                                     const QString &spuFilename, const QString &zipPath)
+{
+    qDebug() << "ImageWriter: Setting SPU source from artifact";
+    qDebug() << "  Artifact ID:" << artifactId;
+    qDebug() << "  Owner:" << owner << "Repo:" << repo << "Branch:" << branch;
+    qDebug() << "  SPU filename:" << spuFilename;
+    qDebug() << "  ZIP path:" << zipPath;
+
+    _isSpuCopyMode = true;
+    _spuArchivePath = zipPath;
+    _spuEntryName = spuFilename;
+
+    // Clear other SPU source types to avoid conflicts
+    _spuFilePath.clear();
+    _spuUrl.clear();
+
+    // Also track artifact info for reference
+    _artifactId = artifactId;
+    _artifactOwner = owner;
+    _artifactRepo = repo;
+    _artifactBranch = branch;
+}
+
+void ImageWriter::setSrcSpuFile(const QString &filePath)
+{
+    qDebug() << "ImageWriter: Setting SPU source from file:" << filePath;
+
+    _isSpuCopyMode = true;
+    _spuFilePath = filePath;
+    _spuArchivePath.clear();
+    _spuEntryName.clear();
+    _spuUrl.clear();
+}
+
+void ImageWriter::setSrcSpuUrl(const QUrl &url, quint64 downloadSize, const QString &displayName)
+{
+    qDebug() << "ImageWriter: Setting SPU source from URL:" << url;
+    qDebug() << "  Download size:" << downloadSize;
+    qDebug() << "  Display name:" << displayName;
+
+    _isSpuCopyMode = true;
+    _spuUrl = url;
+    _spuDownloadSize = downloadSize;
+    _spuDisplayName = displayName.isEmpty() ? url.fileName() : displayName;
+
+    // Clear other SPU source types
+    _spuFilePath.clear();
+    _spuArchivePath.clear();
+    _spuEntryName.clear();
+}
+
+void ImageWriter::clearSpuMode()
+{
+    qDebug() << "ImageWriter: Clearing SPU mode";
+
+    _isSpuCopyMode = false;
+    _spuFilePath.clear();
+    _spuArchivePath.clear();
+    _spuEntryName.clear();
+    _spuUrl.clear();
+    _spuDownloadSize = 0;
+    _spuDisplayName.clear();
+
+    if (_spuCopyThread) {
+        _spuCopyThread->cancelCopy();
+        _spuCopyThread->wait();
+        delete _spuCopyThread;
+        _spuCopyThread = nullptr;
+    }
+}
+
+void ImageWriter::startSpuCopy(bool skipFormat)
+{
+    if (!_isSpuCopyMode) {
+        emit spuCopyError(tr("Not in SPU copy mode"));
+        return;
+    }
+
+    if (_dst.isEmpty()) {
+        emit spuCopyError(tr("No destination drive selected"));
+        return;
+    }
+
+    qDebug() << "ImageWriter: Starting SPU copy";
+    qDebug() << "  Skip format:" << skipFormat;
+    qDebug() << "  Destination:" << _dst;
+
+    // Clean up any existing thread
+    if (_spuCopyThread) {
+        _spuCopyThread->cancelCopy();
+        _spuCopyThread->wait();
+        delete _spuCopyThread;
+        _spuCopyThread = nullptr;
+    }
+
+    // Create the appropriate thread based on source type
+    if (!_spuFilePath.isEmpty()) {
+        // Direct file copy
+        _spuCopyThread = new SPUCopyThread(_spuFilePath, _dst.toLatin1(), skipFormat, this);
+    } else if (!_spuArchivePath.isEmpty() && !_spuEntryName.isEmpty()) {
+        // Extract from ZIP
+        _spuCopyThread = new SPUCopyThread(_spuArchivePath, _spuEntryName, _dst.toLatin1(), skipFormat, this);
+    } else if (_spuUrl.isValid()) {
+        // Download from URL first, then copy
+        // For now, we need to download to a temp location
+        // The SPUCopyThread can handle URL downloads directly
+        _spuCopyThread = new SPUCopyThread(_spuUrl, _dst.toLatin1(), skipFormat, this);
+    } else {
+        emit spuCopyError(tr("No SPU source configured"));
+        return;
+    }
+
+    // Connect signals
+    connect(_spuCopyThread, &SPUCopyThread::success, this, [this]() {
+        qDebug() << "ImageWriter: SPU copy succeeded";
+        emit spuCopySuccess();
+    });
+
+    connect(_spuCopyThread, &SPUCopyThread::error, this, [this](QString msg) {
+        qWarning() << "ImageWriter: SPU copy error:" << msg;
+        emit spuCopyError(msg);
+    });
+
+    connect(_spuCopyThread, &SPUCopyThread::preparationStatusUpdate, this, [this](QString msg) {
+        emit spuPreparationStatusUpdate(msg);
+    });
+
+    connect(_spuCopyThread, &SPUCopyThread::copyProgress, this, [this](quint64 now, quint64 total) {
+        emit spuCopyProgress(QVariant::fromValue(now), QVariant::fromValue(total));
+    });
+
+    // Start the thread
+    _spuCopyThread->start();
+}
+
+void ImageWriter::cancelSpuCopy()
+{
+    qDebug() << "ImageWriter: Cancelling SPU copy";
+
+    if (_spuCopyThread) {
+        _spuCopyThread->cancelCopy();
+    }
+}
+
+QJsonArray ImageWriter::listSpuFilesInZip(const QString &zipPath)
+{
+    qDebug() << "ImageWriter: Listing SPU files in ZIP:" << zipPath;
+    QJsonArray spuFiles;
+
+    struct archive *a = archive_read_new();
+    struct archive_entry *entry;
+
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+        qWarning() << "ImageWriter: Failed to open ZIP for SPU listing:" << archive_error_string(a);
+        archive_read_free(a);
+        return spuFiles;
+    }
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
+        qint64 entrySize = archive_entry_size(entry);
+
+        // Check if this is an SPU file
+        if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
+            QJsonObject spuFile;
+            spuFile["filename"] = entryName;
+            spuFile["size"] = entrySize;
+
+            // Extract a display name from the filename
+            QString displayName = QFileInfo(entryName).fileName();
+            spuFile["display_name"] = displayName;
+
+            spuFiles.append(spuFile);
+            qDebug() << "ImageWriter: Found SPU file in ZIP:" << entryName << "size:" << entrySize;
+        }
+        archive_read_data_skip(a);
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+
+    qDebug() << "ImageWriter: Found" << spuFiles.size() << "SPU files in ZIP";
+    return spuFiles;
+}
+
+bool ImageWriter::isDriveFat32()
+{
+    if (_dst.isEmpty()) {
+        return false;
+    }
+
+    return MountHelper::isFat32(_dst);
+}

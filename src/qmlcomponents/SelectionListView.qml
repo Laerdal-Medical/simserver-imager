@@ -227,7 +227,7 @@ ListView {
             var value = model.data(modelIndex, parseInt(roleKey))
             // Provide sensible defaults for undefined values
             if (value === undefined || value === null) {
-                if (roleName === "url" || roleName === "icon" || roleName === "subitems_json" || 
+                if (roleName === "url" || roleName === "icon" || roleName === "subitems_json" ||
                     roleName === "extract_sha256" || roleName === "init_format" || roleName === "release_date" ||
                     roleName === "tooltip" || roleName === "website" || roleName === "architecture") {
                     value = ""

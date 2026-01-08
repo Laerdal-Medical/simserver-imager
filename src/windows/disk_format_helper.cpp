@@ -1,0 +1,79 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2024 Laerdal Medical AS
+ */
+
+#include "disk_format_helper.h"
+
+#include <QDebug>
+#include <QFile>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QStandardPaths>
+#include <QTextStream>
+#include <QThread>
+
+namespace DiskFormatHelper {
+
+FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel)
+{
+    FormatResult result;
+
+    qDebug() << "DiskFormatHelper: Formatting device with diskpart:" << device;
+
+    // Extract disk number from device path (e.g., "\\.\PhysicalDrive1" -> "1")
+    QString diskNumber;
+    QRegularExpression diskRe("PhysicalDrive(\\d+)");
+    QRegularExpressionMatch match = diskRe.match(device);
+    if (match.hasMatch())
+    {
+        diskNumber = match.captured(1);
+    }
+    else
+    {
+        result.errorMessage = QString("Could not determine disk number from device path: %1").arg(device);
+        return result;
+    }
+
+    // Create diskpart script
+    QString scriptPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/laerdal_diskpart.txt";
+    QFile scriptFile(scriptPath);
+    if (!scriptFile.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        result.errorMessage = "Failed to create diskpart script";
+        return result;
+    }
+
+    QTextStream script(&scriptFile);
+    script << "select disk " << diskNumber << "\n";
+    script << "clean\n";
+    script << "create partition primary\n";
+    script << "format fs=fat32 quick label=" << volumeLabel << "\n";
+    script << "assign\n";
+    scriptFile.close();
+
+    // Run diskpart with the script
+    QProcess diskpartProc;
+    diskpartProc.start("diskpart", {"/s", scriptPath});
+
+    if (!diskpartProc.waitForFinished(120000) || diskpartProc.exitCode() != 0)
+    {
+        QString diskpartError = QString::fromUtf8(diskpartProc.readAllStandardError());
+        QString diskpartOut = QString::fromUtf8(diskpartProc.readAllStandardOutput());
+        qWarning() << "DiskFormatHelper: diskpart failed:" << diskpartError << diskpartOut;
+        QFile::remove(scriptPath);
+        result.errorMessage = QString("Failed to format drive: %1").arg(diskpartError.isEmpty() ? diskpartOut : diskpartError);
+        return result;
+    }
+
+    QFile::remove(scriptPath);
+    qDebug() << "DiskFormatHelper: Format completed successfully";
+
+    // Wait for Windows to recognize the new partition and assign a drive letter
+    QThread::sleep(3);
+
+    result.success = true;
+    return result;
+}
+
+} // namespace DiskFormatHelper

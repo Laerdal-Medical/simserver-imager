@@ -225,31 +225,55 @@ WizardStepBase {
         parent: root.wizardContainer && root.wizardContainer.overlayRootRef ? root.wizardContainer.overlayRootRef : (root.Window.window ? root.Window.window.overlayRootItem : null)
         anchors.centerIn: parent
 
-        onFileSelected: function(filename, displayName, size) {
+        onFileSelected: function(filename, displayName, size, fileType) {
             // User selected a specific file from the artifact
-            console.log("User selected file from artifact:", filename, "display:", displayName, "cached ZIP:", artifactFileSelectionDialog.zipPath)
+            console.log("User selected file from artifact:", filename, "display:", displayName, "type:", fileType, "cached ZIP:", artifactFileSelectionDialog.zipPath)
 
-            // Set the artifact source with the target filename and cached ZIP path
-            imageWriter.setSrcArtifactWithTargetAndCache(
-                artifactFileSelectionDialog.artifactId,
-                artifactFileSelectionDialog.owner,
-                artifactFileSelectionDialog.repo,
-                artifactFileSelectionDialog.branch,
-                size,
-                displayName,
-                filename,
-                artifactFileSelectionDialog.zipPath  // Pass the cached ZIP path
-            )
+            if (fileType === "spu") {
+                // SPU file selected - set up SPU copy mode and navigate to SPU copy step
+                imageWriter.setSrcSpuArtifact(
+                    artifactFileSelectionDialog.artifactId,
+                    artifactFileSelectionDialog.owner,
+                    artifactFileSelectionDialog.repo,
+                    artifactFileSelectionDialog.branch,
+                    filename,
+                    artifactFileSelectionDialog.zipPath
+                )
 
-            // Update UI state
-            root.wizardContainer.selectedOsName = displayName
-            root.wizardContainer.customizationSupported = false
-            root.wizardContainer.piConnectAvailable = false
-            root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
-            root.wizardContainer.ccRpiAvailable = false
-            root.wizardContainer.ifAndFeaturesAvailable = false
-            root.customSelected = false
-            root.nextButtonEnabled = true
+                // Update UI state for SPU mode
+                root.wizardContainer.selectedOsName = displayName
+                root.wizardContainer.isSpuCopyMode = true
+                root.wizardContainer.customizationSupported = false
+                root.wizardContainer.piConnectAvailable = false
+                root.wizardContainer.secureBootAvailable = false
+                root.wizardContainer.ccRpiAvailable = false
+                root.wizardContainer.ifAndFeaturesAvailable = false
+                root.customSelected = false
+                root.nextButtonEnabled = true
+            } else {
+                // WIC file selected - normal disk image flow
+                imageWriter.setSrcArtifactWithTargetAndCache(
+                    artifactFileSelectionDialog.artifactId,
+                    artifactFileSelectionDialog.owner,
+                    artifactFileSelectionDialog.repo,
+                    artifactFileSelectionDialog.branch,
+                    size,
+                    displayName,
+                    filename,
+                    artifactFileSelectionDialog.zipPath  // Pass the cached ZIP path
+                )
+
+                // Update UI state
+                root.wizardContainer.selectedOsName = displayName
+                root.wizardContainer.isSpuCopyMode = false
+                root.wizardContainer.customizationSupported = false
+                root.wizardContainer.piConnectAvailable = false
+                root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
+                root.wizardContainer.ccRpiAvailable = false
+                root.wizardContainer.ifAndFeaturesAvailable = false
+                root.customSelected = false
+                root.nextButtonEnabled = true
+            }
         }
 
         onCancelled: {
@@ -291,37 +315,47 @@ WizardStepBase {
             }
         }
 
-        function onArtifactContentsReady(artifactId, artifactName, owner, repo, branch, wicFiles, zipPath) {
-            console.log("Artifact contents ready:", artifactId, "files:", wicFiles.length)
+        function onArtifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath) {
+            console.log("Artifact contents ready:", artifactId, "files:", imageFiles.length)
 
             // Close the progress dialog
             artifactDownloadProgressDialog.close()
 
-            if (wicFiles.length === 0) {
-                // No WIC files found in artifact
+            if (imageFiles.length === 0) {
+                // No image files found in artifact
                 root.wizardContainer.showError(qsTr("No installable images found in the CI build artifact."))
                 root.nextButtonEnabled = false
-            } else if (wicFiles.length === 1) {
+            } else if (imageFiles.length === 1) {
                 // Only one file - select it directly using the cached ZIP
-                var file = wicFiles[0]
-                imageWriter.setSrcArtifactWithTargetAndCache(
-                    artifactId,
-                    owner,
-                    repo,
-                    branch,
-                    file.size || 0,
-                    file.display_name || file.filename,
-                    file.filename,
-                    zipPath  // Pass the cached ZIP path
-                )
+                var file = imageFiles[0]
+                var displayName = file.display_name || file.filename
+                var fileType = file.type || "wic"
 
-                // Update UI state
-                root.wizardContainer.selectedOsName = file.display_name || file.filename
-                root.wizardContainer.customizationSupported = false
-                root.wizardContainer.piConnectAvailable = false
-                root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
-                root.wizardContainer.ccRpiAvailable = false
-                root.wizardContainer.ifAndFeaturesAvailable = false
+                if (fileType === "spu") {
+                    // SPU file - set up SPU copy mode
+                    imageWriter.setSrcSpuArtifact(artifactId, owner, repo, branch, file.filename, zipPath)
+                    root.wizardContainer.selectedOsName = displayName
+                    root.wizardContainer.isSpuCopyMode = true
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = false
+                    root.wizardContainer.ccRpiAvailable = false
+                    root.wizardContainer.ifAndFeaturesAvailable = false
+                } else {
+                    // WIC file - normal disk image flow
+                    imageWriter.setSrcArtifactWithTargetAndCache(
+                        artifactId, owner, repo, branch,
+                        file.size || 0, displayName, file.filename, zipPath
+                    )
+                    root.wizardContainer.selectedOsName = displayName
+                    root.wizardContainer.isSpuCopyMode = false
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
+                    root.wizardContainer.ccRpiAvailable = false
+                    root.wizardContainer.ifAndFeaturesAvailable = false
+                }
+
                 root.customSelected = false
                 root.nextButtonEnabled = true
             } else {
@@ -332,7 +366,7 @@ WizardStepBase {
                 artifactFileSelectionDialog.repo = repo
                 artifactFileSelectionDialog.branch = branch
                 artifactFileSelectionDialog.zipPath = zipPath
-                artifactFileSelectionDialog.wicFiles = wicFiles
+                artifactFileSelectionDialog.imageFiles = imageFiles
                 artifactFileSelectionDialog.open()
             }
 
@@ -628,25 +662,43 @@ WizardStepBase {
                             }
 
                             // Source badge for GitHub items
-                            Rectangle {
+                            ImBadge {
                                 visible: delegateItem.source === "github"
-                                Layout.preferredHeight: badgeText.implicitHeight + 4
-                                Layout.preferredWidth: badgeText.implicitWidth + 8
-                                radius: 3
-                                color: delegateItem.source_type === "artifact" ? "#6f42c1" : "#28a745"  // Purple for artifacts, green for releases
+                                text: delegateItem.source_type === "artifact" ? qsTr("CI Build") : qsTr("Release")
+                                variant: delegateItem.source_type === "artifact" ? "purple" : "green"
+                                accessibleName: delegateItem.source_type === "artifact" ? qsTr("CI Build from GitHub Actions") : qsTr("GitHub Release")
+                            }
 
-                                Text {
-                                    id: badgeText
-                                    anchors.centerIn: parent
-                                    text: delegateItem.source_type === "artifact" ? qsTr("CI Build") : qsTr("Release")
-                                    font.pixelSize: Style.fontSizeSmall - 1
-                                    font.family: Style.fontFamily
-                                    color: "white"
-                                    Accessible.ignored: true
+                            // Image type badge (SPU/VSI/WIC) based on URL extension
+                            ImBadge {
+                                id: imageTypeBadge
+                                visible: {
+                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                                    return urlStr.length > 0 &&
+                                           !urlStr.startsWith("internal://") &&
+                                           (urlStr.endsWith(".spu") || urlStr.endsWith(".vsi") ||
+                                            urlStr.endsWith(".wic") || urlStr.endsWith(".wic.xz") ||
+                                            urlStr.endsWith(".wic.gz") || urlStr.endsWith(".wic.bz2") ||
+                                            urlStr.endsWith(".wic.zst"))
                                 }
-
-                                Accessible.role: Accessible.StaticText
-                                Accessible.name: delegateItem.source_type === "artifact" ? qsTr("CI Build from GitHub Actions") : qsTr("GitHub Release")
+                                text: {
+                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                                    if (urlStr.endsWith(".spu")) return qsTr("SPU")
+                                    if (urlStr.endsWith(".vsi")) return qsTr("VSI")
+                                    return qsTr("WIC")
+                                }
+                                variant: {
+                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                                    if (urlStr.endsWith(".spu")) return "indigo"
+                                    if (urlStr.endsWith(".vsi")) return "cyan"
+                                    return "emerald"
+                                }
+                                accessibleName: {
+                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                                    if (urlStr.endsWith(".spu")) return qsTr("Software Package Update file")
+                                    if (urlStr.endsWith(".vsi")) return qsTr("Versioned Sparse Image file")
+                                    return qsTr("Disk image file")
+                                }
                             }
                         }
 
@@ -915,6 +967,31 @@ WizardStepBase {
                     return  // Exit early - the Connections handler will complete the selection
                 } else {
                     // Regular OS (CDN or GitHub release)
+                    // Check if this is an SPU file based on URL extension
+                    var urlLower = model.url.toString().toLowerCase()
+                    var isSpu = urlLower.endsWith(".spu")
+
+                    if (isSpu) {
+                        // SPU file from CDN - set up SPU copy mode
+                        console.log("SPU file selected from CDN:", model.url)
+                        imageWriter.setSrcSpuUrl(model.url, model.image_download_size, model.name)
+
+                        root.wizardContainer.selectedOsName = model.name
+                        root.wizardContainer.isSpuCopyMode = true
+                        root.wizardContainer.customizationSupported = false
+                        root.wizardContainer.piConnectAvailable = false
+                        root.wizardContainer.secureBootAvailable = false
+                        root.wizardContainer.ccRpiAvailable = false
+                        root.wizardContainer.ifAndFeaturesAvailable = false
+                        root.customSelected = false
+                        root.nextButtonEnabled = true
+                        if (fromMouse) {
+                            Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
+                        }
+                        return  // Early exit for SPU files
+                    }
+
+                    // Regular WIC/VSI disk image
                     imageWriter.setSrc(
                         model.url,
                         model.image_download_size,
@@ -930,11 +1007,12 @@ WizardStepBase {
                 imageWriter.setSWCapabilitiesList(model.capabilities)
 
                 root.wizardContainer.selectedOsName = model.name
+                root.wizardContainer.isSpuCopyMode = false  // Explicitly set to false for WIC/VSI
                 root.wizardContainer.customizationSupported = false  // Disabled for Laerdal SimServer Imager
                 root.wizardContainer.piConnectAvailable = imageWriter.checkSWCapability("rpi_connect")
                 root.wizardContainer.secureBootAvailable = imageWriter.checkSWCapability("secure_boot") || imageWriter.isSecureBootForcedByCliFlag()
                 root.wizardContainer.ccRpiAvailable = imageWriter.imageSupportsCcRpi()
-                
+
                 // Check if any interface/feature capabilities are available (requires both HW and SW support)
                 if (root.wizardContainer.ccRpiAvailable) {
                     var hasAnyIfFeatures = imageWriter.checkHWAndSWCapability("i2c") ||
@@ -946,7 +1024,7 @@ WizardStepBase {
                 } else {
                     root.wizardContainer.ifAndFeaturesAvailable = false
                 }
-                
+
                 // Clean up incompatible settings from customizationSettings based on OS capabilities
                 if (!root.wizardContainer.piConnectAvailable) {
                     delete root.wizardContainer.customizationSettings.piConnectEnabled

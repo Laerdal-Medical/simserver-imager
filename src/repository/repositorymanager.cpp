@@ -930,3 +930,49 @@ void RepositoryManager::cancelArtifactInspection()
         emit artifactInspectionCancelled();
     }
 }
+
+void RepositoryManager::inspectSpuArtifact(qint64 artifactId, const QString &artifactName,
+                                            const QString &owner, const QString &repo,
+                                            const QString &branch)
+{
+    if (!_githubClient) {
+        qWarning() << "RepositoryManager: Cannot inspect SPU artifact - no GitHub client";
+        return;
+    }
+
+    qDebug() << "RepositoryManager: Inspecting SPU artifact" << artifactName
+             << "from" << owner << "/" << repo << "branch:" << branch;
+
+    setLoading(true);
+    setStatusMessage(tr("Downloading artifact to inspect for SPU files..."));
+
+    // Connect to receive the SPU contents
+    connect(_githubClient, &GitHubClient::artifactSpuContentsReady, this,
+            [this, artifactId, artifactName, owner, repo, branch]
+            (qint64 id, const QString &name, const QString &own, const QString &rep,
+             const QString &br, const QJsonArray &spuFiles, const QString &zipPath) {
+                if (id != artifactId) return;  // Not our artifact
+
+                setLoading(false);
+                setStatusMessage(tr("Found %1 SPU file(s) in artifact").arg(spuFiles.size()));
+                emit artifactSpuContentsReady(id, name, own, rep, br, spuFiles, zipPath);
+            }, Qt::SingleShotConnection);
+
+    connect(_githubClient, &GitHubClient::error, this,
+            [this](const QString &message) {
+                setLoading(false);
+                setStatusMessage(tr("Failed to inspect artifact for SPU files"));
+                emit refreshError(message);
+            }, Qt::SingleShotConnection);
+
+    connect(_githubClient, &GitHubClient::artifactDownloadProgress, this,
+            [this](qint64 bytesReceived, qint64 bytesTotal) {
+                if (bytesTotal > 0) {
+                    int percent = static_cast<int>((bytesReceived * 100) / bytesTotal);
+                    setStatusMessage(tr("Downloading artifact... %1%").arg(percent));
+                }
+                emit artifactDownloadProgress(bytesReceived, bytesTotal);
+            });
+
+    _githubClient->inspectArtifactSpuContents(owner, repo, artifactId, artifactName, branch);
+}

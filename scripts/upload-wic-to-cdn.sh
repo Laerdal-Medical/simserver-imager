@@ -20,6 +20,7 @@
 # Supported formats:
 #   - WIC files: .wic, .wic.zst, .wic.xz, .wic.gz, .wic.bz2
 #   - VSI files: .vsi (Versioned Sparse Image - Laerdal format)
+#   - SPU files: .spu (SimPad Update - ISO UDF format)
 #
 # Options:
 #   -a, --account     Azure Storage account name (or set AZURE_STORAGE_ACCOUNT)
@@ -31,8 +32,9 @@
 #   -i, --identity    SSH identity file (private key) for remote sources
 #   --cache-dir       Directory to cache downloaded files (default: /tmp/wic-cache)
 #   --keep-cache      Keep downloaded files in cache after completion
-#   --vsi-only        Only process VSI files (ignore WIC files)
-#   --wic-only        Only process WIC files (ignore VSI files)
+#   --vsi-only        Only process VSI files (ignore WIC/SPU files)
+#   --wic-only        Only process WIC files (ignore VSI/SPU files)
+#   --spu-only        Only process SPU files (ignore WIC/VSI files)
 #   --append          Fetch existing JSON from CDN and merge new entries (updates existing, adds new)
 #   --skip-existing   Skip upload if blob already exists on CDN (still updates JSON)
 #   -n, --dry-run     Show what would be done without uploading
@@ -80,6 +82,9 @@
 #   # Append new VSI images to existing JSON (keeps existing WIC entries)
 #   ./upload-wic-to-cdn.sh --append --vsi-only /path/to/vsi-images
 #
+#   # Upload only SPU files (firmware updates)
+#   ./upload-wic-to-cdn.sh --spu-only /path/to/spu-images
+#
 
 set -euo pipefail
 
@@ -96,6 +101,7 @@ KEEP_CACHE=false
 DRY_RUN=false
 VSI_ONLY=false
 WIC_ONLY=false
+SPU_ONLY=false
 APPEND_MODE=false
 SKIP_EXISTING=false
 SOURCES=()
@@ -147,6 +153,10 @@ while [[ $# -gt 0 ]]; do
             WIC_ONLY=true
             shift
             ;;
+        --spu-only)
+            SPU_ONLY=true
+            shift
+            ;;
         --append)
             APPEND_MODE=true
             shift
@@ -180,8 +190,13 @@ if [[ ${#SOURCES[@]} -eq 0 ]]; then
     exit 1
 fi
 
-if [[ "$VSI_ONLY" == "true" && "$WIC_ONLY" == "true" ]]; then
-    echo "Error: Cannot specify both --vsi-only and --wic-only" >&2
+# Check for mutually exclusive options
+exclusive_count=0
+[[ "$VSI_ONLY" == "true" ]] && ((exclusive_count++)) || true
+[[ "$WIC_ONLY" == "true" ]] && ((exclusive_count++)) || true
+[[ "$SPU_ONLY" == "true" ]] && ((exclusive_count++)) || true
+if [[ $exclusive_count -gt 1 ]]; then
+    echo "Error: Cannot specify more than one of --vsi-only, --wic-only, --spu-only" >&2
     exit 1
 fi
 
@@ -245,8 +260,10 @@ if [[ "$VSI_ONLY" == "true" ]]; then
     echo "File Filter: VSI only"
 elif [[ "$WIC_ONLY" == "true" ]]; then
     echo "File Filter: WIC only"
+elif [[ "$SPU_ONLY" == "true" ]]; then
+    echo "File Filter: SPU only"
 else
-    echo "File Filter: WIC + VSI"
+    echo "File Filter: WIC + VSI + SPU"
 fi
 if [[ -n "$SSH_KEY" ]]; then
     echo "SSH Key: $SSH_KEY"
@@ -275,8 +292,10 @@ get_find_pattern() {
         echo "-name '*.vsi'"
     elif [[ "$WIC_ONLY" == "true" ]]; then
         echo "\( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' \)"
+    elif [[ "$SPU_ONLY" == "true" ]]; then
+        echo "-name '*.spu'"
     else
-        echo "\( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' -o -name '*.vsi' \)"
+        echo "\( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' -o -name '*.vsi' -o -name '*.spu' \)"
     fi
 }
 
@@ -287,14 +306,21 @@ matches_mode_filter() {
         [[ "$filename" == *.vsi ]]
     elif [[ "$WIC_ONLY" == "true" ]]; then
         [[ "$filename" == *.wic || "$filename" == *.wic.zst || "$filename" == *.wic.xz || "$filename" == *.wic.gz || "$filename" == *.wic.bz2 ]]
+    elif [[ "$SPU_ONLY" == "true" ]]; then
+        [[ "$filename" == *.spu ]]
     else
-        [[ "$filename" == *.wic || "$filename" == *.wic.zst || "$filename" == *.wic.xz || "$filename" == *.wic.gz || "$filename" == *.wic.bz2 || "$filename" == *.vsi ]]
+        [[ "$filename" == *.wic || "$filename" == *.wic.zst || "$filename" == *.wic.xz || "$filename" == *.wic.gz || "$filename" == *.wic.bz2 || "$filename" == *.vsi || "$filename" == *.spu ]]
     fi
 }
 
 # Function to check if file is a VSI file
 is_vsi_file() {
     [[ "$1" == *.vsi ]]
+}
+
+# Function to check if file is an SPU file
+is_spu_file() {
+    [[ "$1" == *.spu ]]
 }
 
 # Function to check if source is a JSON URL
@@ -349,7 +375,9 @@ fetch_from_json_url() {
         if [[ "$SKIP_EXISTING" == "true" && "$DRY_RUN" == "false" ]]; then
             if blob_exists "$blob_path"; then
                 echo "  Skipping download (already on CDN): $filename"
-                SKIPPED_FILES+=("${filename}|${blob_path}|${local_path}")
+                # For JSON URL source, we don't have remote path or build date
+                # Store: filename|blob_path|local_path|remote_path|build_date
+                SKIPPED_FILES+=("${filename}|${blob_path}|${local_path}||")
                 continue
             fi
         fi
@@ -440,6 +468,47 @@ fetch_remote_files() {
         return
     fi
 
+    # Deduplicate remote files - keep only the latest build per filename
+    # For SPU files with same name in different build directories, keep the newest
+    echo "  Deduplicating remote files..."
+    local -A latest_remote_files  # filename -> "full_path|timestamp"
+
+    while IFS= read -r remote_file; do
+        [[ -z "$remote_file" ]] && continue
+        local filename
+        filename=$(basename "$remote_file")
+
+        # Extract build timestamp from path
+        local dir_name ts
+        dir_name=$(dirname "$remote_file")
+        dir_name=$(basename "$dir_name")
+        if [[ "$dir_name" =~ ([0-9]{4})-?([0-9]{2})-?([0-9]{2})-?([0-9]{4})? ]]; then
+            ts="${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}${BASH_REMATCH[4]:-0000}"
+        else
+            ts="0"
+        fi
+
+        if [[ -z "${latest_remote_files[$filename]:-}" ]]; then
+            latest_remote_files[$filename]="${remote_file}|${ts}"
+        else
+            local existing_entry="${latest_remote_files[$filename]}"
+            local existing_ts="${existing_entry#*|}"
+            if [[ "$ts" > "$existing_ts" ]]; then
+                echo "    [$filename] Replacing older build ($existing_ts) with newer ($ts)"
+                latest_remote_files[$filename]="${remote_file}|${ts}"
+            fi
+        fi
+    done <<< "$remote_files"
+
+    # Rebuild remote_files with deduplicated list
+    remote_files=""
+    for filename in "${!latest_remote_files[@]}"; do
+        local entry="${latest_remote_files[$filename]}"
+        local filepath="${entry%|*}"
+        remote_files+="$filepath"$'\n'
+    done
+    echo "  After deduplication: $(echo "$remote_files" | grep -c . || echo 0) file(s)"
+
     # Download each file to flat cache directory
     while IFS= read -r remote_file; do
         [[ -z "$remote_file" ]] && continue
@@ -452,7 +521,18 @@ fetch_remote_files() {
         if [[ "$SKIP_EXISTING" == "true" && "$DRY_RUN" == "false" ]]; then
             if blob_exists "$blob_path"; then
                 echo "  Skipping download (already on CDN): $filename"
-                SKIPPED_FILES+=("${filename}|${blob_path}|${local_path}")
+                # Extract build date from remote path for release date
+                local dir_name build_date
+                dir_name=$(dirname "$remote_file")
+                dir_name=$(basename "$dir_name")
+                if [[ "$dir_name" =~ ([0-9]{4})-([0-9]{2})-([0-9]{2})-?([0-9]{4})? ]]; then
+                    # Convert to ISO date format YYYY-MM-DD
+                    build_date="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
+                else
+                    build_date=""
+                fi
+                # Store: filename|blob_path|local_path|remote_path|build_date
+                SKIPPED_FILES+=("${filename}|${blob_path}|${local_path}|${remote_file}|${build_date}")
                 continue
             fi
         fi
@@ -515,8 +595,10 @@ find_local_files() {
                     find_cmd="$find_cmd -name '*.vsi'"
                 elif [[ "$WIC_ONLY" == "true" ]]; then
                     find_cmd="$find_cmd \( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' \)"
+                elif [[ "$SPU_ONLY" == "true" ]]; then
+                    find_cmd="$find_cmd -name '*.spu'"
                 else
-                    find_cmd="$find_cmd \( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' -o -name '*.vsi' \)"
+                    find_cmd="$find_cmd \( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' -o -name '*.vsi' -o -name '*.spu' \)"
                 fi
                 find_cmd="$find_cmd -print0"
 
@@ -543,8 +625,10 @@ find_local_files() {
             find_cmd="$find_cmd -name '*.vsi'"
         elif [[ "$WIC_ONLY" == "true" ]]; then
             find_cmd="$find_cmd \( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' \)"
+        elif [[ "$SPU_ONLY" == "true" ]]; then
+            find_cmd="$find_cmd -name '*.spu'"
         else
-            find_cmd="$find_cmd \( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' -o -name '*.vsi' \)"
+            find_cmd="$find_cmd \( -name '*.wic' -o -name '*.wic.zst' -o -name '*.wic.xz' -o -name '*.wic.gz' -o -name '*.wic.bz2' -o -name '*.vsi' -o -name '*.spu' \)"
         fi
         find_cmd="$find_cmd -print0"
 
@@ -575,10 +659,7 @@ if [[ ${#IMAGE_FILES[@]} -eq 0 && ${#SKIPPED_FILES[@]} -eq 0 ]]; then
 fi
 
 echo ""
-echo "Found ${#IMAGE_FILES[@]} image file(s) to process"
-if [[ ${#SKIPPED_FILES[@]} -gt 0 ]]; then
-    echo "Found ${#SKIPPED_FILES[@]} file(s) already on CDN (metadata only)"
-fi
+echo "Found ${#IMAGE_FILES[@]} image file(s) before deduplication"
 
 # Function to parse device type from filename
 parse_device_type() {
@@ -629,6 +710,103 @@ parse_version() {
 
     echo "$version"
 }
+
+# Function to extract build timestamp from path (e.g., /path/2024-07-10-1036/file.spu -> 2024071010360)
+# Returns a sortable timestamp string, or file mtime if no build date found
+get_build_timestamp() {
+    local filepath="$1"
+    local dir_name
+    dir_name=$(dirname "$filepath")
+    dir_name=$(basename "$dir_name")
+
+    # Try to extract date from directory name (format: YYYY-MM-DD-HHMM or similar)
+    if [[ "$dir_name" =~ ([0-9]{4})-?([0-9]{2})-?([0-9]{2})-?([0-9]{4})? ]]; then
+        local ts="${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}${BASH_REMATCH[4]:-0000}"
+        echo "$ts"
+        return
+    fi
+
+    # Fallback to file modification time
+    local mtime
+    mtime=$(stat -c%Y "$filepath" 2>/dev/null || stat -f%m "$filepath" 2>/dev/null || echo "0")
+    echo "$mtime"
+}
+
+# Function to get dedup key (base filename without build-specific parts)
+# For SPU: use filename as-is (e.g., simpad-system-9.0.2.41.spu)
+# For WIC/VSI: use device type + version
+get_dedup_key() {
+    local filepath="$1"
+    local filename
+    filename=$(basename "$filepath")
+
+    # For SPU files, the filename itself is the key (same name = same update)
+    if [[ "$filename" == *.spu ]]; then
+        echo "$filename"
+        return
+    fi
+
+    # For WIC/VSI, extract device type and version
+    local device_type version
+    device_type=$(parse_device_type "$filename")
+    version=$(parse_version "$filename")
+    echo "${device_type}_${version}"
+}
+
+# Deduplicate files - keep only the latest build per version
+deduplicate_files() {
+    local -n files_array=$1
+    local -A latest_files  # key -> "filepath|timestamp"
+
+    echo "Deduplicating files..."
+
+    for filepath in "${files_array[@]}"; do
+        local key timestamp
+        key=$(get_dedup_key "$filepath")
+        timestamp=$(get_build_timestamp "$filepath")
+        local filename
+        filename=$(basename "$filepath")
+
+        if [[ -z "${latest_files[$key]:-}" ]]; then
+            # First file for this key
+            latest_files[$key]="${filepath}|${timestamp}"
+            echo "  [$key] First: $filename (ts: $timestamp)"
+        else
+            # Compare with existing
+            local existing_entry="${latest_files[$key]}"
+            local existing_ts="${existing_entry#*|}"
+
+            if [[ "$timestamp" > "$existing_ts" ]]; then
+                local old_file="${existing_entry%|*}"
+                echo "  [$key] Replacing $(basename "$old_file") with $filename (ts: $timestamp > $existing_ts)"
+                latest_files[$key]="${filepath}|${timestamp}"
+            else
+                echo "  [$key] Keeping existing, skipping $filename (ts: $timestamp <= $existing_ts)"
+            fi
+        fi
+    done
+
+    # Rebuild array with deduplicated files
+    files_array=()
+    for key in "${!latest_files[@]}"; do
+        local entry="${latest_files[$key]}"
+        local filepath="${entry%|*}"
+        files_array+=("$filepath")
+    done
+
+    echo "After deduplication: ${#files_array[@]} file(s)"
+}
+
+# Apply deduplication to IMAGE_FILES
+if [[ ${#IMAGE_FILES[@]} -gt 1 ]]; then
+    deduplicate_files IMAGE_FILES
+fi
+
+echo ""
+echo "Found ${#IMAGE_FILES[@]} image file(s) to process"
+if [[ ${#SKIPPED_FILES[@]} -gt 0 ]]; then
+    echo "Found ${#SKIPPED_FILES[@]} file(s) already on CDN (metadata only)"
+fi
 
 # Function to get display name
 get_display_name() {
@@ -699,9 +877,10 @@ get_icon() {
     esac
 }
 
-# Function to build os_entry JSON
+# Function to build os_entry JSON (RPI Imager format)
 # Arguments: image_name description url icon extract_size md5_hash sha256_hash download_size release_date device_tags_json
 # device_tags_json should be a JSON array like '["imx6", "cancpu", "linkbox"]'
+# Note: Image type (wic/vsi/spu) is determined by URL extension, not a separate field
 build_os_entry() {
     local image_name="$1"
     local description="$2"
@@ -846,6 +1025,115 @@ parse_vsi_header() {
     return 0
 }
 
+# Function to parse SPU file metadata (ISO UDF format)
+# SPU files contain vs2_label, vs2_sysversion, vs2_auth2 etc.
+# Returns associative array with: label, version, date, devices (JSON array)
+parse_spu_metadata() {
+    local filepath="$1"
+    local -n spu_info=$2
+    local mount_point=""
+
+    # Create temporary mount point
+    mount_point=$(mktemp -d)
+
+    # Try to mount the SPU file (ISO UDF format)
+    local mounted=false
+    if command -v fuseiso &>/dev/null; then
+        if fuseiso "$filepath" "$mount_point" -o ro 2>/dev/null; then
+            mounted=true
+        fi
+    fi
+
+    if [[ "$mounted" == "false" ]]; then
+        # Try system mount (requires root or sudo)
+        if mount -t udf "$filepath" "$mount_point" -o loop,ro 2>/dev/null; then
+            mounted=true
+        fi
+    fi
+
+    if [[ "$mounted" == "false" ]]; then
+        echo "  Warning: Could not mount SPU file (need fuseiso or root)" >&2
+        rmdir "$mount_point" 2>/dev/null
+        return 1
+    fi
+
+    # Read metadata files
+    spu_info[label]=""
+    spu_info[version]=""
+    spu_info[date]=""
+    spu_info[devices]="[]"
+
+    if [[ -f "$mount_point/vs2_label" ]]; then
+        spu_info[label]=$(cat "$mount_point/vs2_label" 2>/dev/null | tr -d '\n\r')
+    fi
+
+    if [[ -f "$mount_point/vs2_sysversion" ]]; then
+        spu_info[version]=$(cat "$mount_point/vs2_sysversion" 2>/dev/null | tr -d '\n\r')
+    fi
+
+    if [[ -f "$mount_point/vs2_date" ]]; then
+        spu_info[date]=$(cat "$mount_point/vs2_date" 2>/dev/null | tr -d '\n\r')
+    fi
+
+    # Parse vs2_auth2 to extract supported devices
+    if [[ -f "$mount_point/vs2_auth2" ]]; then
+        local devices=()
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$line" ]] && continue
+
+            # Look for allow entries: "+ I=<product_id>"
+            if [[ "$line" =~ ^\+[[:space:]]*I=([0-9-]+) ]]; then
+                local product_id="${BASH_REMATCH[1]}"
+                local device_tag=""
+
+                # Map Product ID to device tag
+                case "$product_id" in
+                    20-19165*) device_tag="simman3g" ;;
+                    20-1148*)  device_tag="cancpu" ;;
+                    20-19560*) device_tag="cancpu2" ;;
+                    204-30250*) device_tag="linkbox" ;;
+                    20-19602*) device_tag="linkbox2" ;;
+                    204-30150*) device_tag="imx6" ;;
+                    20-19601*) device_tag="imx8" ;;
+                esac
+
+                # Add to devices array if not already present
+                if [[ -n "$device_tag" ]]; then
+                    local found=false
+                    for d in "${devices[@]}"; do
+                        [[ "$d" == "$device_tag" ]] && found=true && break
+                    done
+                    [[ "$found" == "false" ]] && devices+=("$device_tag")
+                fi
+            fi
+        done < "$mount_point/vs2_auth2"
+
+        # Convert to JSON array
+        if [[ ${#devices[@]} -gt 0 ]]; then
+            local json_array="["
+            local first=true
+            for d in "${devices[@]}"; do
+                [[ "$first" == "true" ]] && first=false || json_array+=", "
+                json_array+="\"$d\""
+            done
+            json_array+="]"
+            spu_info[devices]="$json_array"
+        fi
+    fi
+
+    # Unmount
+    if command -v fusermount &>/dev/null; then
+        fusermount -u "$mount_point" 2>/dev/null || true
+    else
+        umount "$mount_point" 2>/dev/null || true
+    fi
+    rmdir "$mount_point" 2>/dev/null
+
+    return 0
+}
+
 # Initialize os_list array - fetch existing if in append mode
 OS_LIST_JSON="[]"
 EXISTING_URLS=()
@@ -880,11 +1168,15 @@ for filepath in "${IMAGE_FILES[@]}"; do
     echo ""
     echo "Processing: $filename"
 
-    # Determine if this is a VSI file
+    # Determine file type
     is_vsi=false
+    is_spu=false
     if is_vsi_file "$filename"; then
         is_vsi=true
         echo "  Format: VSI (Versioned Sparse Image)"
+    elif is_spu_file "$filename"; then
+        is_spu=true
+        echo "  Format: SPU (SimPad Update)"
     else
         echo "  Format: WIC"
     fi
@@ -892,6 +1184,32 @@ for filepath in "${IMAGE_FILES[@]}"; do
     # Parse metadata from filename (fallback)
     device_type=$(parse_device_type "$filename")
     version=$(parse_version "$filename")
+
+    # For SPU files, try to extract metadata by mounting
+    spu_label=""
+    spu_version=""
+    spu_date=""
+    spu_devices="[]"
+    if [[ "$is_spu" == "true" ]]; then
+        declare -A spu_header
+        if parse_spu_metadata "$filepath" spu_header; then
+            spu_label="${spu_header[label]}"
+            spu_version="${spu_header[version]}"
+            spu_date="${spu_header[date]}"
+            spu_devices="${spu_header[devices]}"
+            echo "  SPU Label: $spu_label"
+            echo "  SPU Version: $spu_version"
+            echo "  SPU Date: $spu_date"
+            echo "  SPU Devices: $spu_devices"
+            # Use SPU version if available
+            if [[ -n "$spu_version" ]]; then
+                version="$spu_version"
+            fi
+        else
+            echo "  Warning: Could not parse SPU metadata"
+        fi
+        unset spu_header
+    fi
 
     # For VSI files, try to extract metadata from header
     vsi_label=""
@@ -920,7 +1238,12 @@ for filepath in "${IMAGE_FILES[@]}"; do
     fi
 
     display_name=$(get_display_name "$device_type")
-    device_tags=$(get_device_tags "$device_type" "$is_vsi")
+    # For SPU files, use devices from metadata; for others, use get_device_tags
+    if [[ "$is_spu" == "true" && "$spu_devices" != "[]" ]]; then
+        device_tags="$spu_devices"
+    else
+        device_tags=$(get_device_tags "$device_type" "$is_vsi")
+    fi
     icon=$(get_icon "$device_type")
 
     echo "  Device Type: $device_type"
@@ -938,14 +1261,22 @@ for filepath in "${IMAGE_FILES[@]}"; do
 
     # For WIC files, estimate extract size (assume 4x compression)
     # For VSI files, we already got extract_size from header
-    if [[ "$is_vsi" != "true" ]]; then
+    # For SPU files, extract_size equals download_size (no compression)
+    if [[ "$is_spu" == "true" ]]; then
+        extract_size=$download_size
+    elif [[ "$is_vsi" != "true" ]]; then
         extract_size=$((download_size * 4))
     fi
 
     # Get release date
-    # For VSI files with valid timestamp, use that; otherwise use file mtime
+    # For VSI files with valid timestamp, use that
+    # For SPU files with valid date, use that
+    # Otherwise use file mtime
     if [[ "$is_vsi" == "true" && -n "$vsi_timestamp" && "$vsi_timestamp" -gt 0 ]] 2>/dev/null; then
         release_date=$(date -d "@$vsi_timestamp" +%Y-%m-%d 2>/dev/null || date -r "$vsi_timestamp" +%Y-%m-%d 2>/dev/null)
+    elif [[ "$is_spu" == "true" && -n "$spu_date" ]]; then
+        # SPU date is already in YYYY-MM-DD format or similar
+        release_date="$spu_date"
     else
         file_mtime=$(stat -c%Y "$filepath" 2>/dev/null || stat -f%m "$filepath" 2>/dev/null)
         release_date=$(date -d "@$file_mtime" +%Y-%m-%d 2>/dev/null || date -r "$file_mtime" +%Y-%m-%d)
@@ -962,15 +1293,28 @@ for filepath in "${IMAGE_FILES[@]}"; do
     echo "  Release Date: $release_date"
     echo "  URL: $download_url"
 
-    # Build name and description from VSI label if available
-    # Only append version if it's not empty and not the default "0.0.0"
+    # Build name and description from VSI/SPU label if available
+    # Only append version if it's not empty, not the default "0.0.0", and not already in the label
     version_suffix=""
     if [[ -n "$version" && "$version" != "0.0.0" ]]; then
         version_suffix=" v$version"
     fi
 
-    if [[ -n "$vsi_label" ]]; then
-        image_name="${vsi_label}${version_suffix}"
+    if [[ -n "$spu_label" ]]; then
+        # Check if label already contains the version number
+        if [[ "$spu_label" == *"$version"* ]]; then
+            image_name="$spu_label"
+        else
+            image_name="${spu_label}${version_suffix}"
+        fi
+        description="$spu_label firmware update"
+    elif [[ -n "$vsi_label" ]]; then
+        # Check if label already contains the version number
+        if [[ "$vsi_label" == *"$version"* ]]; then
+            image_name="$vsi_label"
+        else
+            image_name="${vsi_label}${version_suffix}"
+        fi
         description="$vsi_label"
     else
         image_name="${display_name}${version_suffix}"
@@ -978,6 +1322,7 @@ for filepath in "${IMAGE_FILES[@]}"; do
     fi
 
     # Build the os_entry and add/update in JSON
+    # Note: Image type (wic/vsi/spu) is determined by URL file extension
     os_entry=$(build_os_entry "$image_name" "$description" "$download_url" "$icon" \
         "$extract_size" "$md5_hash" "$sha256_hash" "$download_size" "$release_date" "$device_tags")
     add_or_update_os_entry "$os_entry" "$download_url"
@@ -1013,11 +1358,8 @@ done
 
 # Process skipped files (already on CDN) - try to get metadata from local file if available
 for skipped_entry in "${SKIPPED_FILES[@]}"; do
-    # Parse entry: filename|blob_path|local_path
-    filename="${skipped_entry%%|*}"
-    rest="${skipped_entry#*|}"
-    blob_path="${rest%%|*}"
-    local_path="${rest#*|}"
+    # Parse entry: filename|blob_path|local_path|remote_path|build_date
+    IFS='|' read -r filename blob_path local_path remote_path source_build_date <<< "$skipped_entry"
 
     # Reset per-iteration variables
     blob_props=""
@@ -1102,13 +1444,41 @@ for skipped_entry in "${SKIPPED_FILES[@]}"; do
     device_type=$(parse_device_type "$filename")
     version=$(parse_version "$filename")
 
-    # Determine if this is a VSI file
+    # Determine file type
     is_vsi=false
+    is_spu=false
     if is_vsi_file "$filename"; then
         is_vsi=true
         echo "  Format: VSI (Versioned Sparse Image)"
+    elif is_spu_file "$filename"; then
+        is_spu=true
+        echo "  Format: SPU (SimPad Update)"
     else
         echo "  Format: WIC"
+    fi
+
+    # For SPU files, try to extract metadata from local file by mounting
+    spu_label=""
+    spu_version=""
+    spu_date=""
+    spu_devices="[]"
+    if [[ "$is_spu" == "true" && "$has_local_file" == "true" ]]; then
+        declare -A spu_header
+        if parse_spu_metadata "$local_path" spu_header; then
+            spu_label="${spu_header[label]}"
+            spu_version="${spu_header[version]}"
+            spu_date="${spu_header[date]}"
+            spu_devices="${spu_header[devices]}"
+            echo "  SPU Label: $spu_label"
+            echo "  SPU Version: $spu_version"
+            echo "  SPU Date: $spu_date"
+            echo "  SPU Devices: $spu_devices"
+            # Use SPU version if available
+            if [[ -n "$spu_version" ]]; then
+                version="$spu_version"
+            fi
+        fi
+        unset spu_header
     fi
 
     # For VSI files, try to extract metadata from local file header
@@ -1137,7 +1507,12 @@ for skipped_entry in "${SKIPPED_FILES[@]}"; do
     fi
 
     display_name=$(get_display_name "$device_type")
-    device_tags=$(get_device_tags "$device_type" "$is_vsi")
+    # For SPU files, use devices from metadata; for others, use get_device_tags
+    if [[ "$is_spu" == "true" && "$spu_devices" != "[]" ]]; then
+        device_tags="$spu_devices"
+    else
+        device_tags=$(get_device_tags "$device_type" "$is_vsi")
+    fi
     icon=$(get_icon "$device_type")
 
     echo "  Device Type: $device_type"
@@ -1165,8 +1540,12 @@ for skipped_entry in "${SKIPPED_FILES[@]}"; do
     md5_hash="${blob_md5:-}"
 
     # For extract size: use VSI header if available, otherwise estimate
+    # SPU files are uncompressed (no extract needed)
     if [[ "$extract_size" -eq 0 ]]; then
-        if [[ "$is_vsi" == "true" ]]; then
+        if [[ "$is_spu" == "true" ]]; then
+            # SPU files are uncompressed
+            extract_size=$download_size
+        elif [[ "$is_vsi" == "true" ]]; then
             # VSI files are typically ~2x compressed
             extract_size=$((download_size * 2))
         else
@@ -1174,10 +1553,17 @@ for skipped_entry in "${SKIPPED_FILES[@]}"; do
         fi
     fi
 
-    # Get release date: prefer VSI timestamp from local file, then blob lastModified, then current date
+    # Get release date: prefer VSI timestamp, SPU date, source build date, then blob lastModified, then current date
     if [[ "$is_vsi" == "true" && -n "$vsi_timestamp" && "$vsi_timestamp" -gt 0 ]] 2>/dev/null; then
         release_date=$(date -d "@$vsi_timestamp" +%Y-%m-%d 2>/dev/null || date -r "$vsi_timestamp" +%Y-%m-%d 2>/dev/null)
         echo "  Release date from VSI header: $release_date"
+    elif [[ "$is_spu" == "true" && -n "$spu_date" ]]; then
+        release_date="$spu_date"
+        echo "  Release date from SPU metadata: $release_date"
+    elif [[ -n "$source_build_date" ]]; then
+        # Use build date from source (SSH path) - already in YYYY-MM-DD format
+        release_date="$source_build_date"
+        echo "  Release date from source build directory: $release_date"
     elif [[ "$has_local_file" == "true" ]]; then
         file_mtime=$(stat -c%Y "$local_path" 2>/dev/null || stat -f%m "$local_path" 2>/dev/null)
         release_date=$(date -d "@$file_mtime" +%Y-%m-%d 2>/dev/null || date -r "$file_mtime" +%Y-%m-%d)
@@ -1202,15 +1588,28 @@ for skipped_entry in "${SKIPPED_FILES[@]}"; do
         echo "  MD5: $md5_hash"
     fi
 
-    # Build name and description from VSI label if available
-    # Only append version if it's not empty and not the default "0.0.0"
+    # Build name and description from VSI/SPU label if available
+    # Only append version if it's not empty, not the default "0.0.0", and not already in the label
     version_suffix=""
     if [[ -n "$version" && "$version" != "0.0.0" ]]; then
         version_suffix=" v$version"
     fi
 
-    if [[ -n "$vsi_label" ]]; then
-        image_name="${vsi_label}${version_suffix}"
+    if [[ -n "$spu_label" ]]; then
+        # Check if label already contains the version number
+        if [[ "$spu_label" == *"$version"* ]]; then
+            image_name="$spu_label"
+        else
+            image_name="${spu_label}${version_suffix}"
+        fi
+        description="$spu_label firmware update"
+    elif [[ -n "$vsi_label" ]]; then
+        # Check if label already contains the version number
+        if [[ "$vsi_label" == *"$version"* ]]; then
+            image_name="$vsi_label"
+        else
+            image_name="${vsi_label}${version_suffix}"
+        fi
         description="$vsi_label"
     else
         image_name="${display_name}${version_suffix}"
@@ -1218,6 +1617,7 @@ for skipped_entry in "${SKIPPED_FILES[@]}"; do
     fi
 
     # Build the os_entry and add/update in JSON (no sha256 for skipped files)
+    # Note: Image type (wic/vsi/spu) is determined by URL file extension
     os_entry=$(build_os_entry "$image_name" "$description" "$download_url" "$icon" \
         "$extract_size" "$md5_hash" "" "$download_size" "$release_date" "$device_tags")
     add_or_update_os_entry "$os_entry" "$download_url"

@@ -43,7 +43,9 @@ set(PLATFORM_SOURCES
     dependencies/drivelist/src/darwin/REDiskList.m
     mac/file_operations_macos.cpp
     mac/platformquirks_macos.mm
-    mac/mac_suspend_inhibitor.cpp)
+    mac/mac_suspend_inhibitor.cpp
+    mac/mount_helper.mm
+    mac/disk_format_helper.cpp)
 
 # Only include GUI-specific components for non-CLI builds
 if(NOT BUILD_CLI_ONLY)

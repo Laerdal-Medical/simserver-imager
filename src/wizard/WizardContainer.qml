@@ -121,6 +121,14 @@ Item {
     readonly property int stepWriting: 4
     readonly property int stepDone: 5
 
+    // SPU flow steps (alternative flow when SPU source is selected)
+    readonly property int stepSpuSelection: 10
+    readonly property int stepSpuCopy: 11
+
+    // Track if we're in SPU copy mode
+    property bool isSpuCopyMode: false
+    property string selectedSpuName: ""
+
     // Legacy step indices (kept for compatibility, mapped to stepWriting)
     readonly property int stepHostnameCustomization: 4
     readonly property int stepLocaleCustomization: 4
@@ -715,6 +723,11 @@ Item {
                 writeAnotherMode = false  // Reset the flag
             }
 
+            // SPU mode routing: after storage selection, go to SPU copy step instead of writing
+            if (root.isSpuCopyMode && root.currentStep === stepStorageSelection) {
+                nextIndex = stepSpuCopy
+            }
+
             root.currentStep = nextIndex
             var nextComponent = getStepComponent(root.currentStep)
             if (nextComponent) {
@@ -835,6 +848,9 @@ Item {
             case stepStorageSelection: return storageSelectionStep
             case stepWriting: return writingStep
             case stepDone: return doneStep
+            // SPU flow steps
+            case stepSpuSelection: return spuSelectionStep
+            case stepSpuCopy: return spuCopyStep
             default: return null
         }
     }
@@ -1056,6 +1072,44 @@ Item {
             nextButtonText: CommonStrings.finish
             appOptionsButton: optionsButton
             onNextClicked: root.wizardCompleted()
+        }
+    }
+
+    // SPU flow step components
+    Component {
+        id: spuSelectionStep
+        SPUSelectionStep {
+            imageWriter: root.imageWriter
+            wizardContainer: root
+            appOptionsButton: optionsButton
+            onNextClicked: {
+                // After SPU selection, go to storage selection, then SPU copy
+                root.jumpToStep(root.stepStorageSelection)
+            }
+            onBackClicked: {
+                // Go back to source selection
+                root.isSpuCopyMode = false
+                root.jumpToStep(root.stepSourceSelection)
+            }
+        }
+    }
+
+    Component {
+        id: spuCopyStep
+        SPUCopyStep {
+            imageWriter: root.imageWriter
+            wizardContainer: root
+            appOptionsButton: optionsButton
+            onNextClicked: {
+                if (isComplete || hasError) {
+                    // Go to done step
+                    root.jumpToStep(root.stepDone)
+                }
+            }
+            onBackClicked: {
+                // Go back to storage selection
+                root.jumpToStep(root.stepStorageSelection)
+            }
         }
     }
 

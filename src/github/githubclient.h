@@ -190,6 +190,21 @@ public:
      */
     Q_INVOKABLE void cancelArtifactInspection();
 
+    /**
+     * @brief Download an artifact and inspect its contents for SPU files
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param artifactId Artifact ID
+     * @param artifactName Original artifact name for display
+     * @param branch Branch name the artifact came from
+     *
+     * Downloads the artifact ZIP to a temporary location and emits
+     * artifactSpuContentsReady with the list of SPU files found.
+     */
+    Q_INVOKABLE void inspectArtifactSpuContents(const QString &owner, const QString &repo,
+                                                 qint64 artifactId, const QString &artifactName,
+                                                 const QString &branch);
+
 signals:
     /**
      * @brief Emitted when artifact inspection is cancelled
@@ -280,6 +295,21 @@ signals:
                                 const QString &zipPath);
 
     /**
+     * @brief Emitted when artifact SPU contents have been inspected
+     * @param artifactId The artifact ID that was inspected
+     * @param artifactName The original artifact name
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param branch Branch name
+     * @param spuFiles Array of SPU file info objects found in the artifact
+     * @param zipPath Path to the downloaded ZIP file (for later extraction)
+     */
+    void artifactSpuContentsReady(qint64 artifactId, const QString &artifactName,
+                                   const QString &owner, const QString &repo,
+                                   const QString &branch, const QJsonArray &spuFiles,
+                                   const QString &zipPath);
+
+    /**
      * @brief Emitted on API error
      * @param message Error message
      */
@@ -314,6 +344,11 @@ private:
                                  qint64 artifactId, const QString &artifactName,
                                  const QString &branch, const QString &zipPath);
     QJsonArray listWicFilesInZip(const QString &zipPath);
+    QJsonArray listSpuFilesInZip(const QString &zipPath);
+    QJsonArray listImageFilesInZip(const QString &zipPath);  // Combined WIC + SPU
+    void inspectArtifactSpuFromUrl(const QUrl &url, const QString &owner, const QString &repo,
+                                    qint64 artifactId, const QString &artifactName,
+                                    const QString &branch, const QString &zipPath);
 
     static constexpr const char* API_BASE_URL = "https://api.github.com";
     static constexpr const char* RAW_BASE_URL = "https://raw.githubusercontent.com";

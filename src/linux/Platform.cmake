@@ -26,7 +26,9 @@ set(PLATFORM_SOURCES
     linux/bootimgcreator_linux.cpp
     linux/rsakeyfingerprint_linux.cpp
     linux/file_operations_linux.cpp
-    linux/platformquirks_linux.cpp)
+    linux/platformquirks_linux.cpp
+    linux/mount_helper.cpp
+    linux/disk_format_helper.cpp)
 
 # Only include DBus-dependent and GUI components for non-CLI builds
 if(NOT BUILD_CLI_ONLY)
