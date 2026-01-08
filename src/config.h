@@ -13,7 +13,7 @@
 #define OSLIST_URL                        "https://laerdalcdn.blob.core.windows.net/software/release/SimPad/factory-images/images.json"
 
 /* GitHub OAuth Client ID - Register at https://github.com/settings/developers */
-#define GITHUB_CLIENT_ID                  "Ov23liKEkgjtcfPAqOpG"
+#define GITHUB_CLIENT_ID                  "Ov23liyr8vkrcTajVFjP"
 
 /* Default GitHub repositories for WIC files (JSON array) */
 #define DEFAULT_GITHUB_REPOS              "[\"LaerdalMedical/simpad-top-plus\",\"LaerdalMedical/simserver-mcbapp\",\"LaerdalMedical/simpad-app-next\",\"LaerdalMedical/simserver-shared-libs\"]"

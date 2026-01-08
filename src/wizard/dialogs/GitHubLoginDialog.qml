@@ -330,7 +330,9 @@ BaseDialog {
             activeFocusOnTab: true
 
             onClicked: {
-                Qt.openUrlExternally(root.verificationUrl)
+                if (root.imageWriter) {
+                    root.imageWriter.openUrl(root.verificationUrl)
+                }
                 // Start polling after user opens GitHub
                 root.authState = "polling"
             }
