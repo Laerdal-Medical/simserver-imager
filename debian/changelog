@@ -1,11 +1,18 @@
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 
+  * VSI Format Support: Added support for Laerdal's VSI (Versioned Sparse
+    Image) disk image format - a zlib-compressed sparse format optimized
+    for factory imaging with MD5 verification
   * Date Formatting: Release dates now display in user's local timezone
     and locale format instead of raw ISO 8601 timestamps
   * GitHub OAuth: Updated OAuth client ID for authentication
   * URL Handling: Fixed URL opening in GitHub login dialog
+  * Suspend Inhibitor Fix: Fixed FIFO permission issue when running via
+    pkexec that caused "cat: Permission denied" errors
+  * Startup Image Fix: Fixed "No device selected" display when launching
+    with an image file argument
 
- -- Laerdal Medical <support@laerdal.com>  Wed, 08 Jan 2025 12:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Wed, 08 Jan 2025 14:00:00 +0000
 
 laerdal-simserver-imager (1.0.3) unstable; urgency=medium
 
