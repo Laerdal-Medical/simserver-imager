@@ -162,7 +162,7 @@ QString detectFilesystem(const QString &device)
 {
     // First try the partition (e.g., /dev/disk2s1) since that's where filesystem lives
     QString partition = device;
-    if (!device.contains("s") || device.endsWith(QRegularExpression("disk\\d+$")))
+    if (!device.contains("s") || QRegularExpression("disk\\d+$").match(device).hasMatch())
     {
         partition = device + "s1";
     }
