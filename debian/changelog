@@ -1,8 +1,18 @@
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 
+  * SPU Support: Full support for Software Package Update (.spu) files -
+    firmware updates that are copied to a mounted device rather than flashed
+    as disk images. Includes platform-specific mount/unmount helpers and
+    FAT32 formatting when needed.
   * VSI Format Support: Added support for Laerdal's VSI (Versioned Sparse
     Image) disk image format - a zlib-compressed sparse format optimized
     for factory imaging with MD5 verification
+  * Image Type Badges: New ImBadge component displays colored badges in OS
+    selection list (SPU=indigo, WIC=emerald, VSI=cyan)
+  * GitHub Source Validation: GitHub CI option is now disabled when not
+    authenticated or no repositories are configured
+  * Device Filtering: Improved device filtering and sorting for OS images
+  * User Guide: Added comprehensive user documentation (doc/userguide.md)
   * Date Formatting: Release dates now display in user's local timezone
     and locale format instead of raw ISO 8601 timestamps
   * GitHub OAuth: Updated OAuth client ID for authentication
