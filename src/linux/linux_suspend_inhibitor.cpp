@@ -99,6 +99,32 @@ ProcessScopedSuspendInhibitor::ProcessScopedSuspendInhibitor(const char *fileNam
         return;
     }
 
+    // Make the FIFO readable by the original user if running with elevated privileges.
+    // The cat command will run as the unprivileged user and needs to read from this FIFO.
+    const char* pkexecUid = getenv("PKEXEC_UID");
+    if (pkexecUid)
+    {
+        uid_t targetUid = static_cast<uid_t>(atoi(pkexecUid));
+        struct passwd* pw = getpwuid(targetUid);
+        if (pw)
+        {
+            // If chown fails, cat will fail with a permission error but suspend
+            // inhibition isn't critical functionality - we continue anyway
+            if (chown(_fifoName, targetUid, pw->pw_gid) < 0)
+            {
+                // Best effort - ignore failure
+            }
+        }
+    }
+    else if (getuid() != geteuid())
+    {
+        // Running under sudo - make readable by real user
+        if (chown(_fifoName, getuid(), getgid()) < 0)
+        {
+            // Best effort - ignore failure
+        }
+    }
+
     // Open the FIFO, creating our end of the pipe.
     _controlFd = open(_fifoName, O_RDWR);
 

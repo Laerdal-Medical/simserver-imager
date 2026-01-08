@@ -299,6 +299,7 @@ set(SOURCES_BASE
     "devicewrapperfatpartition.cpp"
     "driveformatthread.cpp"
     "localfileextractthread.cpp"
+    "vsiextractthread.cpp"
     "archiveentryiodevice.cpp"
     "archiveentryextractthread.cpp"
     "downloadstatstelemetry.cpp"

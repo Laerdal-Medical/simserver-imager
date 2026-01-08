@@ -555,6 +555,7 @@ protected:
 
     void _parseCompressedFile();
     void _parseXZFile();
+    void _parseVsiFile();
     QString _pubKeyFileName();
     QString _privKeyFileName();
     QString _sshKeyDir();

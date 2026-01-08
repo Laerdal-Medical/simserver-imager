@@ -21,7 +21,7 @@ Item {
     function withAll(list)          { return list.concat([allFilesLabel]) }
     function toFilterString(list)   { return list.join(";;") }
 
-    readonly property var imageExtensions: ["*.wic", "*.wic.xz", "*.wic.gz", "*.wic.zst"]
+    readonly property var imageExtensions: ["*.wic", "*.wic.xz", "*.wic.gz", "*.wic.zst", "*.vsi"]
 
     readonly property var imageFiltersList: withAll([
         qsTr("WIC image files (%1)").arg(imageExtensions.join(" "))

@@ -15,6 +15,7 @@
 #include "dependencies/yescrypt/yescrypt_wrapper.h"
 #include "driveformatthread.h"
 #include "localfileextractthread.h"
+#include "vsiextractthread.h"
 #include "systemmemorymanager.h"
 #include "downloadstatstelemetry.h"
 #include "wlancredentials.h"
@@ -864,7 +865,8 @@ void ImageWriter::startWrite()
                             lowercaseurl.endsWith(".gz") ||
                             lowercaseurl.endsWith(".7z") ||
                             lowercaseurl.endsWith(".zst") ||
-                            lowercaseurl.endsWith(".cache");
+                            lowercaseurl.endsWith(".cache") ||
+                            lowercaseurl.endsWith(".vsi");
 
     // Proactive validation for local sources before spawning threads
     if (_src.isLocalFile())
@@ -892,6 +894,8 @@ void ImageWriter::startWrite()
     {
         if (!compressed)
             _extrLen = _downloadLen;
+        else if (lowercaseurl.endsWith(".vsi"))
+            _parseVsiFile();
         else if (lowercaseurl.endsWith(".xz"))
             _parseXZFile();
         else
@@ -1054,6 +1058,10 @@ void ImageWriter::startWrite()
         // Clear the streaming info after use
         _artifactZipForStreaming.clear();
         _artifactEntryForStreaming.clear();
+    }
+    else if (lowercaseurl.endsWith(".vsi"))
+    {
+        _thread = new VsiExtractThread(urlstr, writeDevicePath.toLatin1(), _expectedHash, this);
     }
     else if (QUrl(urlstr).isLocalFile())
     {
@@ -2503,6 +2511,23 @@ void ImageWriter::_parseXZFile()
     }
 }
 
+void ImageWriter::_parseVsiFile()
+{
+    VsiExtractThread::VsiHeader header;
+    _extrLen = 0;
+
+    if (VsiExtractThread::parseVsiHeader(_src.toLocalFile(), header))
+    {
+        _extrLen = header.uncompressedSize;
+        qDebug() << "Parsed .vsi file. Uncompressed size:" << _extrLen
+                 << "Block size:" << header.blockSize;
+    }
+    else
+    {
+        qDebug() << "Unable to parse .vsi file header";
+    }
+}
+
 bool ImageWriter::isOnline()
 {
     // Use platform abstraction for network connectivity check
@@ -3693,13 +3718,21 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
         // Continue with the write operation (this is the code that was after cache verification)
         // Use platform-specific write device path (e.g., rdisk on macOS for direct I/O)
         QString writeDevicePath = PlatformQuirks::getWriteDevicePath(_dst);
-        _thread = new LocalFileExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
+        QString lowercaseurl = urlstr.toLower();
+        if (lowercaseurl.endsWith(".vsi"))
+            _thread = new VsiExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
+        else
+            _thread = new LocalFileExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
     }
     else
     {
         // Use platform-specific write device path (e.g., rdisk on macOS for direct I/O)
         QString writeDevicePath = PlatformQuirks::getWriteDevicePath(_dst);
-        _thread = new DownloadExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
+        QString lowercaseurl = urlstr.toLower();
+        if (lowercaseurl.endsWith(".vsi"))
+            _thread = new VsiExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
+        else
+            _thread = new DownloadExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
         if (_repo.toString() == OSLIST_URL)
         {
             DownloadStatsTelemetry *tele = new DownloadStatsTelemetry(urlstr.toLatin1(), _parentCategory.toLatin1(), _osName.toLatin1(), isEmbeddedMode(), _currentLangcode, this);

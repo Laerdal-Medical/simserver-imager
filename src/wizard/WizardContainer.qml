@@ -212,6 +212,21 @@ Item {
         }
     }
 
+    // Update selectedDeviceName when hardware device is auto-selected (for startup image flow)
+    Connections {
+        target: imageWriter ? imageWriter.getHWList() : null
+        function onCurrentNameChanged() {
+            // When a startup image bypasses device selection, auto-update selectedDeviceName
+            if (root.hasStartupImage && root.selectedDeviceName === "") {
+                var hwModel = imageWriter.getHWList()
+                if (hwModel && hwModel.currentName && hwModel.currentName.length > 0) {
+                    root.selectedDeviceName = hwModel.currentName
+                    console.log("Auto-set selectedDeviceName from startup image flow:", root.selectedDeviceName)
+                }
+            }
+        }
+    }
+
     // Laerdal simplified wizard step names for sidebar
     readonly property var stepNames: [
         qsTr("Device"),
