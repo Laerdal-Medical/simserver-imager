@@ -1,3 +1,12 @@
+laerdal-simserver-imager (1.0.4) unstable; urgency=medium
+
+  * Date Formatting: Release dates now display in user's local timezone
+    and locale format instead of raw ISO 8601 timestamps
+  * GitHub OAuth: Updated OAuth client ID for authentication
+  * URL Handling: Fixed URL opening in GitHub login dialog
+
+ -- Laerdal Medical <support@laerdal.com>  Wed, 08 Jan 2025 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.3) unstable; urgency=medium
 
   * Source Selection: Fixed source type radio selection to properly show
