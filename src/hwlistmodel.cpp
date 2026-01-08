@@ -57,6 +57,46 @@ static QJsonArray getLaerdalDevices()
         simman3g64["matching_type"] = "exclusive";
         simman3g64["architecture"] = "aarch64";
         devices.append(simman3g64);
+
+        QJsonObject linkbox;
+        linkbox["name"] = "Link Box PLUS";
+        linkbox["tags"] = QJsonArray({"linkbox"});  // SimPad Plus WIC images also have "linkbox" tag
+        linkbox["capabilities"] = QJsonArray();
+        linkbox["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox.png";
+        linkbox["description"] = "Link Box PLUS device (i.MX6)";
+        linkbox["matching_type"] = "exclusive";
+        linkbox["architecture"] = "armhf";
+        devices.append(linkbox);
+
+        QJsonObject linkbox2;
+        linkbox2["name"] = "Link Box PLUS 2";
+        linkbox2["tags"] = QJsonArray({"linkbox2"});  // SimPad Plus 2 WIC images also have "linkbox2" tag
+        linkbox2["capabilities"] = QJsonArray();
+        linkbox2["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox2.png";
+        linkbox2["description"] = "Link Box PLUS 2 device (i.MX8)";
+        linkbox2["matching_type"] = "exclusive";
+        linkbox2["architecture"] = "aarch64";
+        devices.append(linkbox2);
+
+        QJsonObject cancpu;
+        cancpu["name"] = "CANCPU Module";
+        cancpu["tags"] = QJsonArray({"cancpu"});  // SimPad Plus WIC images also have "cancpu" tag
+        cancpu["capabilities"] = QJsonArray();
+        cancpu["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu.png";
+        cancpu["description"] = "CANCPU Module device (i.MX6)";
+        cancpu["matching_type"] = "exclusive";
+        cancpu["architecture"] = "armhf";
+        devices.append(cancpu);
+
+        QJsonObject cancpu2;
+        cancpu2["name"] = "CANCPU Module 2";
+        cancpu2["tags"] = QJsonArray({"cancpu2"});  // SimPad Plus 2 WIC images also have "cancpu2" tag
+        cancpu2["capabilities"] = QJsonArray();
+        cancpu2["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu2.png";
+        cancpu2["description"] = "CANCPU Module 2 device (i.MX8)";
+        cancpu2["matching_type"] = "exclusive";
+        cancpu2["architecture"] = "aarch64";
+        devices.append(cancpu2);
     }
     return devices;
 }

@@ -87,6 +87,50 @@ Test files are in `src/test/`:
 - **Windows**: MinGW and MSVC, Inno Setup installer
 - **macOS**: Universal binary (x86_64 + arm64), DMG packaging
 
+## RPI Imager JSON Schema
+
+This project uses the Raspberry Pi Imager JSON format for OS image lists. The official schema is at:
+`github.com/raspberrypi/rpi-imager/blob/qml/doc/json-schema/os-list-schema.json`
+
+### Required Fields (per OS entry)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Display name (version should be embedded here, e.g., "Image Name v1.2.3") |
+| `description` | string | Brief description of the image |
+| `icon` | string | URL or resource path to icon |
+| `url` | string | Download URL for the image |
+| `extract_size` | integer | Uncompressed image size in bytes |
+| `extract_sha256` | string | SHA256 hash of uncompressed image |
+| `image_download_size` | integer | Compressed download size in bytes |
+| `release_date` | string | ISO 8601 date (YYYY-MM-DD) |
+| `devices` | array | List of compatible device tags |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `init_format` | string | Initialization format type |
+| `website` | string | Project website URL |
+| `architecture` | string | Target architecture (e.g., "armhf", "aarch64") |
+| `matching_type` | string | Device matching behavior ("exclusive" or "inclusive") |
+| `subitems_url` | string | URL to fetch nested OS list |
+| `subitems` | array | Inline nested OS entries |
+
+### Version Handling
+
+**Important**: There is NO separate `version` field in the RPI Imager schema. Version information must be embedded in the `name` field.
+
+The application extracts version from `name` using this regex pattern:
+```
+v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?
+```
+
+Examples of valid name formats:
+- `"SimPad PLUS v1.2.3"`
+- `"Factory Image 2.0.1"`
+- `"My Image v1.0.0.4"` (4-part version)
+
 ## Coding Conventions
 
 - Qt signal/slot architecture with `Q_OBJECT` macro

@@ -588,9 +588,12 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &wicFiles)
     // Convert WIC files to OS list format and append
     for (const auto &wicValue : wicFiles) {
         QJsonObject wic = wicValue.toObject();
+        QString fileName = wic["name"].toString();
+        QString fileNameLower = fileName.toLower();
+        bool isVsi = fileNameLower.endsWith(".vsi");
 
         QJsonObject osEntry;
-        osEntry["name"] = wic["name"].toString();
+        osEntry["name"] = fileName;
         osEntry["description"] = QString("%1/%2 - Release: %3").arg(wic["owner"].toString(), wic["repo"].toString(), wic["release_name"].toString());
         osEntry["url"] = wic["download_url"].toString();
         osEntry["extract_size"] = wic["size"].toVariant().toLongLong();
@@ -601,6 +604,48 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &wicFiles)
         osEntry["source"] = "github";
         osEntry["source_type"] = "release";
         osEntry["prerelease"] = wic["prerelease"].toBool();
+
+        // Set devices array and icon based on file name
+        // SimPad: imx6 = SimPad Plus, imx8 = SimPad Plus 2
+        // SimMan: simman3g-64 = 64-bit, simman3g-32 = 32-bit
+        // WIC images for SimPad Plus also work on LinkBox and CANCPU devices
+        QJsonArray devices;
+        if (fileNameLower.contains("simman3g-64") || fileNameLower.contains("simman-64")) {
+            devices.append("simman3g-64");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+        } else if (fileNameLower.contains("simman3g-32") || fileNameLower.contains("simman-32")) {
+            devices.append("simman3g-32");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+        } else if (fileNameLower.contains("linkbox2")) {
+            devices.append("linkbox2");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox2.png";
+        } else if (fileNameLower.contains("linkbox")) {
+            devices.append("linkbox");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox.png";
+        } else if (fileNameLower.contains("cancpu2")) {
+            devices.append("cancpu2");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu2.png";
+        } else if (fileNameLower.contains("cancpu")) {
+            devices.append("cancpu");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu.png";
+        } else if (fileNameLower.contains("imx8")) {
+            devices.append("imx8");
+            // WIC images for SimPad Plus 2 also work on LinkBox2 and CANCPU2
+            if (!isVsi) {
+                devices.append("linkbox2");
+                devices.append("cancpu2");
+            }
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
+        } else if (fileNameLower.contains("imx6")) {
+            devices.append("imx6");
+            // WIC images for SimPad Plus also work on LinkBox and CANCPU
+            if (!isVsi) {
+                devices.append("linkbox");
+                devices.append("cancpu");
+            }
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
+        }
+        osEntry["devices"] = devices;
 
         _githubOsList.append(osEntry);
     }
@@ -617,6 +662,8 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
     for (const auto &wicValue : wicFiles) {
         QJsonObject wic = wicValue.toObject();
         QString artifactName = wic["name"].toString();
+        QString artifactNameLower = artifactName.toLower();
+        bool isVsi = artifactNameLower.endsWith(".vsi");
 
         QJsonObject osEntry;
         osEntry["name"] = artifactName;
@@ -637,8 +684,8 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         // Set devices array and icon based on artifact name
         // SimPad: imx6 = SimPad Plus, imx8 = SimPad Plus 2
         // SimMan: simman3g-64 = 64-bit, simman3g-32 = 32-bit
+        // WIC images for SimPad Plus also work on LinkBox and CANCPU devices
         QJsonArray devices;
-        QString artifactNameLower = artifactName.toLower();
 
         if (artifactNameLower.contains("simman3g-64") || artifactNameLower.contains("simman-64")) {
             devices.append("simman3g-64");
@@ -646,11 +693,33 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         } else if (artifactNameLower.contains("simman3g-32") || artifactNameLower.contains("simman-32")) {
             devices.append("simman3g-32");
             osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+        } else if (artifactNameLower.contains("linkbox2")) {
+            devices.append("linkbox2");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox2.png";
+        } else if (artifactNameLower.contains("linkbox")) {
+            devices.append("linkbox");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox.png";
+        } else if (artifactNameLower.contains("cancpu2")) {
+            devices.append("cancpu2");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu2.png";
+        } else if (artifactNameLower.contains("cancpu")) {
+            devices.append("cancpu");
+            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu.png";
         } else if (artifactNameLower.contains("imx8")) {
             devices.append("imx8");
+            // WIC images for SimPad Plus 2 also work on LinkBox2 and CANCPU2
+            if (!isVsi) {
+                devices.append("linkbox2");
+                devices.append("cancpu2");
+            }
             osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
         } else if (artifactNameLower.contains("imx6")) {
             devices.append("imx6");
+            // WIC images for SimPad Plus also work on LinkBox and CANCPU
+            if (!isVsi) {
+                devices.append("linkbox");
+                devices.append("cancpu");
+            }
             osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
         } else {
             osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";

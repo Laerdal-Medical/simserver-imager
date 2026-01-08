@@ -62,7 +62,7 @@ namespace {
         return url.startsWith("internal://");
     }
 
-    // Sort OS list by version (newest first), grouping by device type
+    // Sort OS list by version (highest first)
     // Special entries (Erase, Use custom) are moved to the end
     void sortByVersionDescending(QJsonArray &list) {
         if (list.size() <= 1) return;
@@ -80,26 +80,31 @@ namespace {
             }
         }
 
-        // Sort regular items by: 1) device type (to group), 2) version descending
+        // Sort regular items by version descending (highest version first)
         std::stable_sort(regularItems.begin(), regularItems.end(), [](const QJsonValue &a, const QJsonValue &b) {
             QJsonObject objA = a.toObject();
             QJsonObject objB = b.toObject();
 
-            // First, group by device type (from devices array)
-            QJsonArray devicesA = objA["devices"].toArray();
-            QJsonArray devicesB = objB["devices"].toArray();
-            QString deviceA = devicesA.isEmpty() ? "" : devicesA[0].toString();
-            QString deviceB = devicesB.isEmpty() ? "" : devicesB[0].toString();
-
-            if (deviceA != deviceB) {
-                return deviceA < deviceB;  // Group by device alphabetically
-            }
-
-            // Within same device type, sort by version descending (newest first)
             QList<int> versionA = extractVersionFromName(objA["name"].toString());
             QList<int> versionB = extractVersionFromName(objB["name"].toString());
 
-            return isVersionGreater(versionA, versionB);
+            // Items without version go last, use release_date as tiebreaker
+            if (versionA.isEmpty() && versionB.isEmpty()) {
+                QString dateA = objA["release_date"].toString();
+                QString dateB = objB["release_date"].toString();
+                return dateA > dateB;
+            }
+            if (versionA.isEmpty()) return false;
+            if (versionB.isEmpty()) return true;
+
+            // Compare versions
+            if (isVersionGreater(versionA, versionB)) return true;
+            if (isVersionGreater(versionB, versionA)) return false;
+
+            // Same version, sort by release_date descending as tiebreaker
+            QString dateA = objA["release_date"].toString();
+            QString dateB = objB["release_date"].toString();
+            return dateA > dateB;
         });
 
         // Rebuild list: regular items first (sorted), then special items at end
@@ -111,8 +116,17 @@ namespace {
             list.append(item);
         }
 
-        qDebug() << "OSListModel: Sorted" << regularItems.size() << "WIC images by version (newest first),"
-                 << specialItems.size() << "special items at end";
+        // Log the first item after sorting to verify
+        if (!list.isEmpty()) {
+            QJsonObject first = list[0].toObject();
+            QList<int> firstVersion = extractVersionFromName(first["name"].toString());
+            QString versionStr = firstVersion.isEmpty() ? "no version" :
+                QString("%1.%2.%3.%4").arg(firstVersion[0]).arg(firstVersion[1])
+                    .arg(firstVersion[2]).arg(firstVersion.size() > 3 ? firstVersion[3] : 0);
+            qDebug() << "OSListModel: Sorted" << regularItems.size() << "images by version (highest first)."
+                     << "First item:" << first["name"].toString()
+                     << "(" << versionStr << ")";
+        }
     }
 
     // Valid init_format values according to schema
@@ -235,7 +249,7 @@ namespace {
 
         shuffleIfRandom(list);
 
-        // Sort by version (newest first), grouped by device type
+        // Sort by version (highest first)
         sortByVersionDescending(list);
 
         // Flatten, since GUI doesn't support a tree model

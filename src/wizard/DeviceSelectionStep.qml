@@ -302,6 +302,7 @@ WizardStepBase {
                         source: hwitem.icon || ""
                         Layout.preferredWidth: 40
                         Layout.preferredHeight: 40
+                        Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
                         fillMode: Image.PreserveAspectFit
                         smooth: true
                         mipmap: true
