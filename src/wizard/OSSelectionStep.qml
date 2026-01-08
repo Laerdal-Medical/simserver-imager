@@ -103,6 +103,7 @@ WizardStepBase {
         // Rebuild focus order when returning to main list
         root.rebuildFocusOrder()
     }
+
     
     function initializeListViewFocus(listView) {
         // No-op: Do not auto-select first item to avoid unwanted highlighting on load
@@ -495,7 +496,21 @@ WizardStepBase {
             required property var artifact_id
             required property string source_owner
             required property string source_repo
-            
+
+            // Format release_date to user's local timezone and locale format
+            readonly property string formattedReleaseDate: {
+                if (!release_date || release_date === "") {
+                    return ""
+                }
+                var date = new Date(release_date)
+                if (isNaN(date.getTime())) {
+                    // If parsing fails, return the original string
+                    return release_date
+                }
+                // Format to user's locale (date and time)
+                return date.toLocaleDateString(Qt.locale()) + " " + date.toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
+            }
+
             // Get reference to the containing ListView
             // IMPORTANT: Cache ListView.view in a property for reliable access.
             // This delegate is shared between the main OS list and dynamically created sublists.
@@ -509,7 +524,7 @@ WizardStepBase {
             
             // Accessibility properties
             Accessible.role: Accessible.ListItem
-            Accessible.name: delegateItem.name + ". " + delegateItem.description + (delegateItem.release_date !== "" ? ". " + qsTr("Released: %1").arg(delegateItem.release_date) : "")
+            Accessible.name: delegateItem.name + ". " + delegateItem.description + (delegateItem.formattedReleaseDate !== "" ? ". " + qsTr("Released: %1").arg(delegateItem.formattedReleaseDate) : "")
             Accessible.focusable: true
             Accessible.ignored: false
             
@@ -672,12 +687,12 @@ WizardStepBase {
                         }
                         
                         Text {
-                            text: delegateItem.release_date !== "" ? qsTr("Released: %1").arg(delegateItem.release_date) : ""
+                            text: delegateItem.formattedReleaseDate !== "" ? qsTr("Released: %1").arg(delegateItem.formattedReleaseDate) : ""
                             font.pixelSize: Style.fontSizeSmall
                             font.family: Style.fontFamily
                             color: Style.textMetadataColor
                             Layout.fillWidth: true
-                            visible: delegateItem.release_date !== ""
+                            visible: delegateItem.formattedReleaseDate !== ""
                             Accessible.ignored: true
                         }
                     }
