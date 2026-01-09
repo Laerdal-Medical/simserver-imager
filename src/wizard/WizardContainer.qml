@@ -371,6 +371,12 @@ Item {
                 contentWidth: -1
                 contentHeight: sidebarColumn.implicitHeight
                 z: 1
+                boundsBehavior: Flickable.StopAtBounds
+
+                // Touch scrolling improvements
+                flickDeceleration: 1500  // Slower deceleration for smoother touch scrolling
+                maximumFlickVelocity: 2500  // Reasonable max velocity
+                pressDelay: 50  // Brief delay to distinguish tap from scroll on touch
 
                 ColumnLayout {
                     id: sidebarColumn

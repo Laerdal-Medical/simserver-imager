@@ -47,6 +47,11 @@ ListView {
     activeFocusOnTab: true
     boundsBehavior: Flickable.StopAtBounds
     currentIndex: -1
+
+    // Touch scrolling improvements
+    flickDeceleration: 1500  // Slower deceleration for smoother touch scrolling
+    maximumFlickVelocity: 2500  // Reasonable max velocity
+    pressDelay: 50  // Brief delay to distinguish tap from scroll on touch
     
     // Keep delegates instantiated beyond the visible area to prevent
     // itemAtIndex() returning null during keyboard/accessibility navigation

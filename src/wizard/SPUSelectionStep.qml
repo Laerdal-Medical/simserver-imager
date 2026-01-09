@@ -342,6 +342,11 @@ WizardStepBase {
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
+            // Touch scrolling improvements
+            flickDeceleration: 1500  // Slower deceleration for smoother touch scrolling
+            maximumFlickVelocity: 2500  // Reasonable max velocity
+            pressDelay: 50  // Brief delay to distinguish tap from scroll on touch
+
             ScrollBar.vertical: ScrollBar {
                 width: Style.scrollBarWidth
                 policy: ScrollBar.AsNeeded

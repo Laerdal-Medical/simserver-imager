@@ -581,7 +581,6 @@ WizardStepBase {
                     id: osMouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    preventStealing: true
                     cursorShape: Qt.PointingHandCursor
                     
                     onPressed: {

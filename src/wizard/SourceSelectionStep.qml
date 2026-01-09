@@ -119,6 +119,11 @@ WizardStepBase {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
+        // Touch scrolling improvements
+        flickDeceleration: 1500  // Slower deceleration for smoother touch scrolling
+        maximumFlickVelocity: 2500  // Reasonable max velocity
+        pressDelay: 50  // Brief delay to distinguish tap from scroll on touch
+
         ScrollBar.vertical: ScrollBar {
             width: Style.scrollBarWidth
             policy: ScrollBar.AsNeeded
@@ -346,7 +351,7 @@ WizardStepBase {
                     Layout.fillWidth: true
                 }
 
-                ComboBox {
+                ImComboBox {
                     id: branchFilterCombo
                     Layout.fillWidth: true
                     Layout.preferredHeight: Style.buttonHeightStandard
@@ -355,11 +360,9 @@ WizardStepBase {
                     property string currentFilter: root.repoManager ? root.repoManager.artifactBranchFilter : ""
 
                     model: {
-                        var branches = [""].concat(availableBranches)
+                        var branches = [qsTr("All branches")].concat(availableBranches)
                         return branches
                     }
-
-                    displayText: currentIndex === 0 ? qsTr("All branches") : currentText
 
                     currentIndex: {
                         if (!currentFilter || currentFilter === "") return 0
@@ -380,28 +383,9 @@ WizardStepBase {
                         }
                     }
 
-                    delegate: ItemDelegate {
-                        id: branchDelegate
-                        required property string modelData
-                        required property int index
-
-                        width: branchFilterCombo.width
-                        height: Style.buttonHeightStandard
-
-                        contentItem: Text {
-                            text: branchDelegate.index === 0 ? qsTr("All branches") : branchDelegate.modelData
-                            font.pixelSize: Style.fontSizeFormLabel
-                            font.family: Style.fontFamily
-                            color: Style.formLabelColor
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        highlighted: branchFilterCombo.highlightedIndex === branchDelegate.index
-                    }
-
                     Accessible.role: Accessible.ComboBox
                     Accessible.name: qsTr("Branch filter")
-                    Accessible.description: qsTr("Select which branch to fetch GitHub artifacts from")
+                    Accessible.description: qsTr("Select which branch to fetch GitHub artifacts from. Type to search.")
                 }
             }
 
