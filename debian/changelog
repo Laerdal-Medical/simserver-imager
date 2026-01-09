@@ -1,3 +1,14 @@
+laerdal-simserver-imager (1.0.5) unstable; urgency=medium
+
+  * Touch Scrolling: Improved touch screen scrolling behavior across all
+    list views and scrollable areas with smoother deceleration and better
+    tap vs scroll gesture detection
+  * Branch Filter Search: Branch filter dropdown now supports type-ahead
+    search for quickly finding branches in large repositories
+  * macOS Build Fix: Fixed QRegularExpression usage in mount helper
+
+ -- Laerdal Medical <support@laerdal.com>  Thu, 09 Jan 2025 10:00:00 +0000
+
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 
   * SPU Support: Full support for Software Package Update (.spu) files -
