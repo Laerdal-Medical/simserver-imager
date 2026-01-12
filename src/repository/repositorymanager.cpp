@@ -10,6 +10,7 @@
 #include <QJsonObject>
 #include <QDebug>
 #include <QSet>
+#include <QTimer>
 
 RepositoryManager::RepositoryManager(QObject *parent)
     : QObject(parent)
@@ -325,6 +326,19 @@ void RepositoryManager::fetchAvailableBranches()
     }
 
     qDebug() << "RepositoryManager: Fetching branches from" << _pendingBranchFetchCount << "repos";
+
+    // Set a timeout to ensure branches eventually get emitted even if some requests fail
+    // This prevents the UI from hanging indefinitely if network requests fail silently
+    if (_pendingBranchFetchCount > 0) {
+        QTimer::singleShot(15000, this, [this]() {
+            if (_pendingBranchFetchCount > 0) {
+                qWarning() << "RepositoryManager: Branch fetch timeout, emitting partial results. Pending:" << _pendingBranchFetchCount;
+                _pendingBranchFetchCount = 0;
+                _availableBranches.sort();
+                emit availableBranchesChanged();
+            }
+        });
+    }
 }
 
 void RepositoryManager::refreshAllSources()
@@ -757,6 +771,24 @@ void RepositoryManager::onBranchesReady(const QJsonArray &branches)
         _availableBranches.sort();
 
         qDebug() << "RepositoryManager: Available branches:" << _availableBranches;
+        emit availableBranchesChanged();
+    }
+}
+
+void RepositoryManager::onBranchFetchError(const QString &message)
+{
+    // Handle errors during branch fetch - decrement counter to avoid UI hang
+    qWarning() << "RepositoryManager: Branch fetch error:" << message;
+
+    _pendingBranchFetchCount--;
+
+    if (_pendingBranchFetchCount <= 0) {
+        _pendingBranchFetchCount = 0;
+        // Emit with whatever branches we did manage to fetch
+        if (!_availableBranches.isEmpty()) {
+            _availableBranches.sort();
+        }
+        qDebug() << "RepositoryManager: Branch fetch completed with errors, available:" << _availableBranches;
         emit availableBranchesChanged();
     }
 }

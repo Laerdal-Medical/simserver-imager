@@ -313,6 +313,7 @@ private slots:
     void onGitHubWicFilesReady(const QJsonArray &wicFiles);
     void onGitHubArtifactFilesReady(const QJsonArray &wicFiles);
     void onBranchesReady(const QJsonArray &branches);
+    void onBranchFetchError(const QString &message);
     void onSourceError(const QString &message);
 
 private:

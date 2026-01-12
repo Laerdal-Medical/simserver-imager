@@ -351,41 +351,70 @@ WizardStepBase {
                     Layout.fillWidth: true
                 }
 
-                ImComboBox {
-                    id: branchFilterCombo
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Style.buttonHeightStandard
+                    spacing: Style.spacingSmall
 
-                    property var availableBranches: root.repoManager ? root.repoManager.availableBranches : []
-                    property string currentFilter: root.repoManager ? root.repoManager.artifactBranchFilter : ""
+                    ImComboBox {
+                        id: branchFilterCombo
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Style.buttonHeightStandard
 
-                    model: {
-                        var branches = [qsTr("All branches")].concat(availableBranches)
-                        return branches
-                    }
+                        property var availableBranches: root.repoManager ? root.repoManager.availableBranches : []
+                        property string currentFilter: root.repoManager ? root.repoManager.artifactBranchFilter : ""
 
-                    currentIndex: {
-                        if (!currentFilter || currentFilter === "") return 0
-                        var branches = availableBranches
-                        for (var i = 0; i < branches.length; i++) {
-                            if (branches[i] === currentFilter) return i + 1
+                        model: {
+                            var branches = [qsTr("All branches")].concat(availableBranches)
+                            return branches
                         }
-                        return 0
-                    }
 
-                    onActivated: function(index) {
-                        if (root.repoManager) {
-                            if (index === 0) {
-                                root.repoManager.setArtifactBranchFilter("")
-                            } else {
-                                root.repoManager.setArtifactBranchFilter(availableBranches[index - 1])
+                        currentIndex: {
+                            if (!currentFilter || currentFilter === "") return 0
+                            var branches = availableBranches
+                            for (var i = 0; i < branches.length; i++) {
+                                if (branches[i] === currentFilter) return i + 1
+                            }
+                            return 0
+                        }
+
+                        onActivated: function(index) {
+                            if (root.repoManager) {
+                                if (index === 0) {
+                                    root.repoManager.setArtifactBranchFilter("")
+                                } else {
+                                    root.repoManager.setArtifactBranchFilter(availableBranches[index - 1])
+                                }
                             }
                         }
+
+                        Accessible.role: Accessible.ComboBox
+                        Accessible.name: qsTr("Branch filter")
+                        Accessible.description: qsTr("Select which branch to fetch GitHub artifacts from. Type to search.")
                     }
 
-                    Accessible.role: Accessible.ComboBox
-                    Accessible.name: qsTr("Branch filter")
-                    Accessible.description: qsTr("Select which branch to fetch GitHub artifacts from. Type to search.")
+                    // Refresh button to manually re-fetch branches
+                    Button {
+                        id: refreshBranchesButton
+                        Layout.preferredWidth: implicitWidth
+                        Layout.preferredHeight: Style.buttonHeightStandard
+
+                        text: qsTr("Refresh")
+
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Refresh the list of available branches from GitHub")
+                        ToolTip.delay: 500
+
+                        onClicked: {
+                            if (root.repoManager) {
+                                console.log("SourceSelectionStep: Manual branch refresh requested")
+                                root.repoManager.fetchAvailableBranches()
+                            }
+                        }
+
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("Refresh branches")
+                        Accessible.description: qsTr("Click to refresh the list of available branches from GitHub")
+                    }
                 }
             }
 

@@ -48,12 +48,21 @@ public:
     
     /**
      * @brief Set slow polling mode (reduced frequency)
-     * 
+     *
      * Use this after write completion when user is viewing results
      * but doesn't need frequent drive list updates.
      */
     void setSlowPolling();
-    
+
+    /**
+     * @brief Request an immediate drive list refresh
+     *
+     * Triggers an immediate scan of available drives, regardless of
+     * current polling mode timing. Use after write operations complete
+     * to ensure the drive list shows updated device information.
+     */
+    void refreshNow();
+
     /**
      * @brief Get child devices (e.g., APFS volumes) for a given device path
      * 

@@ -63,7 +63,6 @@ void DriveListModel::processDriveList(std::vector<Drivelist::DeviceDescriptor> l
     QSet<QString> drivesInNewList;
 
     // First pass: collect all valid drives from the new list
-    // We need to do this before modifications to correctly calculate row indices
     struct NewDriveInfo {
         QString key;
         QString device;
@@ -77,6 +76,7 @@ void DriveListModel::processDriveList(std::vector<Drivelist::DeviceDescriptor> l
         QStringList childDevices;
     };
     QList<NewDriveInfo> drivesToAdd;
+    QList<NewDriveInfo> drivesToUpdate;
 
     for (auto &i: l)
     {
@@ -107,36 +107,50 @@ void DriveListModel::processDriveList(std::vector<Drivelist::DeviceDescriptor> l
             deviceNamePlusSize += "ro";
         drivesInNewList.insert(deviceNamePlusSize);
 
+        // Mark virtual disks as system drives to trigger confirmation dialog
+        const bool isSystemOverride = i.isSystem || i.isVirtual;
+
+        // Treat NVMe drives like SCSI for icon purposes
+        QString busType = QString::fromStdString(i.busType);
+        QString devicePath = QString::fromStdString(i.device);
+        bool isNvme = (busType.compare("NVME", Qt::CaseInsensitive) == 0) || devicePath.startsWith("/dev/nvme");
+        bool isScsiForIcon = i.isSCSI || isNvme;
+
+        // Convert child devices (APFS volumes on macOS) to QStringList
+        QStringList childDevices;
+        for (auto &s: i.childDevices)
+        {
+            childDevices.append(QString::fromStdString(s));
+        }
+
+        NewDriveInfo info;
+        info.key = deviceNamePlusSize;
+        info.device = QString::fromStdString(i.device);
+        info.description = QString::fromStdString(i.description);
+        info.size = i.size;
+        info.isUSB = i.isUSB;
+        info.isScsi = isScsiForIcon;
+        info.isReadOnly = i.isReadOnly;
+        info.isSystem = isSystemOverride;
+        info.mountpoints = mountpoints;
+        info.childDevices = childDevices;
+
         if (!_drivelist.contains(deviceNamePlusSize))
         {
-            // Mark virtual disks as system drives to trigger confirmation dialog
-            const bool isSystemOverride = i.isSystem || i.isVirtual;
-
-            // Treat NVMe drives like SCSI for icon purposes
-            QString busType = QString::fromStdString(i.busType);
-            QString devicePath = QString::fromStdString(i.device);
-            bool isNvme = (busType.compare("NVME", Qt::CaseInsensitive) == 0) || devicePath.startsWith("/dev/nvme");
-            bool isScsiForIcon = i.isSCSI || isNvme;
-
-            // Convert child devices (APFS volumes on macOS) to QStringList
-            QStringList childDevices;
-            for (auto &s: i.childDevices)
-            {
-                childDevices.append(QString::fromStdString(s));
-            }
-
-            NewDriveInfo info;
-            info.key = deviceNamePlusSize;
-            info.device = QString::fromStdString(i.device);
-            info.description = QString::fromStdString(i.description);
-            info.size = i.size;
-            info.isUSB = i.isUSB;
-            info.isScsi = isScsiForIcon;
-            info.isReadOnly = i.isReadOnly;
-            info.isSystem = isSystemOverride;
-            info.mountpoints = mountpoints;
-            info.childDevices = childDevices;
+            // New drive - add it
             drivesToAdd.append(info);
+        }
+        else
+        {
+            // Existing drive - check if properties changed (description, mountpoints, etc.)
+            DriveListItem *existing = _drivelist.value(deviceNamePlusSize);
+            if (existing->property("description").toString() != info.description ||
+                existing->property("mountpoints").toStringList() != info.mountpoints ||
+                existing->property("childDevices").toStringList() != info.childDevices)
+            {
+                // Properties changed - need to update (replace) the item
+                drivesToUpdate.append(info);
+            }
         }
     }
 
@@ -162,6 +176,28 @@ void DriveListModel::processDriveList(std::vector<Drivelist::DeviceDescriptor> l
                 // Emit signal for this specific device removal
                 emit deviceRemoved(devicePath);
             }
+        }
+    }
+
+    // Update existing drives with changed properties
+    // Since DriveListItem properties are CONSTANT, we need to replace the item
+    for (const auto &info : drivesToUpdate)
+    {
+        int row = _drivelist.keys().indexOf(info.key);
+        if (row >= 0)
+        {
+            qDebug() << "Drive updated:" << info.device << "description:" << info.description;
+
+            // Delete old item and create new one with updated properties
+            _drivelist.value(info.key)->deleteLater();
+            _drivelist[info.key] = new DriveListItem(
+                info.device, info.description, info.size,
+                info.isUSB, info.isScsi, info.isReadOnly, info.isSystem,
+                info.mountpoints, info.childDevices, this);
+
+            // Notify view that this row's data changed
+            QModelIndex idx = index(row);
+            emit dataChanged(idx, idx);
         }
     }
 
@@ -212,6 +248,11 @@ void DriveListModel::resumePolling()
 void DriveListModel::setSlowPolling()
 {
     _thread.setScanMode(DriveListModelPollThread::ScanMode::Slow);
+}
+
+void DriveListModel::refreshNow()
+{
+    _thread.refreshNow();
 }
 
 QStringList DriveListModel::getChildDevices(const QString &device) const

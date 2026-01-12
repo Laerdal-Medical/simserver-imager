@@ -18,6 +18,7 @@
 #include <sys/mount.h>
 #include <mntent.h>
 #include <errno.h>
+#include <unistd.h>
 #include "../mountutils.hpp"
 
 MOUNTUTILS_RESULT unmount_disk(const char *device_path) {
@@ -135,6 +136,16 @@ MOUNTUTILS_RESULT unmount_disk(const char *device_path) {
       unmounts++;
       continue;
     }
+  }
+
+  // If we found mount points and unmounted them, sync and wait for kernel to settle
+  if (!mount_dirs.empty() && unmounts > 0) {
+    MountUtilsLog("Syncing filesystems after unmount...");
+    sync();
+    // Give the kernel time to fully release device references
+    // This helps avoid race conditions when immediately opening the device for writing
+    usleep(500000);  // 500ms
+    MountUtilsLog("Sync complete, device should be ready");
   }
 
   return unmounts == mount_dirs.size() ?

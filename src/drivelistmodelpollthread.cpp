@@ -11,7 +11,7 @@
  */
 
 DriveListModelPollThread::DriveListModelPollThread(QObject *parent)
-    : QThread(parent), _terminate(false), _scanMode(ScanMode::Normal)
+    : QThread(parent)
 {
     qRegisterMetaType< std::vector<Drivelist::DeviceDescriptor> >( "std::vector<Drivelist::DeviceDescriptor>" );
 }
@@ -73,6 +73,14 @@ void DriveListModelPollThread::resume()
     setScanMode(ScanMode::Normal);
 }
 
+void DriveListModelPollThread::refreshNow()
+{
+    QMutexLocker lock(&_mutex);
+    _refreshRequested = true;
+    qDebug() << "Drive list refresh requested";
+    _modeChanged.wakeAll();  // Wake thread to perform immediate scan
+}
+
 void DriveListModelPollThread::run()
 {
 #ifdef Q_OS_WIN
@@ -88,41 +96,44 @@ void DriveListModelPollThread::run()
 
     while (!_terminate)
     {
-        // Check current scan mode
+        // Check current scan mode and refresh flag
         ScanMode currentMode;
+        bool needsRefresh;
         {
             QMutexLocker lock(&_mutex);
             currentMode = _scanMode;
+            needsRefresh = _refreshRequested;
+            _refreshRequested = false;  // Clear the flag
         }
-        
-        if (currentMode == ScanMode::Paused) {
-            // Wait until mode changes or we're told to terminate
+
+        if (currentMode == ScanMode::Paused && !needsRefresh) {
+            // Wait until mode changes, refresh requested, or we're told to terminate
             QMutexLocker lock(&_mutex);
-            while (_scanMode == ScanMode::Paused && !_terminate) {
+            while (_scanMode == ScanMode::Paused && !_refreshRequested && !_terminate) {
                 _modeChanged.wait(&_mutex, 500);  // Check every 500ms for terminate
             }
             continue;  // Re-check mode after waking
         }
-        
+
         // Perform the scan
         t1.start();
         emit newDriveList( Drivelist::ListStorageDevices() );
         quint32 elapsed = static_cast<quint32>(t1.elapsed());
-        
+
         // Emit timing event for performance tracking (always, but listeners can filter)
         emit eventDriveListPoll(elapsed);
-        
+
         if (elapsed > 1000)
             qDebug() << "Enumerating drives took a long time:" << elapsed/1000.0 << "seconds";
-        
+
         // Sleep based on current mode
         int sleepSeconds = (currentMode == ScanMode::Slow) ? 5 : 1;
-        
-        // Use interruptible sleep - check mode periodically
+
+        // Use interruptible sleep - check mode and refresh flag periodically
         for (int i = 0; i < sleepSeconds && !_terminate; ++i) {
             QMutexLocker lock(&_mutex);
-            if (_scanMode == ScanMode::Paused) {
-                break;  // Mode changed to paused, exit sleep early
+            if (_scanMode == ScanMode::Paused || _refreshRequested) {
+                break;  // Mode changed or refresh requested, exit sleep early
             }
             lock.unlock();
             QThread::sleep(1);

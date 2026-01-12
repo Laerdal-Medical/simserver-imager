@@ -1,5 +1,10 @@
 laerdal-simserver-imager (1.0.5) unstable; urgency=medium
 
+  * Device Readiness Polling: Replaced fixed sleep delays with intelligent
+    device readiness polling across all platforms (Linux, Windows, macOS).
+    Operations complete faster when devices are ready and wait longer when
+    devices need more time.
+  * Drive List Refresh: Improved drive list refresh and UI updates
   * Touch Scrolling: Improved touch screen scrolling behavior across all
     list views and scrollable areas with smoother deceleration and better
     tap vs scroll gesture detection
@@ -7,7 +12,7 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
     search for quickly finding branches in large repositories
   * macOS Build Fix: Fixed QRegularExpression usage in mount helper
 
- -- Laerdal Medical <support@laerdal.com>  Thu, 09 Jan 2025 10:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Sun, 12 Jan 2025 14:00:00 +0000
 
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 

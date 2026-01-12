@@ -2331,13 +2331,19 @@ void ImageWriter::onSuccess()
 {
     setWriteState(WriteState::Succeeded);
     stopProgressPolling();
-    
+
     // End performance stats session
     _performanceStats->endSession(true);
-    
+
     // Clear Pi Connect token on successful write completion
     clearConnectToken();
-    
+
+    // Trigger immediate drive list refresh so UI shows updated device info
+    // Use a short delay to give the OS time to recognize the new partition table
+    QTimer::singleShot(1000, this, [this]() {
+        _drivelist.refreshNow();
+    });
+
     emit success();
 
     if (_settings.value("beep").toBool()) {
@@ -4741,6 +4747,9 @@ void ImageWriter::startSpuCopy(bool skipFormat)
     qDebug() << "  Skip format:" << skipFormat;
     qDebug() << "  Destination:" << _dst;
 
+    // Pause drive list polling during SPU copy operation
+    _drivelist.pausePolling();
+
     // Clean up any existing thread
     if (_spuCopyThread) {
         _spuCopyThread->cancelCopy();
@@ -4769,11 +4778,17 @@ void ImageWriter::startSpuCopy(bool skipFormat)
     // Connect signals
     connect(_spuCopyThread, &SPUCopyThread::success, this, [this]() {
         qDebug() << "ImageWriter: SPU copy succeeded";
+        // Resume drive list polling and trigger immediate refresh
+        _drivelist.resumePolling();
+        _drivelist.refreshNow();
         emit spuCopySuccess();
     });
 
     connect(_spuCopyThread, &SPUCopyThread::error, this, [this](QString msg) {
         qWarning() << "ImageWriter: SPU copy error:" << msg;
+        // Resume drive list polling and trigger immediate refresh
+        _drivelist.resumePolling();
+        _drivelist.refreshNow();
         emit spuCopyError(msg);
     });
 
@@ -4796,6 +4811,9 @@ void ImageWriter::cancelSpuCopy()
     if (_spuCopyThread) {
         _spuCopyThread->cancelCopy();
     }
+
+    // Resume drive list polling after cancel
+    _drivelist.resumePolling();
 }
 
 QJsonArray ImageWriter::listSpuFilesInZip(const QString &zipPath)

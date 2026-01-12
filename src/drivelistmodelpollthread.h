@@ -66,14 +66,24 @@ public:
     
     /**
      * @brief Convenience method to resume normal scanning
-     * 
+     *
      * Equivalent to setScanMode(ScanMode::Normal)
      */
     void resume();
 
+    /**
+     * @brief Request an immediate drive scan
+     *
+     * Wakes the thread and triggers an immediate scan regardless of
+     * current mode timing. Useful after write operations complete
+     * to refresh the drive list with updated device information.
+     */
+    void refreshNow();
+
 protected:
-    bool _terminate;
-    ScanMode _scanMode;
+    bool _terminate = false;
+    bool _refreshRequested = false;
+    ScanMode _scanMode = ScanMode::Normal;
     mutable QMutex _mutex;
     QWaitCondition _modeChanged;
     

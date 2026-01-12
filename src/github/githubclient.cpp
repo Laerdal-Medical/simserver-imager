@@ -144,7 +144,9 @@ void GitHubClient::fetchRepoInfo(const QString &owner, const QString &repo)
 
 void GitHubClient::fetchBranches(const QString &owner, const QString &repo)
 {
-    QString urlStr = QString("%1/repos/%2/%3/branches")
+    // Use per_page=100 to get more branches (GitHub default is 30)
+    // This helps avoid missing branches like 'main' when repos have many branches
+    QString urlStr = QString("%1/repos/%2/%3/branches?per_page=100")
                          .arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
@@ -162,7 +164,8 @@ void GitHubClient::fetchBranches(const QString &owner, const QString &repo)
 
 void GitHubClient::fetchTags(const QString &owner, const QString &repo)
 {
-    QString urlStr = QString("%1/repos/%2/%3/tags")
+    // Use per_page=100 to get more tags (GitHub default is 30)
+    QString urlStr = QString("%1/repos/%2/%3/tags?per_page=100")
                          .arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
