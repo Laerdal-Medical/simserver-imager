@@ -111,24 +111,39 @@ DiskpartResult unmountVolumes(const QByteArray &device, TimingCallback timingCal
                 DWORD bytesReturned;
                 
                 // Lock the volume (prevents other processes from accessing it)
-                for (int attempt = 0; attempt < 10; attempt++)
+                bool lockSucceeded = false;
+                for (int attempt = 0; attempt < 20; attempt++)  // Increased retries
                 {
                     if (DeviceIoControl(hVolume, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &bytesReturned, nullptr))
                     {
-                        qDebug() << "Locked volume" << driveLetter;
+                        qDebug() << "Locked volume" << driveLetter << "on attempt" << (attempt + 1);
+                        lockSucceeded = true;
                         break;
                     }
-                    QThread::msleep(50);  // Reduced from 100ms
+                    QThread::msleep(100);  // Increased delay between retries
                 }
-                
+
+                if (!lockSucceeded)
+                {
+                    qWarning() << "Failed to lock volume" << driveLetter << "after 20 attempts - will retry dismount anyway";
+                }
+
                 // Dismount the volume (flushes buffers and invalidates handles)
-                if (DeviceIoControl(hVolume, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &bytesReturned, nullptr))
+                bool dismountSucceeded = false;
+                for (int attempt = 0; attempt < 5; attempt++)  // Retry dismount
                 {
-                    qDebug() << "Dismounted volume" << driveLetter;
+                    if (DeviceIoControl(hVolume, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &bytesReturned, nullptr))
+                    {
+                        qDebug() << "Dismounted volume" << driveLetter << "on attempt" << (attempt + 1);
+                        dismountSucceeded = true;
+                        break;
+                    }
+                    QThread::msleep(200);  // Wait before retry
                 }
-                else
+
+                if (!dismountSucceeded)
                 {
-                    qDebug() << "Failed to dismount volume" << driveLetter << "- continuing anyway";
+                    qWarning() << "Failed to dismount volume" << driveLetter << "after 5 attempts - continuing anyway";
                 }
                 
                 // Unlock and close the volume handle BEFORE removing mount point
@@ -154,25 +169,28 @@ DiskpartResult unmountVolumes(const QByteArray &device, TimingCallback timingCal
                 // Notify Explorer that the drive has been removed
                 // This is a secondary notification to help Explorer update its view
                 notifyShellDriveRemoved(driveLetter);
-                
+
                 volumesProcessed++;
-                
-                // Brief pause between volumes (reduced from 500ms)
-                if (volumesProcessed > 0)
-                {
-                    QThread::msleep(100);
-                }
             }
             break;
         }
     }
-    
+
+    // Wait for the physical device to be ready after all volumes are processed
+    if (volumesProcessed > 0)
+    {
+        qDebug() << "Waiting for device to be ready after volume unmount...";
+        if (!PlatformQuirks::waitForDeviceReady(QString::fromLatin1(device), 5000)) {
+            qWarning() << "Device may not be fully ready after unmounting volumes";
+        }
+    }
+
     quint32 elapsed = static_cast<quint32>(timer.elapsed());
     if (timingCallback)
     {
         timingCallback("driveUnmountVolumes", elapsed, true);
     }
-    
+
     qDebug() << "Unmounted" << volumesProcessed << "volumes in" << elapsed << "ms";
     return DiskpartResult{true, QString()};
 }
@@ -279,13 +297,16 @@ DiskpartResult cleanDiskFast(const QByteArray &device, TimingCallback timingCall
     }
     
     CloseHandle(hDisk);
-    
+
     if (success)
     {
-        // Brief pause to let Windows process the changes (reduced from 1 second)
-        QThread::msleep(200);
+        // Wait for device to be ready after disk layout changes
+        qDebug() << "Waiting for device to be ready after disk clean...";
+        if (!PlatformQuirks::waitForDeviceReady(QString::fromLatin1(device), 5000)) {
+            qWarning() << "Device may not be fully ready after disk clean";
+        }
     }
-    
+
     quint32 rescanElapsed = static_cast<quint32>(rescanTimer.elapsed());
     if (timingCallback && success)
     {
@@ -340,9 +361,12 @@ DiskpartResult cleanDisk(const QByteArray &device, std::chrono::milliseconds tim
                         }
                         tempFile.close();
                     }
-                    
-                    // Give the system time to process the unmount
-                    QThread::msleep(std::chrono::milliseconds(500).count());
+                }
+
+                // Wait for device to be ready after unmounting all volumes
+                qDebug() << "Waiting for device to be ready after volume unmount...";
+                if (!PlatformQuirks::waitForDeviceReady(QString::fromLatin1(device), 5000)) {
+                    qWarning() << "Device may not be fully ready after unmounting volumes";
                 }
                 break;
             }
@@ -412,10 +436,13 @@ DiskpartResult cleanDisk(const QByteArray &device, std::chrono::milliseconds tim
             return DiskpartResult{false, lastError};
         }
     }
-    
-    // Brief pause to let system settle
-    QThread::msleep(std::chrono::seconds(1).count());
-    
+
+    // Wait for device to be ready after diskpart clean
+    qDebug() << "Waiting for device to be ready after diskpart clean...";
+    if (!PlatformQuirks::waitForDeviceReady(QString::fromLatin1(device), 5000)) {
+        qWarning() << "Device may not be fully ready after diskpart clean";
+    }
+
     return DiskpartResult{true, QString()};
 }
 

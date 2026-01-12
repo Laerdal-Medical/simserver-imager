@@ -4,6 +4,7 @@
  */
 
 #include "bootimgcreator.h"
+#include "platformquirks.h"
 #include <QFile>
 #include <QDir>
 #include <QFileInfo>
@@ -11,7 +12,6 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QDebug>
-#include <QThread>
 
 bool BootImgCreator::createBootImg(const QMap<QString, QByteArray> &files, 
                                    const QString &outputPath, 
@@ -64,14 +64,16 @@ bool BootImgCreator::createBootImg(const QMap<QString, QByteArray> &files,
     QProcess diskpartProc;
     diskpartProc.start("diskpart", QStringList() << "/s" << diskpartScript);
     if (!diskpartProc.waitForFinished(60000) || diskpartProc.exitCode() != 0) {
-        qDebug() << "BootImgCreator (Windows): diskpart failed:" 
+        qDebug() << "BootImgCreator (Windows): diskpart failed:"
                  << diskpartProc.readAllStandardError();
         return false;
     }
-    
-    // Wait for the drive to be ready
-    QThread::msleep(2000);
-    
+
+    // Wait for the virtual drive to be ready at Z:
+    if (!PlatformQuirks::waitForDeviceReady("\\\\.\\Z:", 5000)) {
+        qWarning() << "BootImgCreator (Windows): Virtual drive may not be fully ready";
+    }
+
     // Copy files to Z:
     for (auto it = files.constBegin(); it != files.constEnd(); ++it) {
         QString destPath = "Z:\\" + QString(it.key()).replace("/", "\\");

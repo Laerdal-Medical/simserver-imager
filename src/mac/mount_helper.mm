@@ -4,13 +4,13 @@
  */
 
 #include "mount_helper.h"
+#include "../platformquirks.h"
 
 #include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QProcess>
 #include <QRegularExpression>
-#include <QThread>
 
 #import <Foundation/Foundation.h>
 #import <DiskArbitration/DiskArbitration.h>
@@ -24,19 +24,11 @@ QString waitForPartition(const QString &device, int timeoutMs)
 
     QString partitionPath = device + "s1";
 
-    int elapsed = 0;
-    const int pollInterval = 100; // ms
-
-    while (elapsed < timeoutMs)
+    // Wait for partition to be ready for I/O
+    if (PlatformQuirks::waitForDeviceReady(partitionPath, timeoutMs))
     {
-        if (QFile::exists(partitionPath))
-        {
-            qDebug() << "Found partition:" << partitionPath;
-            return partitionPath;
-        }
-
-        QThread::msleep(pollInterval);
-        elapsed += pollInterval;
+        qDebug() << "Found partition:" << partitionPath;
+        return partitionPath;
     }
 
     qWarning() << "Timeout waiting for partition on device:" << device;

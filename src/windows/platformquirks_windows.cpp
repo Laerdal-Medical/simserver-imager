@@ -481,4 +481,81 @@ QString getEjectDevicePath(const QString& devicePath) {
     return devicePath;
 }
 
+bool waitForDeviceReady(const QString& devicePath, int timeoutMs) {
+    // Poll the device using Windows APIs until it's accessible for writing.
+    // This is more reliable than a fixed sleep because:
+    // 1. Returns immediately when device is ready (faster)
+    // 2. Waits longer if device needs more time (more robust)
+    // 3. Provides clear success/failure feedback
+
+    LARGE_INTEGER startTime, currentTime, frequency;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&startTime);
+
+    const int pollIntervalMs = 50;  // Check every 50ms
+    DWORD lastError = 0;
+
+    while (true) {
+        // Check elapsed time
+        QueryPerformanceCounter(&currentTime);
+        double elapsedMs = (double)(currentTime.QuadPart - startTime.QuadPart) * 1000.0 / frequency.QuadPart;
+
+        if (elapsedMs >= timeoutMs) {
+            break;
+        }
+
+        // Try to open device for exclusive write access
+        HANDLE hDevice = CreateFileW(
+            reinterpret_cast<LPCWSTR>(devicePath.utf16()),
+            GENERIC_READ | GENERIC_WRITE,
+            0,  // No sharing - exclusive access
+            nullptr,
+            OPEN_EXISTING,
+            0,
+            nullptr
+        );
+
+        if (hDevice != INVALID_HANDLE_VALUE) {
+            CloseHandle(hDevice);
+            fprintf(stderr, "Device %s ready after %.0f ms\n",
+                    devicePath.toUtf8().constData(), elapsedMs);
+            return true;
+        }
+
+        lastError = GetLastError();
+
+        // ERROR_SHARING_VIOLATION means device is in use - keep waiting
+        // ERROR_ACCESS_DENIED might mean we need to wait for system to release
+        // ERROR_NOT_READY means device is being initialized
+        if (lastError != ERROR_SHARING_VIOLATION &&
+            lastError != ERROR_ACCESS_DENIED &&
+            lastError != ERROR_NOT_READY &&
+            lastError != ERROR_GEN_FAILURE) {
+            // For other errors, try with shared access as fallback
+            hDevice = CreateFileW(
+                reinterpret_cast<LPCWSTR>(devicePath.utf16()),
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                nullptr,
+                OPEN_EXISTING,
+                0,
+                nullptr
+            );
+
+            if (hDevice != INVALID_HANDLE_VALUE) {
+                CloseHandle(hDevice);
+                fprintf(stderr, "Device %s ready (shared access) after %.0f ms\n",
+                        devicePath.toUtf8().constData(), elapsedMs);
+                return true;
+            }
+        }
+
+        Sleep(pollIntervalMs);
+    }
+
+    fprintf(stderr, "Device %s not ready after %d ms, last error: %lu\n",
+            devicePath.toUtf8().constData(), timeoutMs, lastError);
+    return false;
+}
+
 } // namespace PlatformQuirks

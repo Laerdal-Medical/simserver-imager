@@ -10,7 +10,6 @@
 #include <QDebug>
 #include <QFile>
 #include <QProcess>
-#include <QThread>
 
 #include <unistd.h>
 
@@ -79,9 +78,6 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
 
     qDebug() << "DiskFormatHelper: Partition table created successfully";
 
-    // Wait for kernel to recognize the new partition
-    QThread::msleep(500);
-
     // Trigger partition re-read
     QProcess partprobeProc;
     if (isRoot)
@@ -93,9 +89,6 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
         partprobeProc.start("pkexec", {"partprobe", device});
     }
     partprobeProc.waitForFinished(15000);
-
-    // Wait a bit more for udev
-    QThread::msleep(1000);
 
     // Determine partition path
     QString partitionPath = device;
@@ -112,17 +105,10 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
         partitionPath = device + "1";
     }
 
-    // Wait for partition to exist
-    int waitTime = 0;
-    while (!QFile::exists(partitionPath) && waitTime < 5000)
+    // Wait for partition to be ready
+    if (!PlatformQuirks::waitForDeviceReady(partitionPath, 5000))
     {
-        QThread::msleep(100);
-        waitTime += 100;
-    }
-
-    if (!QFile::exists(partitionPath))
-    {
-        result.errorMessage = QString("Partition %1 did not appear after formatting").arg(partitionPath);
+        result.errorMessage = QString("Partition %1 did not appear after partitioning").arg(partitionPath);
         return result;
     }
 
@@ -157,8 +143,10 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
 
     qDebug() << "DiskFormatHelper: Format completed successfully";
 
-    // Wait for the OS to recognize the filesystem
-    QThread::sleep(2);
+    // Wait for the device to be ready for I/O
+    if (!PlatformQuirks::waitForDeviceReady(partitionPath, 5000)) {
+        qWarning() << "DiskFormatHelper: Device may not be fully ready after format";
+    }
 
     result.success = true;
     return result;

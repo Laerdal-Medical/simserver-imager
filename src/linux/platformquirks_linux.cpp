@@ -24,6 +24,8 @@
 #include <QDebug>
 #include <QProcess>
 #include <QFile>
+#include <QElapsedTimer>
+#include <QThread>
 #include <QDir>
 #include <QFileInfo>
 #include <QCryptographicHash>
@@ -772,6 +774,55 @@ QString getWriteDevicePath(const QString& devicePath) {
 QString getEjectDevicePath(const QString& devicePath) {
     // No path transformation needed on Linux.
     return devicePath;
+}
+
+bool waitForDeviceReady(const QString& devicePath, int timeoutMs) {
+    // Poll the device file descriptor until it's accessible for exclusive write access.
+    // This is more reliable than a fixed sleep because:
+    // 1. Returns immediately when device is ready (faster)
+    // 2. Waits longer if device needs more time (more robust)
+    // 3. Provides clear success/failure feedback
+
+    QByteArray deviceBytes = devicePath.toUtf8();
+    const char* device = deviceBytes.constData();
+
+    QElapsedTimer timer;
+    timer.start();
+
+    const int pollIntervalMs = 50;  // Check every 50ms
+    int lastErrno = 0;
+
+    while (timer.elapsed() < timeoutMs) {
+        // Try to open device with exclusive access
+        // O_EXCL ensures no other process has the device open
+        int fd = ::open(device, O_RDWR | O_EXCL | O_CLOEXEC);
+        if (fd >= 0) {
+            ::close(fd);
+            qDebug() << "Device" << devicePath << "ready after" << timer.elapsed() << "ms";
+            return true;
+        }
+
+        lastErrno = errno;
+
+        // EBUSY means device is in use - keep waiting
+        // ENOENT means device doesn't exist yet (partition table being rebuilt)
+        // Other errors might be permanent failures
+        if (lastErrno != EBUSY && lastErrno != ENOENT && lastErrno != EAGAIN) {
+            // For other errors, try without O_EXCL as fallback
+            // Some devices don't support exclusive access
+            fd = ::open(device, O_RDWR | O_CLOEXEC);
+            if (fd >= 0) {
+                ::close(fd);
+                qDebug() << "Device" << devicePath << "ready (non-exclusive) after" << timer.elapsed() << "ms";
+                return true;
+            }
+        }
+
+        QThread::msleep(pollIntervalMs);
+    }
+
+    qWarning() << "Device" << devicePath << "not ready after" << timeoutMs << "ms, last error:" << strerror(lastErrno);
+    return false;
 }
 
 const char* findCACertBundle()

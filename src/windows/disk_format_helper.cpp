@@ -4,6 +4,7 @@
  */
 
 #include "disk_format_helper.h"
+#include "../platformquirks.h"
 
 #include <QDebug>
 #include <QFile>
@@ -11,7 +12,6 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTextStream>
-#include <QThread>
 
 namespace DiskFormatHelper {
 
@@ -69,8 +69,10 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
     QFile::remove(scriptPath);
     qDebug() << "DiskFormatHelper: Format completed successfully";
 
-    // Wait for Windows to recognize the new partition and assign a drive letter
-    QThread::sleep(3);
+    // Wait for the device to be ready for I/O
+    if (!PlatformQuirks::waitForDeviceReady(device, 5000)) {
+        qWarning() << "DiskFormatHelper: Device may not be fully ready after format";
+    }
 
     result.success = true;
     return result;

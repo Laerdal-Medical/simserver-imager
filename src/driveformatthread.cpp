@@ -101,6 +101,13 @@ void DriveFormatThread::run()
 #endif
         return;
     }
+
+    // Wait for device to be ready for writing after unmount
+    // Uses platform-specific polling instead of fixed sleep
+    qDebug() << "Waiting for device to be ready after unmount...";
+    if (!PlatformQuirks::waitForDeviceReady(QString::fromLatin1(_device), 5000)) {
+        qWarning() << "Device may not be fully ready, proceeding anyway";
+    }
 #endif
 
 #ifdef Q_OS_LINUX

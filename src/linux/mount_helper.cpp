@@ -4,6 +4,7 @@
  */
 
 #include "mount_helper.h"
+#include "platformquirks.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -18,45 +19,45 @@ namespace MountHelper {
 QString waitForPartition(const QString &device, int timeoutMs)
 {
     // Try common partition naming schemes
-    QStringList partitionPaths;
+    QString partitionPath;
 
     // For /dev/sdX devices -> /dev/sdX1
     if (device.contains("/dev/sd"))
     {
-        partitionPaths << device + "1";
+        partitionPath = device + "1";
     }
     // For /dev/mmcblkX devices -> /dev/mmcblkXp1
     else if (device.contains("/dev/mmcblk"))
     {
-        partitionPaths << device + "p1";
+        partitionPath = device + "p1";
     }
     // For /dev/nvmeXnY devices -> /dev/nvmeXnYp1
     else if (device.contains("/dev/nvme"))
     {
-        partitionPaths << device + "p1";
+        partitionPath = device + "p1";
     }
     else
     {
-        // Generic: try both patterns
-        partitionPaths << device + "1" << device + "p1";
+        // Default to sdX-style naming
+        partitionPath = device + "1";
     }
 
-    int elapsed = 0;
-    const int pollInterval = 100; // ms
-
-    while (elapsed < timeoutMs)
+    // Wait for partition to be ready for I/O
+    if (PlatformQuirks::waitForDeviceReady(partitionPath, timeoutMs))
     {
-        for (const QString &partition : partitionPaths)
-        {
-            if (QFile::exists(partition))
-            {
-                qDebug() << "Found partition:" << partition;
-                return partition;
-            }
-        }
+        qDebug() << "Found partition:" << partitionPath;
+        return partitionPath;
+    }
 
-        QThread::msleep(pollInterval);
-        elapsed += pollInterval;
+    // Try alternate naming pattern for generic devices
+    if (!device.contains("/dev/sd") && !device.contains("/dev/mmcblk") && !device.contains("/dev/nvme"))
+    {
+        QString altPath = device + "p1";
+        if (PlatformQuirks::waitForDeviceReady(altPath, 1000))
+        {
+            qDebug() << "Found partition (alternate):" << altPath;
+            return altPath;
+        }
     }
 
     qWarning() << "Timeout waiting for partition on device:" << device;

@@ -6,7 +6,13 @@
 #include "../platformquirks.h"
 #include <cstdlib>
 #include <cstdio>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/time.h>
 #include <QProcess>
+#include <QElapsedTimer>
+#include <QThread>
 #import <AppKit/AppKit.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 
@@ -197,6 +203,60 @@ QString getEjectDevicePath(const QString& devicePath) {
     QString result = devicePath;
     result.replace("/dev/rdisk", "/dev/disk");
     return result;
+}
+
+bool waitForDeviceReady(const QString& devicePath, int timeoutMs) {
+    // Poll the device file descriptor until it's accessible for writing.
+    // On macOS, we use the block device path (/dev/disk) for this check.
+    // This is more reliable than a fixed sleep because:
+    // 1. Returns immediately when device is ready (faster)
+    // 2. Waits longer if device needs more time (more robust)
+    // 3. Provides clear success/failure feedback
+
+    // Use block device path for readiness check
+    QString blockDevicePath = getEjectDevicePath(devicePath);
+    QByteArray deviceBytes = blockDevicePath.toUtf8();
+    const char* device = deviceBytes.constData();
+
+    QElapsedTimer timer;
+    timer.start();
+
+    const int pollIntervalMs = 50;  // Check every 50ms
+    int lastErrno = 0;
+
+    while (timer.elapsed() < timeoutMs) {
+        // Try to open device with exclusive access
+        // O_EXLOCK ensures no other process has the device open
+        int fd = ::open(device, O_RDWR | O_EXLOCK | O_NONBLOCK);
+        if (fd >= 0) {
+            ::close(fd);
+            fprintf(stderr, "Device %s ready after %lld ms\n",
+                    device, timer.elapsed());
+            return true;
+        }
+
+        lastErrno = errno;
+
+        // EBUSY means device is in use - keep waiting
+        // EAGAIN/EWOULDBLOCK can happen with O_NONBLOCK - keep waiting
+        if (lastErrno != EBUSY && lastErrno != EAGAIN && lastErrno != EWOULDBLOCK) {
+            // For other errors, try without O_EXLOCK as fallback
+            // Some devices don't support exclusive locking
+            fd = ::open(device, O_RDWR | O_NONBLOCK);
+            if (fd >= 0) {
+                ::close(fd);
+                fprintf(stderr, "Device %s ready (non-exclusive) after %lld ms\n",
+                        device, timer.elapsed());
+                return true;
+            }
+        }
+
+        QThread::msleep(pollIntervalMs);
+    }
+
+    fprintf(stderr, "Device %s not ready after %d ms, last error: %s\n",
+            device, timeoutMs, strerror(lastErrno));
+    return false;
 }
 
 } // namespace PlatformQuirks

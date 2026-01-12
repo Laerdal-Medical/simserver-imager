@@ -9,7 +9,6 @@
 
 #include <QDebug>
 #include <QProcess>
-#include <QThread>
 
 namespace DiskFormatHelper {
 
@@ -44,8 +43,10 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
 
     qDebug() << "DiskFormatHelper: Format completed successfully";
 
-    // Wait for the OS to recognize the new partition
-    QThread::sleep(2);
+    // Wait for the device to be ready for I/O
+    if (!PlatformQuirks::waitForDeviceReady(device, 5000)) {
+        qWarning() << "DiskFormatHelper: Device may not be fully ready after format";
+    }
 
     result.success = true;
     return result;

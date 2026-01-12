@@ -4,6 +4,7 @@
  */
 
 #include "winfile.h"
+#include "../platformquirks.h"
 #include <QDebug>
 #include <QThread>
 
@@ -28,15 +29,13 @@ bool WinFile::open(QIODevice::OpenMode)
 {
     QByteArray n = _name.toLatin1();
 
-    for (int attempt = 0; attempt < 20; attempt++)
+    // Wait for device to be ready before attempting to open
+    if (!PlatformQuirks::waitForDeviceReady(_name, 2000))
     {
-        _h = CreateFileA(n.data(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-        if (_h != INVALID_HANDLE_VALUE)
-            break;
-
-        qDebug() << "Error opening device. Retrying...";
-        QThread::msleep(100);
+        qDebug() << "Device not ready after waiting, attempting open anyway";
     }
+
+    _h = CreateFileA(n.data(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 
     // Try with FILE_SHARE_WRITE
     if (_h == INVALID_HANDLE_VALUE)

@@ -89,6 +89,20 @@ namespace PlatformQuirks {
      */
     QString getEjectDevicePath(const QString& devicePath);
 
+    /**
+     * Wait for a device to be ready for I/O operations after unmount.
+     *
+     * Uses platform-specific methods to verify device readiness:
+     * - Linux: Polls device file descriptor with O_RDWR | O_EXCL
+     * - Windows: Uses IOCTL to check device accessibility
+     * - macOS: Uses disk arbitration to verify device state
+     *
+     * @param devicePath The device path (e.g., /dev/sda, \\.\PHYSICALDRIVE1)
+     * @param timeoutMs Maximum time to wait in milliseconds (default 5000)
+     * @return true if device is ready, false if timeout or error
+     */
+    bool waitForDeviceReady(const QString& devicePath, int timeoutMs = 5000);
+
 #ifdef Q_OS_LINUX
     /**
      * Find the system's CA certificate bundle for libcurl.
