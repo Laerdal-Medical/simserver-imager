@@ -11,6 +11,8 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
   * Branch Filter Search: Branch filter dropdown now supports type-ahead
     search for quickly finding branches in large repositories
   * macOS Build Fix: Fixed QRegularExpression usage in mount helper
+  * Windows FAT32 Fix: Support formatting drives larger than 32GB as FAT32
+    by using explicit 32KB cluster size to bypass Windows' artificial limit
 
  -- Laerdal Medical <support@laerdal.com>  Sun, 12 Jan 2025 14:00:00 +0000
 
