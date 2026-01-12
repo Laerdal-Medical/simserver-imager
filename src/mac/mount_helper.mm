@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QThread>
 
 #import <Foundation/Foundation.h>
 #import <DiskArbitration/DiskArbitration.h>
