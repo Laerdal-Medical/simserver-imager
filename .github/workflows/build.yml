@@ -45,6 +45,7 @@ jobs:
             cmake \
             ninja-build \
             libgnutls28-dev \
+            liburing-dev \
             libfuse2 \
             fuse \
             libgl1-mesa-dev \

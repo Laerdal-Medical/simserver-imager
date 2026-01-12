@@ -105,6 +105,7 @@ class LinuxFileOperations : public FileOperations {
   std::uint64_t async_write_offset_;
   bool io_uring_available_;
   io_uring* ring_;
+  bool logged_queue_limit_;  // Log queue depth limit once
   
   // Track callbacks by user_data pointer
   struct PendingWrite {

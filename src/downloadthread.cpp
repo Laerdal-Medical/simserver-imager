@@ -958,72 +958,85 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
     quint32 currentMax = _writeTimingStats.maxWriteSizeBytes.load();
     while (lenU32 > currentMax && !_writeTimingStats.maxWriteSizeBytes.compare_exchange_weak(currentMax, lenU32)) {}
 
-    // Pipelined hash computation: wait for PREVIOUS hash before starting current one
-    if (_hasPendingHash) {
-        if (!_pendingHashFuture.isFinished()) {
-            opTimer.start();
-            _pendingHashFuture.waitForFinished();
-            preHashWaitMs = static_cast<quint64>(opTimer.elapsed());
-            _writeTimingStats.totalPreHashWaitMs.fetch_add(preHashWaitMs);
-            
-            if (preHashWaitMs > 10) {
-                qDebug() << "Hash pipeline stall: waited" << preHashWaitMs << "ms for previous hash";
+    // Determine if we can use zero-copy async I/O (check early for hash strategy)
+    bool useAsync = _debugAsyncIO && _file->IsAsyncIOSupported() && _file->GetAsyncQueueDepth() > 1;
+    bool useZeroCopy = useAsync && onComplete;  // Zero-copy requires completion callback
+
+    // Hash computation strategy:
+    // - With async I/O: Hash inline (synchronously). Since writes return immediately
+    //   after being queued, there's no benefit to threading the hash, and it avoids
+    //   the thread spawn/wait overhead that was causing 12-14ms stalls.
+    // - Without async I/O: Use pipelined threading to overlap hash with synchronous write.
+    if (useZeroCopy) {
+        // Inline hash for async I/O - no thread overhead
+        _writehash.addData(buf, len);
+    } else {
+        // Pipelined hash for sync I/O - overlap with write
+        if (_hasPendingHash) {
+            if (!_pendingHashFuture.isFinished()) {
+                opTimer.start();
+                _pendingHashFuture.waitForFinished();
+                preHashWaitMs = static_cast<quint64>(opTimer.elapsed());
+                _writeTimingStats.totalPreHashWaitMs.fetch_add(preHashWaitMs);
+
+                if (preHashWaitMs > 10) {
+                    qDebug() << "Hash pipeline stall: waited" << preHashWaitMs << "ms for previous hash";
+                }
             }
         }
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        _pendingHashFuture = QtConcurrent::run(&DownloadThread::_hashData, this, buf, len);
+#else
+        _pendingHashFuture = QtConcurrent::run(this, &DownloadThread::_hashData, buf, len);
+#endif
+        _hasPendingHash = true;
     }
 
-    // Start hash computation for current buffer
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    _pendingHashFuture = QtConcurrent::run(&DownloadThread::_hashData, this, buf, len);
-#else
-    _pendingHashFuture = QtConcurrent::run(this, &DownloadThread::_hashData, buf, len);
-#endif
-    _hasPendingHash = true;
-
-    // Determine if we can use zero-copy async I/O
     opTimer.start();
     size_t bytes_written = 0;
     rpi_imager::FileError write_result;
-    
-    bool useAsync = _debugAsyncIO && _file->IsAsyncIOSupported() && _file->GetAsyncQueueDepth() > 1;
-    bool useZeroCopy = useAsync && onComplete;  // Zero-copy requires completion callback
-    
+
     if (useZeroCopy) {
         // ZERO-COPY ASYNC: Use caller's buffer directly, release via callback
         // This is the optimal path when using ring buffer slots as async I/O buffers
-        // 
-        // IMPORTANT: The buffer is used by both the async write AND the hash computation.
-        // We must wait for BOTH to complete before releasing the buffer.
-        // Capture the hash future so the completion callback can wait for it.
+        //
+        // Note: Hash was already computed inline above, so no need to wait for it.
+        // The buffer can be released as soon as the async write completes.
         size_t writeLen = len;
-        QFuture<void> hashFuture = _pendingHashFuture;
-        
+
         // Capture pointer to _bytesWritten for callback to update on completion
         // This ensures progress reflects COMPLETED writes, not just queued writes
         std::atomic<std::uint64_t>* bytesWrittenPtr = &_bytesWritten;
-        
+
         // Capture 'this' and total for event-driven progress notification
         // The signal emission is thread-safe via Qt::QueuedConnection
         DownloadThread* self = this;
         quint64 totalBytes = _extractTotal.load();
-        
+
+        // Capture pointer to progress throttle atomic
+        std::atomic<qint64>* lastEmitMsPtr = &_lastAsyncProgressEmitMs;
+
         write_result = _file->AsyncWriteSequential(
             reinterpret_cast<const std::uint8_t*>(buf), len,
-            [onComplete, writeLen, hashFuture, bytesWrittenPtr, self, totalBytes](rpi_imager::FileError result, std::size_t written) mutable {
-                // Wait for hash computation to complete before releasing buffer
-                // This ensures the buffer isn't reused while still being hashed
-                if (!hashFuture.isFinished()) {
-                    hashFuture.waitForFinished();
-                }
-                
+            [onComplete, writeLen, bytesWrittenPtr, self, totalBytes, lastEmitMsPtr](rpi_imager::FileError result, std::size_t written) mutable {
                 // Update progress when write actually completes (not when queued)
                 if (result == rpi_imager::FileError::kSuccess) {
                     quint64 newTotal = bytesWrittenPtr->fetch_add(written) + written;
-                    // Emit progress signal - thread-safe via queued connection to main thread
-                    emit self->asyncWriteProgress(newTotal, totalBytes);
+
+                    // Throttle progress signals to ~60fps to avoid flooding UI event loop
+                    auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                    qint64 lastMs = lastEmitMsPtr->load(std::memory_order_relaxed);
+                    if (nowMs - lastMs >= ASYNC_PROGRESS_THROTTLE_MS) {
+                        // Try to claim this emit slot
+                        if (lastEmitMsPtr->compare_exchange_weak(lastMs, nowMs, std::memory_order_relaxed)) {
+                            emit self->asyncWriteProgress(newTotal, totalBytes);
+                        }
+                    }
                 }
-                
-                // Now safe to release the buffer
+
+                // Release the buffer - hash was computed inline before queueing
                 if (onComplete) onComplete();
                 if (result != rpi_imager::FileError::kSuccess) {
                     qDebug() << "Async write (zero-copy): error" << static_cast<int>(result)
@@ -1054,26 +1067,38 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
         std::uint8_t* asyncBuf = static_cast<std::uint8_t*>(qMallocAligned(len, 4096));
         if (asyncBuf) {
             ::memcpy(asyncBuf, buf, len);
-            
+
             size_t writeLen = len;
             // Capture pointer to _bytesWritten for callback to update on completion
             std::atomic<std::uint64_t>* bytesWrittenPtr = &_bytesWritten;
-            
+
             // Capture 'this' and total for event-driven progress notification
             DownloadThread* self = this;
             quint64 totalBytes = _extractTotal.load();
-            
-            write_result = _file->AsyncWriteSequential(asyncBuf, len, 
-                [asyncBuf, writeLen, bytesWrittenPtr, self, totalBytes](rpi_imager::FileError result, std::size_t written) {
+
+            // Capture pointer to progress throttle atomic
+            std::atomic<qint64>* lastEmitMsPtr = &_lastAsyncProgressEmitMs;
+
+            write_result = _file->AsyncWriteSequential(asyncBuf, len,
+                [asyncBuf, writeLen, bytesWrittenPtr, self, totalBytes, lastEmitMsPtr](rpi_imager::FileError result, std::size_t written) {
                     // Update progress when write actually completes (not when queued)
                     if (result == rpi_imager::FileError::kSuccess) {
                         quint64 newTotal = bytesWrittenPtr->fetch_add(written) + written;
-                        // Emit progress signal - thread-safe via queued connection to main thread
-                        emit self->asyncWriteProgress(newTotal, totalBytes);
+
+                        // Throttle progress signals to ~60fps to avoid flooding UI event loop
+                        auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch()).count();
+                        qint64 lastMs = lastEmitMsPtr->load(std::memory_order_relaxed);
+                        if (nowMs - lastMs >= ASYNC_PROGRESS_THROTTLE_MS) {
+                            // Try to claim this emit slot
+                            if (lastEmitMsPtr->compare_exchange_weak(lastMs, nowMs, std::memory_order_relaxed)) {
+                                emit self->asyncWriteProgress(newTotal, totalBytes);
+                            }
+                        }
                     }
                     qFreeAligned(asyncBuf);
                     if (result != rpi_imager::FileError::kSuccess) {
-                        qDebug() << "Async write callback: error" << static_cast<int>(result) 
+                        qDebug() << "Async write callback: error" << static_cast<int>(result)
                                  << "expected" << writeLen << "wrote" << written;
                     }
                 });
@@ -1141,9 +1166,12 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
 
     // Cross-platform periodic sync
     _periodicSync();
-    
+
     // Update bottleneck state for UI feedback
     _updateBottleneckState();
+
+    // Periodic progress logging (every 5 seconds)
+    _logWriteProgress();
 
     return (written < 0) ? 0 : written;
 }
@@ -1367,7 +1395,10 @@ void DownloadThread::_writeComplete()
         int pendingBefore = _file->GetPendingWriteCount();
         
         rpi_imager::FileError asyncResult = _file->WaitForPendingWrites();
-        
+
+        // Emit final progress to ensure UI shows 100% (throttling may have skipped final updates)
+        emit asyncWriteProgress(_bytesWritten.load(), _extractTotal.load());
+
         quint32 asyncWaitMs = static_cast<quint32>(asyncWaitTimer.elapsed());
         qDebug() << "Async I/O drain:" << pendingBefore << "pending writes completed in" << asyncWaitMs << "ms";
         
@@ -1769,6 +1800,47 @@ void DownloadThread::_periodicSync()
         
         qDebug() << "Periodic sync completed successfully in" << syncMs << "ms";
     }
+}
+
+void DownloadThread::_logWriteProgress()
+{
+    auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    qint64 lastLogMs = _lastProgressLogMs.load(std::memory_order_relaxed);
+
+    // Check if enough time has passed since last log
+    if (nowMs - lastLogMs < PROGRESS_LOG_INTERVAL_MS) {
+        return;
+    }
+
+    // Try to claim this log slot (avoid multiple threads logging simultaneously)
+    if (!_lastProgressLogMs.compare_exchange_weak(lastLogMs, nowMs, std::memory_order_relaxed)) {
+        return;
+    }
+
+    quint64 currentBytes = _bytesWritten.load();
+    quint64 totalBytes = _extractTotal.load();
+    quint64 lastBytes = _lastProgressLogBytes.exchange(currentBytes, std::memory_order_relaxed);
+
+    // Calculate progress percentage
+    double progressPct = totalBytes > 0 ? (currentBytes * 100.0 / totalBytes) : 0.0;
+
+    // Calculate speed in MB/s (bytes written since last log / time elapsed)
+    double elapsedSec = (nowMs - lastLogMs) / 1000.0;
+    double speedMBps = 0.0;
+    if (elapsedSec > 0 && currentBytes > lastBytes) {
+        speedMBps = (currentBytes - lastBytes) / (1024.0 * 1024.0) / elapsedSec;
+    }
+
+    // Get pending async writes count if available
+    int pendingWrites = _file ? _file->GetPendingWriteCount() : 0;
+
+    qDebug() << QString("Write progress: %1 / %2 MB (%3%) - %4 MB/s - %5 pending writes")
+                    .arg(currentBytes / (1024 * 1024))
+                    .arg(totalBytes / (1024 * 1024))
+                    .arg(progressPct, 0, 'f', 1)
+                    .arg(speedMBps, 0, 'f', 1)
+                    .arg(pendingWrites);
 }
 
 void DownloadThread::_emitWriteTimingStats()

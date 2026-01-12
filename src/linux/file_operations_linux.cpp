@@ -26,10 +26,10 @@ static void Log(const std::string& msg) {
     FileOperationsLog(msg);
 }
 
-LinuxFileOperations::LinuxFileOperations() 
+LinuxFileOperations::LinuxFileOperations()
     : fd_(-1), last_error_code_(0), using_direct_io_(false), direct_io_attempted_(false),
       async_queue_depth_(1), pending_writes_(0), cancelled_(false), first_async_error_(FileError::kSuccess),
-      async_write_offset_(0), io_uring_available_(false), ring_(nullptr), next_write_id_(1) {  // Start at 1, 0 is reserved for cancel operations
+      async_write_offset_(0), io_uring_available_(false), ring_(nullptr), logged_queue_limit_(false), next_write_id_(1) {  // Start at 1, 0 is reserved for cancel operations
     
 #ifdef HAVE_LIBURING
     // Probe for io_uring availability
@@ -107,7 +107,8 @@ void LinuxFileOperations::ProcessCompletions(bool wait) {
     
     if (wait && !cancelled_.load()) {
         // Use timeout-based wait so we can check for cancellation
-        struct __kernel_timespec ts = {.tv_sec = 0, .tv_nsec = 100000000};  // 100ms
+        // Use shorter timeout (10ms) for better responsiveness
+        struct __kernel_timespec ts = {.tv_sec = 0, .tv_nsec = 10000000};  // 10ms
         ret = io_uring_wait_cqe_timeout(ring_, &cqe, &ts);
         // If timeout (-ETIME) and not cancelled, try again
         while (ret == -ETIME && !cancelled_.load() && pending_writes_.load() > 0) {
@@ -141,6 +142,13 @@ void LinuxFileOperations::ProcessCompletions(bool wait) {
                 expected_size = it->second.size;
                 submit_time = it->second.submit_time;
                 pending_callbacks_.erase(it);
+            } else {
+                // Debug: callback not found - this should not happen
+                std::ostringstream oss;
+                oss << "io_uring completion for unknown write_id " << write_id
+                    << ", pending_callbacks size: " << pending_callbacks_.size()
+                    << ", result: " << result;
+                Log(oss.str());
             }
         }
         
@@ -511,18 +519,47 @@ int LinuxFileOperations::GetLastErrorCode() const {
 
 bool LinuxFileOperations::SetAsyncQueueDepth(int depth) {
   if (depth < 1) depth = 1;
-  
+
   async_queue_depth_ = depth;
-  
+
   if (depth > 1 && !io_uring_available_) {
     Log("Warning: Async I/O requested but io_uring not available");
     return false;
   }
-  
+
+#ifdef HAVE_LIBURING
+  // Reinitialize io_uring with the correct queue size if needed
+  // The initial initialization uses a small default; resize to match requested depth
+  if (depth > 1 && io_uring_available_ && ring_ != nullptr) {
+    // Clean up existing ring and reinitialize with new size
+    CleanupIOUring();
+
+    ring_ = new io_uring;
+    memset(ring_, 0, sizeof(io_uring));
+
+    struct io_uring_params params;
+    memset(&params, 0, sizeof(params));
+
+    int ret = io_uring_queue_init_params(depth, ring_, &params);
+    if (ret < 0) {
+      std::ostringstream oss;
+      oss << "io_uring resize to " << depth << " failed: " << strerror(-ret);
+      Log(oss.str());
+      delete ring_;
+      ring_ = nullptr;
+      io_uring_available_ = false;
+    } else {
+      std::ostringstream oss;
+      oss << "io_uring resized to queue depth " << depth;
+      Log(oss.str());
+    }
+  }
+#endif
+
   std::ostringstream oss;
   oss << "Async queue depth set to " << depth << " (io_uring: " << (io_uring_available_ ? "yes" : "no") << ")";
   Log(oss.str());
-  
+
   return io_uring_available_;
 }
 
@@ -550,9 +587,24 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
   
   // Process any completed writes first (non-blocking)
   ProcessCompletions(false);
-  
+
+  // With O_DIRECT, limit effective queue depth to prevent massive latency buildup.
+  // USB devices can only complete one write at a time (~800ms for 8MB at 10MB/s).
+  // A deep queue just means waiting 800ms * 256 = 200+ seconds for draining.
+  // Use a small limit (4) for responsive progress and fast drain at end of write.
+  int effectiveQueueLimit = using_direct_io_ ? std::min(async_queue_depth_, 4) : async_queue_depth_;
+
+  // Log once when queue depth is limited due to O_DIRECT
+  if (using_direct_io_ && effectiveQueueLimit < async_queue_depth_ && !logged_queue_limit_) {
+    std::ostringstream oss;
+    oss << "Effective queue depth limited to " << effectiveQueueLimit
+        << " (configured: " << async_queue_depth_ << ") due to O_DIRECT";
+    Log(oss.str());
+    logged_queue_limit_ = true;
+  }
+
   // If queue is full, wait for completions
-  while (pending_writes_.load() >= async_queue_depth_) {
+  while (pending_writes_.load() >= effectiveQueueLimit) {
     ProcessCompletions(true);
   }
   
@@ -591,8 +643,9 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
   // Set up the SQE for a write
   io_uring_prep_write(sqe, fd_, data, static_cast<unsigned>(size), static_cast<off_t>(write_offset));
   io_uring_sqe_set_data64(sqe, write_id);
-  
-  // Submit the request
+
+  // Submit immediately - for USB storage devices, the device is the bottleneck,
+  // not syscall overhead. Batching can cause writes to stall waiting in the queue.
   int ret = io_uring_submit(ring_);
   if (ret < 0) {
     pending_writes_.fetch_sub(1);
@@ -606,7 +659,7 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
     if (callback) callback(FileError::kWriteError, 0);
     return FileError::kWriteError;
   }
-  
+
   return FileError::kSuccess;
 #else
   // Should never reach here, but just in case
@@ -657,12 +710,15 @@ FileError LinuxFileOperations::WaitForPendingWrites() {
   if (!io_uring_available_ || ring_ == nullptr) {
     return FileError::kSuccess;
   }
-  
+
+  // Flush any queued but unsubmitted entries first
+  io_uring_submit(ring_);
+
   // Process completions until all pending writes are done
   while (pending_writes_.load() > 0) {
     ProcessCompletions(true);
   }
-  
+
   return first_async_error_;
 #else
   return FileError::kSuccess;

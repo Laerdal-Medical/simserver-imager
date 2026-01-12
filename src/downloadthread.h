@@ -16,6 +16,7 @@
 #include <QElapsedTimer>
 #include <QFuture>
 #include <atomic>
+#include <chrono>
 #include <time.h>
 #include <curl/curl.h>
 #include "acceleratedcryptographichash.h"
@@ -330,8 +331,19 @@ protected:
     WriteTimingStats _writeTimingStats;
     QElapsedTimer _lastWriteTimer;  // For measuring inter-write throughput
     quint64 _lastWriteBytes{0};     // Bytes written at last measurement
-    
+
+    // Async progress signal throttling - prevents flooding UI event loop
+    // Stores milliseconds since epoch, compared with steady_clock for ~16ms throttle
+    std::atomic<qint64> _lastAsyncProgressEmitMs{0};
+    static constexpr int ASYNC_PROGRESS_THROTTLE_MS = 16;  // ~60fps max update rate
+
+    // Periodic progress logging - shows MB written and speed
+    std::atomic<qint64> _lastProgressLogMs{0};
+    std::atomic<quint64> _lastProgressLogBytes{0};
+    static constexpr int PROGRESS_LOG_INTERVAL_MS = 5000;  // Log every 5 seconds
+
     void _emitWriteTimingStats();   // Called at end of write phase
+    void _logWriteProgress();       // Periodic progress logging
 };
 
 #endif // DOWNLOADTHREAD_H

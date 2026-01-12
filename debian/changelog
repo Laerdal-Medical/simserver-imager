@@ -13,6 +13,11 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
   * macOS Build Fix: Fixed QRegularExpression usage in mount helper
   * Windows FAT32 Fix: Support formatting drives larger than 32GB as FAT32
     by using explicit 32KB cluster size to bypass Windows' artificial limit
+  * Linux io_uring Optimization: Limit async I/O queue depth to 4 when using
+    O_DIRECT to prevent massive latency buildup on USB devices. Reduces
+    end-of-write drain time from ~175 seconds to ~2 seconds.
+  * Write Progress Logging: Added periodic progress logging showing MB
+    written, speed in MB/s, and pending writes for better diagnostics
 
  -- Laerdal Medical <support@laerdal.com>  Sun, 12 Jan 2025 14:00:00 +0000
 
