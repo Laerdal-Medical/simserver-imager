@@ -36,6 +36,8 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
     }
 
     // Create diskpart script
+    // Using unit=32768 (32KB clusters) bypasses Windows' 32GB FAT32 limit.
+    // FAT32 with 32KB clusters supports volumes up to 2TB.
     QString scriptPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/laerdal_diskpart.txt";
     QFile scriptFile(scriptPath);
     if (!scriptFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -45,11 +47,11 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
     }
 
     QTextStream script(&scriptFile);
-    script << "select disk " << diskNumber << "\n";
-    script << "clean\n";
-    script << "create partition primary\n";
-    script << "format fs=fat32 quick label=" << volumeLabel << "\n";
-    script << "assign\n";
+    script << "select disk " << diskNumber << "\r\n";
+    script << "clean\r\n";
+    script << "create partition primary\r\n";
+    script << "format fs=fat32 quick unit=32768 label=" << volumeLabel << "\r\n";
+    script << "assign\r\n";
     scriptFile.close();
 
     // Run diskpart with the script
