@@ -763,11 +763,13 @@ void RepositoryManager::onBranchesReady(const QJsonArray &branches)
         }
     }
 
+    // Save accumulated branches after each response (not just at the end)
+    _availableBranches = branchSet.values();
+
     _pendingBranchFetchCount--;
 
     if (_pendingBranchFetchCount <= 0) {
         _pendingBranchFetchCount = 0;
-        _availableBranches = branchSet.values();
         _availableBranches.sort();
 
         qDebug() << "RepositoryManager: Available branches:" << _availableBranches;

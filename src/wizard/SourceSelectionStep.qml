@@ -56,18 +56,6 @@ WizardStepBase {
         }
     }
 
-    // Listen for available branches updates from repo manager
-    Connections {
-        target: root.repoManager
-        enabled: root.repoManager !== null
-        function onAvailableBranchesChanged() {
-            // Refresh the branch filter when branches are ready
-            if (root.repoManager) {
-                branchFilterCombo.availableBranches = root.repoManager.availableBranches
-            }
-        }
-    }
-
     // Environment options
     readonly property var environmentOptions: [
         { value: 0, label: qsTr("Production"), description: qsTr("Stable releases for production use") },
@@ -360,8 +348,34 @@ WizardStepBase {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Style.buttonHeightStandard
 
-                        property var availableBranches: root.repoManager ? root.repoManager.availableBranches : []
+                        // Use a stable internal copy of branches to avoid model updates while popup is open
+                        // This prevents focus loss during typing when branches are being fetched
+                        property var availableBranches: []
+                        property var pendingBranches: root.repoManager ? root.repoManager.availableBranches : []
                         property string currentFilter: root.repoManager ? root.repoManager.artifactBranchFilter : ""
+
+                        // Update availableBranches only when popup is closed to preserve focus
+                        onPendingBranchesChanged: {
+                            if (!popup.visible) {
+                                availableBranches = pendingBranches
+                            }
+                        }
+
+                        // Also update when popup closes if there are pending changes
+                        Connections {
+                            target: branchFilterCombo.popup
+                            function onVisibleChanged() {
+                                if (!branchFilterCombo.popup.visible &&
+                                    branchFilterCombo.pendingBranches !== branchFilterCombo.availableBranches) {
+                                    branchFilterCombo.availableBranches = branchFilterCombo.pendingBranches
+                                }
+                            }
+                        }
+
+                        // Initialize with current branches
+                        Component.onCompleted: {
+                            availableBranches = pendingBranches
+                        }
 
                         model: {
                             var branches = [qsTr("All branches")].concat(availableBranches)

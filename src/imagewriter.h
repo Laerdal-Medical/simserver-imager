@@ -604,6 +604,7 @@ protected:
     void _parseCompressedFile();
     void _parseXZFile();
     void _parseVsiFile();
+    qint64 _getCompressedFileSizeFromZip(const QString &zipPath, const QString &entryName, qint64 compressedSize);
     QString _pubKeyFileName();
     QString _privKeyFileName();
     QString _sshKeyDir();

@@ -769,7 +769,21 @@ void ImageWriter::startWrite()
             _src = QUrl(archiveUrl);
             _isArtifactSource = false;
             _downloadLen = wicSize;
-            _extrLen = wicSize;  // Will be decompressed by ArchiveEntryExtractThread if needed
+
+            // For compressed files, parse the actual uncompressed size
+            QString lowerFilename = targetFilename.toLower();
+            if (lowerFilename.endsWith(".xz") || lowerFilename.endsWith(".gz")) {
+                _extrLen = _getCompressedFileSizeFromZip(zipPath, targetFilename, wicSize);
+                if (_extrLen == 0) {
+                    qWarning() << "Failed to parse uncompressed size, progress may be inaccurate";
+                }
+            } else if (lowerFilename.endsWith(".bz2") || lowerFilename.endsWith(".zst")) {
+                // For bz2/zstd, we don't have easy size detection from footer
+                _extrLen = 0;
+                qDebug() << "Compressed file in archive, uncompressed size unknown";
+            } else {
+                _extrLen = wicSize;
+            }
 
             // Store the archive info for the streaming thread
             _artifactZipForStreaming = zipPath;
@@ -814,7 +828,21 @@ void ImageWriter::startWrite()
                     _src = QUrl(archiveUrl);
                     _isArtifactSource = false;
                     _downloadLen = wicSize;
-                    _extrLen = wicSize;
+
+                    // For compressed files, parse the actual uncompressed size
+                    QString lowerFilename = targetFilename.toLower();
+                    if (lowerFilename.endsWith(".xz") || lowerFilename.endsWith(".gz")) {
+                        _extrLen = _getCompressedFileSizeFromZip(localPath, targetFilename, wicSize);
+                        if (_extrLen == 0) {
+                            qWarning() << "Failed to parse uncompressed size, progress may be inaccurate";
+                        }
+                    } else if (lowerFilename.endsWith(".bz2") || lowerFilename.endsWith(".zst")) {
+                        // For bz2/zstd, we don't have easy size detection from footer
+                        _extrLen = 0;
+                        qDebug() << "Compressed file in archive, uncompressed size unknown";
+                    } else {
+                        _extrLen = wicSize;
+                    }
 
                     // Store the archive info for the streaming thread
                     _artifactZipForStreaming = localPath;
@@ -2532,6 +2560,141 @@ void ImageWriter::_parseVsiFile()
     {
         qDebug() << "Unable to parse .vsi file header";
     }
+}
+
+qint64 ImageWriter::_getCompressedFileSizeFromZip(const QString &zipPath, const QString &entryName, qint64 compressedSize)
+{
+    // Parse uncompressed size from a compressed file stored inside a ZIP archive.
+    // Supports:
+    //   - XZ: stores index (containing uncompressed size) in last ~100 bytes
+    //   - GZIP: stores original size (mod 2^32) in last 4 bytes
+
+    QString lowerName = entryName.toLower();
+    bool isXZ = lowerName.endsWith(".xz");
+    bool isGZ = lowerName.endsWith(".gz");
+
+    if (!isXZ && !isGZ) {
+        qDebug() << "_getCompressedFileSizeFromZip: Unsupported format:" << entryName;
+        return 0;
+    }
+
+    struct archive *a = archive_read_new();
+    archive_read_support_filter_all(a);
+    archive_read_support_format_zip(a);
+
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 65536) != ARCHIVE_OK) {
+        qWarning() << "_getCompressedFileSizeFromZip: Cannot open archive:" << archive_error_string(a);
+        archive_read_free(a);
+        return 0;
+    }
+
+    struct archive_entry *entry;
+    qint64 uncompressedSize = 0;
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        QString currentEntry = QString::fromUtf8(archive_entry_pathname(entry));
+        QString baseName = QFileInfo(currentEntry).fileName();
+
+        if (currentEntry == entryName || baseName == entryName) {
+            // Found the entry. Read it and keep track of the tail.
+            const size_t TAIL_SIZE = 4096;  // Keep last 4KB for XZ index parsing
+            QByteArray tailBuffer;
+            tailBuffer.reserve(TAIL_SIZE);
+
+            char buffer[65536];
+            ssize_t bytesRead;
+            qint64 totalRead = 0;
+
+            while ((bytesRead = archive_read_data(a, buffer, sizeof(buffer))) > 0) {
+                totalRead += bytesRead;
+
+                // Accumulate the tail
+                if (tailBuffer.size() + bytesRead <= static_cast<qsizetype>(TAIL_SIZE)) {
+                    tailBuffer.append(buffer, bytesRead);
+                } else {
+                    // Shift to keep only the tail
+                    qsizetype keepFrom = tailBuffer.size() + bytesRead - TAIL_SIZE;
+                    if (keepFrom < tailBuffer.size()) {
+                        tailBuffer = tailBuffer.mid(keepFrom);
+                    } else {
+                        tailBuffer.clear();
+                    }
+                    qsizetype fromBuffer = TAIL_SIZE - tailBuffer.size();
+                    tailBuffer.append(buffer + bytesRead - fromBuffer, fromBuffer);
+                }
+            }
+
+            qDebug() << "_getCompressedFileSizeFromZip: Read" << totalRead << "bytes, tail size:" << tailBuffer.size();
+
+            if (isXZ) {
+                // Parse XZ footer from the last 12 bytes
+                if (tailBuffer.size() >= LZMA_STREAM_HEADER_SIZE) {
+                    lzma_stream_flags opts = { 0 };
+                    const uint8_t *footer = reinterpret_cast<const uint8_t*>(
+                        tailBuffer.constData() + tailBuffer.size() - LZMA_STREAM_HEADER_SIZE);
+
+                    lzma_ret ret = lzma_stream_footer_decode(&opts, footer);
+
+                    if (ret == LZMA_OK && opts.backward_size < 1000000 &&
+                        opts.backward_size < static_cast<uint64_t>(tailBuffer.size()) - LZMA_STREAM_HEADER_SIZE) {
+
+                        size_t indexOffset = tailBuffer.size() - LZMA_STREAM_HEADER_SIZE - opts.backward_size;
+                        const uint8_t *indexData = reinterpret_cast<const uint8_t*>(
+                            tailBuffer.constData() + indexOffset);
+                        size_t indexSize = opts.backward_size + LZMA_STREAM_HEADER_SIZE;
+
+                        lzma_index *idx = nullptr;
+                        uint64_t memlimit = UINT64_MAX;
+                        size_t pos = 0;
+
+                        ret = lzma_index_buffer_decode(&idx, &memlimit, nullptr, indexData, &pos, indexSize);
+
+                        if (ret == LZMA_OK && idx) {
+                            uncompressedSize = lzma_index_uncompressed_size(idx);
+                            lzma_index_end(idx, nullptr);
+                        } else {
+                            qWarning() << "_getCompressedFileSizeFromZip: Failed to decode XZ index, ret:" << ret;
+                        }
+                    } else {
+                        qWarning() << "_getCompressedFileSizeFromZip: Failed to decode XZ footer, ret:" << ret;
+                    }
+                }
+            } else if (isGZ) {
+                // GZIP stores original size (mod 2^32) in last 4 bytes (little-endian)
+                if (tailBuffer.size() >= 4) {
+                    const uint8_t *sizeBytes = reinterpret_cast<const uint8_t*>(
+                        tailBuffer.constData() + tailBuffer.size() - 4);
+                    uint32_t gzSize = sizeBytes[0] | (sizeBytes[1] << 8) |
+                                      (sizeBytes[2] << 16) | (sizeBytes[3] << 24);
+
+                    // GZIP only stores 32 bits, so for files > 4GB we need to estimate
+                    // Use compression ratio heuristic: typical WIC images compress ~3-5x
+                    if (gzSize < static_cast<uint32_t>(compressedSize)) {
+                        // The stored size wrapped around (file > 4GB)
+                        // Estimate based on typical compression ratio
+                        qint64 estimatedSize = compressedSize * 4;  // Assume 4:1 ratio
+                        // Round up to next 4GB boundary that includes gzSize
+                        qint64 numWraps = (estimatedSize - gzSize) / 0x100000000LL + 1;
+                        uncompressedSize = gzSize + (numWraps * 0x100000000LL);
+                        qDebug() << "_getCompressedFileSizeFromZip: GZIP size wrapped, estimated:" << uncompressedSize;
+                    } else {
+                        uncompressedSize = gzSize;
+                    }
+                }
+            }
+
+            if (uncompressedSize > 0) {
+                qDebug() << "_getCompressedFileSizeFromZip: Uncompressed size:" << uncompressedSize
+                         << "bytes (" << (uncompressedSize / (1024*1024)) << "MB)"
+                         << "from compressed:" << compressedSize << "bytes";
+            }
+            break;
+        }
+        archive_read_data_skip(a);
+    }
+
+    archive_read_free(a);
+    return uncompressedSize;
 }
 
 bool ImageWriter::isOnline()
