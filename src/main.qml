@@ -523,6 +523,20 @@ ApplicationWindow {
             // Left padding
             Item { Layout.preferredWidth: Style.cardPadding }
 
+            // Install Authorization button - only shown for elevatable bundles without policy installed
+            ImButton {
+                id: installAuthButton
+                text: qsTr("Install Authorization")
+                Layout.preferredHeight: Style.buttonHeightStandard
+                activeFocusOnTab: true
+                visible: window.imageWriter && window.imageWriter.isElevatableBundle() && !window.imageWriter.hasElevationPolicyInstalled()
+                onClicked: {
+                    if (window.imageWriter.installElevationPolicy()) {
+                        permissionWarningDialog.close()
+                    }
+                }
+            }
+
             Item { Layout.fillWidth: true }
 
             ImButton {
