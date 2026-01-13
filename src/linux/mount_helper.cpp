@@ -14,6 +14,10 @@
 #include <QRegularExpression>
 #include <QThread>
 
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+
 namespace MountHelper {
 
 QString waitForPartition(const QString &device, int timeoutMs)
@@ -64,10 +68,104 @@ QString waitForPartition(const QString &device, int timeoutMs)
     return QString();
 }
 
+QString getExistingMountPoint(const QString &partition)
+{
+    // Use standard C file I/O - QFile has issues with /proc files in some contexts
+    // Try multiple mount sources: /proc/1/mounts works reliably when running as root via pkexec
+    const char* mountFiles[] = {"/proc/1/mounts", "/proc/mounts", "/etc/mtab", nullptr};
+
+    for (int i = 0; mountFiles[i] != nullptr; i++)
+    {
+        FILE* fp = fopen(mountFiles[i], "r");
+        if (!fp)
+        {
+            continue;
+        }
+
+        char line[4096];
+        bool foundData = false;
+
+        while (fgets(line, sizeof(line), fp) != nullptr)
+        {
+            foundData = true;
+            QString qline = QString::fromUtf8(line).trimmed();
+            QStringList parts = qline.split(' ');
+
+            if (parts.size() >= 2)
+            {
+                QString device = parts[0];
+                QString mountPoint = parts[1];
+
+                if (device == partition)
+                {
+                    // Decode octal escapes (e.g., \040 for space)
+                    mountPoint.replace("\\040", " ");
+                    mountPoint.replace("\\011", "\t");
+                    qDebug() << "Found existing mount point for" << partition << ":" << mountPoint;
+                    fclose(fp);
+                    return mountPoint;
+                }
+            }
+        }
+
+        fclose(fp);
+
+        if (foundData)
+        {
+            // We found a working mount file but partition wasn't in it
+            return QString();
+        }
+    }
+
+    qWarning() << "Could not read any mount information";
+    return QString();
+}
+
+QString getPartitionPath(const QString &device)
+{
+    // Determine partition path from device path without waiting for exclusive access
+    QString partitionPath;
+
+    // For /dev/sdX devices -> /dev/sdX1
+    if (device.contains("/dev/sd"))
+    {
+        partitionPath = device + "1";
+    }
+    // For /dev/mmcblkX devices -> /dev/mmcblkXp1
+    else if (device.contains("/dev/mmcblk"))
+    {
+        partitionPath = device + "p1";
+    }
+    // For /dev/nvmeXnY devices -> /dev/nvmeXnYp1
+    else if (device.contains("/dev/nvme"))
+    {
+        partitionPath = device + "p1";
+    }
+    else
+    {
+        // Default to sdX-style naming
+        partitionPath = device + "1";
+    }
+
+    return partitionPath;
+}
+
 QString mountDevice(const QString &device)
 {
-    // Wait for partition to appear
-    QString partition = waitForPartition(device);
+    // First, determine the partition path
+    QString partition = getPartitionPath(device);
+
+    // Check if already mounted BEFORE trying to get exclusive access
+    // This avoids timeout when device is already in use by mount
+    QString existingMount = getExistingMountPoint(partition);
+    if (!existingMount.isEmpty())
+    {
+        qDebug() << "Device" << partition << "already mounted at:" << existingMount;
+        return existingMount;
+    }
+
+    // Not mounted - wait for partition to be ready for exclusive access
+    partition = waitForPartition(device);
     if (partition.isEmpty())
     {
         qWarning() << "No partition found for device:" << device;

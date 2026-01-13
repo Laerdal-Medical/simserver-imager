@@ -18,8 +18,20 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
     end-of-write drain time from ~175 seconds to ~2 seconds.
   * Write Progress Logging: Added periodic progress logging showing MB
     written, speed in MB/s, and pending writes for better diagnostics
+  * SelectionListDelegate: New reusable QML delegate component providing
+    consistent styling for list items with icon, title, description, badges,
+    and metadata across all wizard selection screens
+  * Deferred Artifact Download: CI artifacts are now downloaded only when
+    user double-clicks or presses Next, reducing unnecessary downloads when
+    browsing the artifact list
+  * SPU Copy Flow: Improved SPU file copy workflow with auto-advance to
+    done step and dedicated completion message for SPU operations
+  * Mount Helper Fix: Check if device is already mounted before trying to
+    get exclusive access, avoiding timeout when device is already in use
+  * Large Artifact ID Fix: Support GitHub artifact IDs larger than 2^31 by
+    using JavaScript's safe integer range (2^53)
 
- -- Laerdal Medical <support@laerdal.com>  Sun, 12 Jan 2025 14:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Mon, 13 Jan 2025 10:00:00 +0000
 
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 

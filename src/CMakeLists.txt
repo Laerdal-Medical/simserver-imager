@@ -615,6 +615,7 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/ImBanner.qml
       qmlcomponents/ImLoadingBanner.qml
       qmlcomponents/SelectionListView.qml
+      qmlcomponents/SelectionListDelegate.qml
       qmlcomponents/OSSelectionListView.qml
       wizard/WizardStepBase.qml
       wizard/WizardContainer.qml

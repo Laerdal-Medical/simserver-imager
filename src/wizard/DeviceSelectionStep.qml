@@ -240,112 +240,19 @@ WizardStepBase {
     // Device delegate component
     Component {
         id: hwdelegate
-        
-        Item {
-            id: hwitem
-            
+
+        SelectionListDelegate {
+            id: hwDelegateItem
+
             required property int index
             required property string name
             required property string description
             required property string icon
-            required property QtObject model
-            
-            width: hwlist.width
-            // Let content determine height for balanced vertical padding
-            height: Math.max(60, row.implicitHeight + Style.spacingSmall + Style.spacingMedium)
-            
-            // Accessibility properties
-            Accessible.role: Accessible.ListItem
-            Accessible.name: hwitem.name + ". " + hwitem.description
-            Accessible.focusable: true
-            Accessible.ignored: false
-            
-            Rectangle {
-                id: hwbgrect
-                anchors.fill: parent
-                color: (hwlist.currentIndex === hwitem.index) ? Style.listViewHighlightColor :
-                       (hwMouseArea.containsMouse ? Style.listViewHoverRowBackgroundColor : Style.listViewRowBackgroundColor)
-                radius: 0
-                anchors.rightMargin: (hwlist.contentHeight > hwlist.height ? Style.scrollBarWidth : 0)
-                Accessible.ignored: true
-                
-                MouseArea {
-                    id: hwMouseArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    
-                    onClicked: {
-                        // Trigger the itemSelected signal by setting ListView's currentIndex
-                        // This will handle all the selection logic in onItemSelected
-                        hwlist.itemSelected(hwitem.index, hwitem)
-                    }
-                    
-                    onDoubleClicked: {
-                        // Double-click acts like pressing Return - select and advance
-                        hwlist.itemDoubleClicked(hwitem.index, hwitem)
-                    }
-                }
-                
-                RowLayout {
-                    id: row
-                    anchors.fill: parent
-                    anchors.leftMargin: Style.listItemPadding
-                    anchors.rightMargin: Style.listItemPadding
-                    anchors.topMargin: Style.spacingSmall
-                    anchors.bottomMargin: Style.spacingMedium
-                    spacing: Style.spacingMedium
-                    
-                    // Hardware Icon
-                    Image {
-                        id: hwicon
-                        source: hwitem.icon || ""
-                        Layout.preferredWidth: 40
-                        Layout.preferredHeight: 40
-                        Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        mipmap: true
-                        // Rasterize vector sources at device pixel ratio to avoid aliasing/blurriness on HiDPI
-                        sourceSize: Qt.size(Math.round(Layout.preferredWidth * Screen.devicePixelRatio), Math.round(Layout.preferredHeight * Screen.devicePixelRatio))
-                        visible: source.toString().length > 0
-                        
-                        Rectangle {
-                            anchors.fill: parent
-                            color: "transparent"
-                            border.color: Style.titleSeparatorColor
-                            border.width: 1
-                            radius: 0
-                            visible: parent.status === Image.Error
-                        }
-                    }
-                    
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: Style.spacingXXSmall
-                        
-                        Text {
-                            text: hwitem.name
-                            font.pixelSize: Style.fontSizeFormLabel
-                            font.family: Style.fontFamilyBold
-                            font.bold: true
-                            color: Style.formLabelColor
-                            Layout.fillWidth: true
-                            Accessible.ignored: true
-                        }
-                        
-                        Text {
-                            text: hwitem.description
-                            font.pixelSize: Style.fontSizeDescription
-                            font.family: Style.fontFamily
-                            color: Style.textDescriptionColor
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            Accessible.ignored: true
-                        }
-                    }
-                }
-            }
+
+            delegateIndex: hwDelegateItem.index
+            itemTitle: hwDelegateItem.name
+            itemDescription: hwDelegateItem.description
+            itemIcon: hwDelegateItem.icon
         }
     }
 } 

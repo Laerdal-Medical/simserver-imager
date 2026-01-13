@@ -20,7 +20,8 @@ BaseDialog {
     title: qsTr("Select Image File")
 
     // Artifact metadata
-    property int artifactId: 0
+    // Using var/double to support GitHub artifact IDs > 2^31 (JavaScript's safe integer range is 2^53)
+    property var artifactId: 0
     property string artifactName: ""
     property string owner: ""
     property string repo: ""

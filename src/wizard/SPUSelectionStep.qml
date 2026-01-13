@@ -210,8 +210,11 @@ WizardStepBase {
 
         console.log("SPUSelectionStep: Selected SPU file:", spuFile ? spuFile.name : "none")
 
-        // Set the SPU source in ImageWriter
+        // Set the SPU source in ImageWriter and update wizard container state
         if (spuFile) {
+            // Update the wizard container with the selected SPU name
+            root.wizardContainer.selectedSpuName = spuFile.name || spuFile.filename || ""
+
             if (spuFile.source === "github" && spuFile.source_type === "spu_file") {
                 // SPU file from inspected GitHub artifact
                 imageWriter.setSrcSpuArtifact(
@@ -432,126 +435,62 @@ WizardStepBase {
                         visible: root.ciArtifacts.length > 0 && root.inspectedSpuFiles.length === 0
                     }
 
-                    ListView {
+                    SelectionListView {
                         id: spuListView
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.min(contentHeight, 400)
                         model: root.displayList
-                        clip: true
-                        spacing: Style.spacingSmall
-                        currentIndex: -1
+                        keyboardAutoAdvance: false  // We handle auto-advance manually based on item type
+                        nextFunction: root.nextClicked
+                        accessibleName: qsTr("SPU file selection list")
+                        accessibleDescription: qsTr("Use arrow keys to navigate, Enter or Space to select")
 
-                        delegate: ItemDelegate {
+                        delegate: SelectionListDelegate {
                             id: spuDelegate
                             required property var modelData
                             required property int index
 
-                            width: spuListView.width
-                            height: spuDelegateContent.implicitHeight + Style.spacingSmall * 2
-                            highlighted: spuListView.currentIndex === index
-
-                            property bool isSelected: root.selectedSpuFile === modelData
-                            property bool isArtifact: modelData.source_type === "artifact"
-
-                            background: Rectangle {
-                                color: spuDelegate.isSelected ? Style.laerdalBlue
-                                     : spuDelegate.highlighted ? Style.listViewHoverRowBackgroundColor
-                                     : Style.listViewRowBackgroundColor
-                                radius: Style.listItemBorderRadius
-                                border.color: spuDelegate.isSelected ? Style.laerdalBlue
-                                            : spuDelegate.isArtifact ? Style.textDescriptionColor
-                                            : "transparent"
-                                border.width: spuDelegate.isArtifact ? 1 : 2
+                            delegateIndex: spuDelegate.index
+                            itemTitle: modelData.name || "Unknown"
+                            itemDescription: {
+                                if (modelData.source_type === "artifact") {
+                                    return qsTr("Click to scan for SPU files (Branch: %1)").arg(modelData.branch || "unknown")
+                                }
+                                return modelData.description || ""
                             }
+                            itemEmoji: modelData.source_type === "artifact" ? "📦" : "📄"
+                            itemMetadata: modelData.size > 0 && modelData.source_type !== "artifact"
+                                ? qsTr("Size: %1").arg(root.imageWriter.formatSize(modelData.size))
+                                : ""
+                            badges: [{
+                                text: modelData.source_type === "artifact" ? qsTr("CI Artifact")
+                                    : modelData.source === "github" ? qsTr("CI")
+                                    : qsTr("CDN"),
+                                color: modelData.source === "github" ? "#238636" : "#0969da"
+                            }]
+                            isItemSelected: root.selectedSpuFile === modelData
+                            showArrow: modelData.source_type === "artifact"
+                        }
 
-                            contentItem: ColumnLayout {
-                                id: spuDelegateContent
-                                spacing: Style.spacingXXSmall
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: Style.spacingSmall
-
-                                    // Icon for artifact vs SPU file
-                                    Text {
-                                        text: spuDelegate.isArtifact ? "📦" : "📄"
-                                        font.pixelSize: Style.fontSizeFormLabel
-                                        visible: true
-                                    }
-
-                                    Text {
-                                        text: spuDelegate.modelData.name || "Unknown"
-                                        font.pixelSize: Style.fontSizeFormLabel
-                                        font.family: Style.fontFamilyBold
-                                        font.bold: true
-                                        color: spuDelegate.isSelected ? "white" : Style.formLabelColor
-                                        elide: Text.ElideMiddle
-                                        Layout.fillWidth: true
-                                    }
-
-                                    // Source badge
-                                    Rectangle {
-                                        width: sourceBadgeText.implicitWidth + Style.spacingSmall * 2
-                                        height: sourceBadgeText.implicitHeight + Style.spacingXXSmall * 2
-                                        radius: Style.listItemBorderRadius
-                                        color: spuDelegate.modelData.source === "github" ? "#238636" : "#0969da"
-
-                                        Text {
-                                            id: sourceBadgeText
-                                            anchors.centerIn: parent
-                                            text: spuDelegate.isArtifact ? qsTr("CI Artifact")
-                                                : spuDelegate.modelData.source === "github" ? qsTr("CI")
-                                                : qsTr("CDN")
-                                            font.pixelSize: Style.fontSizeCaption
-                                            font.family: Style.fontFamily
-                                            color: "white"
-                                        }
-                                    }
-                                }
-
-                                // Description or branch info
-                                Text {
-                                    text: {
-                                        if (spuDelegate.isArtifact) {
-                                            return qsTr("Click to scan for SPU files (Branch: %1)").arg(spuDelegate.modelData.branch || "unknown")
-                                        } else if (spuDelegate.modelData.description) {
-                                            return spuDelegate.modelData.description
-                                        }
-                                        return ""
-                                    }
-                                    font.pixelSize: Style.fontSizeCaption
-                                    font.family: Style.fontFamily
-                                    color: spuDelegate.isSelected ? "white" : Style.textDescriptionColor
-                                    visible: text.length > 0
-                                    wrapMode: Text.Wrap
-                                    Layout.fillWidth: true
-                                }
-
-                                // Size info (only for actual SPU files)
-                                Text {
-                                    text: spuDelegate.modelData.size > 0 && !spuDelegate.isArtifact
-                                        ? qsTr("Size: %1").arg(root.imageWriter.formatSize(spuDelegate.modelData.size))
-                                        : ""
-                                    font.pixelSize: Style.fontSizeCaption
-                                    font.family: Style.fontFamily
-                                    color: spuDelegate.isSelected ? "white" : Style.textDescriptionColor
-                                    visible: text.length > 0
-                                }
-                            }
-
-                            onClicked: {
-                                spuListView.currentIndex = index
+                        onItemSelected: function(index, item) {
+                            if (index >= 0 && index < count) {
+                                currentIndex = index
+                                var modelData = root.displayList[index]
                                 root.handleItemClicked(modelData)
                             }
+                        }
 
-                            Keys.onReturnPressed: function(event) {
-                                spuListView.currentIndex = index
+                        onItemDoubleClicked: function(index, item) {
+                            if (index >= 0 && index < count) {
+                                currentIndex = index
+                                var modelData = root.displayList[index]
                                 root.handleItemClicked(modelData)
-                            }
-
-                            Keys.onEnterPressed: function(event) {
-                                spuListView.currentIndex = index
-                                root.handleItemClicked(modelData)
+                                // Advance to next step if this is a selectable SPU file (not an artifact to inspect)
+                                if (modelData.source_type !== "artifact" && root.nextButtonEnabled) {
+                                    Qt.callLater(function() {
+                                        root.nextClicked()
+                                    })
+                                }
                             }
                         }
                     }

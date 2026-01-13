@@ -18,6 +18,42 @@
 
 namespace MountHelper {
 
+// Internal helper to get partition path from device
+static QString getPartitionPath(const QString &device)
+{
+    // On macOS, partitions are named like /dev/disk2s1
+    return device + "s1";
+}
+
+// Internal helper to check if partition is already mounted
+static QString getExistingMountPoint(const QString &partition)
+{
+    // Use diskutil info to check if already mounted
+    QProcess diskutilInfo;
+    diskutilInfo.start("diskutil", {"info", partition});
+
+    if (diskutilInfo.waitForFinished(5000) && diskutilInfo.exitCode() == 0)
+    {
+        QString info = QString::fromUtf8(diskutilInfo.readAllStandardOutput());
+        QStringList lines = info.split('\n');
+
+        for (const QString &line : lines)
+        {
+            if (line.trimmed().startsWith("Mount Point:"))
+            {
+                QString mountPoint = line.mid(line.indexOf(':') + 1).trimmed();
+                if (!mountPoint.isEmpty() && mountPoint != "(not mounted)")
+                {
+                    qDebug() << "Found existing mount point for" << partition << ":" << mountPoint;
+                    return mountPoint;
+                }
+            }
+        }
+    }
+
+    return QString();
+}
+
 QString waitForPartition(const QString &device, int timeoutMs)
 {
     // On macOS, device is like "/dev/disk2"
@@ -38,8 +74,20 @@ QString waitForPartition(const QString &device, int timeoutMs)
 
 QString mountDevice(const QString &device)
 {
-    // Wait for partition to appear
-    QString partition = waitForPartition(device);
+    // First, determine the partition path
+    QString partition = getPartitionPath(device);
+
+    // Check if already mounted BEFORE trying to get exclusive access
+    // This avoids waiting when device is already in use by mount
+    QString existingMount = getExistingMountPoint(partition);
+    if (!existingMount.isEmpty())
+    {
+        qDebug() << "Device" << partition << "already mounted at:" << existingMount;
+        return existingMount;
+    }
+
+    // Not mounted - wait for partition to appear
+    partition = waitForPartition(device);
     if (partition.isEmpty())
     {
         qWarning() << "No partition found for device:" << device;

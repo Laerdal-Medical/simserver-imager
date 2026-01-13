@@ -4922,18 +4922,28 @@ void ImageWriter::startSpuCopy(bool skipFormat)
     }
 
     // Create the appropriate thread based on source type
+    qDebug() << "  SPU source state:";
+    qDebug() << "    _spuFilePath:" << _spuFilePath;
+    qDebug() << "    _spuArchivePath:" << _spuArchivePath;
+    qDebug() << "    _spuEntryName:" << _spuEntryName;
+    qDebug() << "    _spuUrl:" << _spuUrl;
+
     if (!_spuFilePath.isEmpty()) {
         // Direct file copy
+        qDebug() << "  Using direct file copy mode";
         _spuCopyThread = new SPUCopyThread(_spuFilePath, _dst.toLatin1(), skipFormat, this);
     } else if (!_spuArchivePath.isEmpty() && !_spuEntryName.isEmpty()) {
         // Extract from ZIP
+        qDebug() << "  Using ZIP extraction mode";
         _spuCopyThread = new SPUCopyThread(_spuArchivePath, _spuEntryName, _dst.toLatin1(), skipFormat, this);
     } else if (_spuUrl.isValid()) {
         // Download from URL first, then copy
         // For now, we need to download to a temp location
         // The SPUCopyThread can handle URL downloads directly
+        qDebug() << "  Using URL download mode";
         _spuCopyThread = new SPUCopyThread(_spuUrl, _dst.toLatin1(), skipFormat, this);
     } else {
+        qDebug() << "  ERROR: No SPU source configured!";
         emit spuCopyError(tr("No SPU source configured"));
         return;
     }

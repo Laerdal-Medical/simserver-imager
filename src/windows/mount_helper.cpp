@@ -17,6 +17,32 @@
 
 namespace MountHelper {
 
+// Internal helper to get the drive letter for an already-mounted device
+static QString getExistingDriveLetter(const QString &device)
+{
+    // On Windows, check if the physical drive already has a drive letter assigned
+    // This avoids waiting for a drive that's already mounted
+    Q_UNUSED(device)
+
+    DWORD drives = GetLogicalDrives();
+    for (char letter = 'D'; letter <= 'Z'; letter++)
+    {
+        if (drives & (1 << (letter - 'A')))
+        {
+            QString drivePath = QString("%1:\\").arg(letter);
+            UINT driveType = GetDriveTypeA(drivePath.toLatin1().constData());
+            if (driveType == DRIVE_REMOVABLE)
+            {
+                // Found a removable drive
+                qDebug() << "Found existing removable drive:" << drivePath;
+                return QString("%1:").arg(letter);
+            }
+        }
+    }
+
+    return QString();
+}
+
 QString waitForPartition(const QString &device, int timeoutMs)
 {
     // On Windows, device is like "\\.\PhysicalDrive1"
@@ -62,6 +88,15 @@ QString mountDevice(const QString &device)
 {
     // On Windows, removable drives are typically auto-mounted
     // We just need to find the drive letter associated with the physical drive
+
+    // First check if already mounted - avoid waiting for a drive that's already available
+    QString existingDrive = getExistingDriveLetter(device);
+    if (!existingDrive.isEmpty())
+    {
+        QString mountPoint = existingDrive + "\\";
+        qDebug() << "Device already mounted at:" << mountPoint;
+        return mountPoint;
+    }
 
     // Wait for partition to appear and get drive letter
     QString driveLetter = waitForPartition(device);

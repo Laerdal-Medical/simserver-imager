@@ -14,8 +14,11 @@ WizardStepBase {
     
     required property ImageWriter imageWriter
     required property var wizardContainer
-    
-    title: qsTr("Write complete!")
+
+    // Detect if we completed an SPU copy operation
+    readonly property bool isSpuCopyMode: wizardContainer.isSpuCopyMode
+
+    title: isSpuCopyMode ? qsTr("Copy complete!") : qsTr("Write complete!")
     showBackButton: false
     showNextButton: false
     readonly property bool autoEjectEnabled: imageWriter.getBoolSetting("eject")
@@ -44,11 +47,77 @@ WizardStepBase {
         anchors.margins: Style.cardPadding
         spacing: Style.spacingLarge
         
-        // What was configured (de-chromed)
+        // SPU copy completion message (simple view)
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacingLarge
+            visible: root.isSpuCopyMode
+
+            Rectangle {
+                Layout.preferredWidth: 80
+                Layout.preferredHeight: 80
+                Layout.alignment: Qt.AlignHCenter
+                radius: 40
+                color: Style.successColor
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "\u2713"
+                    font.pixelSize: 40
+                    color: "white"
+                }
+            }
+
+            Text {
+                text: qsTr("SPU file copied successfully!")
+                font.pixelSize: Style.fontSizeHeading
+                font.family: Style.fontFamilyBold
+                font.bold: true
+                color: Style.formLabelColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            Text {
+                text: root.wizardContainer.selectedSpuName || ""
+                font.pixelSize: Style.fontSizeDescription
+                font.family: Style.fontFamily
+                color: Style.textDescriptionColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                visible: text.length > 0
+            }
+
+            Text {
+                text: qsTr("Copied to: %1").arg(root.wizardContainer.selectedStorageName || "")
+                font.pixelSize: Style.fontSizeDescription
+                font.family: Style.fontFamily
+                color: Style.textDescriptionColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                visible: root.wizardContainer.selectedStorageName
+            }
+
+            Text {
+                text: root.autoEjectEnabled
+                    ? qsTr("The USB drive was ejected automatically. You can now remove it safely.")
+                    : qsTr("Please eject the USB drive before removing it from your computer.")
+                font.pixelSize: Style.fontSizeDescription
+                font.family: Style.fontFamily
+                color: Style.textDescriptionColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                Layout.topMargin: Style.spacingMedium
+            }
+        }
+
+        // What was configured (de-chromed) - hidden for SPU copy mode
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Style.spacingMedium
-            
+            visible: !root.isSpuCopyMode
+
             Text {
                 id: choicesHeading
                 text: qsTr("Your choices:")

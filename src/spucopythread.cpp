@@ -31,6 +31,7 @@ SPUCopyThread::SPUCopyThread(const QString &archivePath, const QString &spuEntry
     , _device(device)
     , _skipFormat(skipFormat)
     , _isDirectFile(false)
+    , _isUrlDownload(false)
     , _cancelled(false)
 {
 }

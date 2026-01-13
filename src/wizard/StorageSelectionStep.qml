@@ -146,6 +146,7 @@ WizardStepBase {
             highlightFollowsCurrentItem: false
             
             onItemSelected: function(index, item) {
+                console.log("StorageSelectionStep: onItemSelected called, index:", index, "item:", item)
                 if (index >= 0 && index < dstlist.count) {
                     // Try to use the delegate item if available
                     if (item && typeof item.selectDrive === "function") {
@@ -161,10 +162,11 @@ WizardStepBase {
             }
             
             onItemDoubleClicked: function(index, item) {
+                console.log("StorageSelectionStep: onItemDoubleClicked called!")
                 // First select the item
                 if (index >= 0 && index < count && item && typeof item.selectDrive === "function") {
                     item.selectDrive()
-                    
+
                     // Then advance to next step if possible (same as pressing Return)
                     Qt.callLater(function() {
                         if (root.nextButtonEnabled) {
@@ -270,10 +272,10 @@ WizardStepBase {
     // Storage delegate component
     Component {
         id: dstdelegate
-        
-        Item {
+
+        SelectionListDelegate {
             id: dstitem
-            
+
             required property int index
             required property string device
             required property string description
@@ -284,138 +286,33 @@ WizardStepBase {
             required property bool isSystem
             required property var mountpoints
             required property QtObject modelData
-            
-            readonly property bool shouldHide: isSystem && filterSystemDrives.checked
+
+            // Expose isSystem for system drive confirmation
             readonly property bool unselectable: isReadOnly
-            
-            // Accessibility properties
-            Accessible.role: Accessible.ListItem
-            Accessible.name: dstitem.description + ". " + imageWriter.formatSize(parseFloat(dstitem.size)) + (dstitem.mountpoints.length > 0 ? ". " + qsTr("Mounted as %1").arg(dstitem.mountpoints.join(", ")) : "") + (dstitem.unselectable ? ". " + qsTr("Read-only") : "")
-            Accessible.focusable: true
-            Accessible.ignored: false
-            
+
             // Function called by keyboard selection
             function selectDrive() {
                 if (!unselectable) {
                     root.selectDstItem(dstitem)
                 }
             }
-            
-            width: dstlist.width
-            height: shouldHide ? 0 : 80
-            visible: !shouldHide
-            
-            Rectangle {
-                id: dstbgrect
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                color: (dstlist.currentIndex === dstitem.index) ? Style.listViewHighlightColor :
-                       (dstMouseArea.containsMouse && !dstitem.unselectable ? Style.listViewHoverRowBackgroundColor : Style.listViewRowBackgroundColor)
-                radius: 0
-                opacity: dstitem.unselectable ? 0.5 : 1.0
-                anchors.rightMargin: (dstlist.contentHeight > dstlist.height ? Style.scrollBarWidth : 0)
-                Accessible.ignored: true
-                
-                MouseArea {
-                    id: dstMouseArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: dstitem.unselectable ? Qt.ForbiddenCursor : Qt.PointingHandCursor
-                    enabled: !dstitem.unselectable
-                    
-                    onClicked: {
-                        if (!dstitem.unselectable) {
-                            dstlist.currentIndex = dstitem.index
-                            root.selectDstItem(dstitem)
-                        }
-                    }
-                    
-                    onDoubleClicked: {
-                        if (!dstitem.unselectable) {
-                            // Double-click acts like pressing Return - select and advance
-                            dstlist.itemDoubleClicked(dstitem.index, dstitem)
-                        }
-                    }
-                }
-                
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: Style.listItemPadding
-                    spacing: Style.spacingMedium
-                    
-                    // Storage icon
-                    Image {
-                        id: storageIcon
-                        source: dstitem.isUsb ? "../icons/ic_usb_40px.svg" :
-                                dstitem.isScsi ? "../icons/ic_storage_40px.svg" :
-                                "../icons/ic_sd_storage_40px.svg"
-                        Layout.preferredWidth: 40
-                        Layout.preferredHeight: 40
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        mipmap: true
-                        // Rasterize vector sources at device pixel ratio to avoid aliasing/blurriness on HiDPI
-                        sourceSize: Qt.size(Math.round(40 * Screen.devicePixelRatio), Math.round(40 * Screen.devicePixelRatio))
-                        visible: source.toString().length > 0
 
-                        Rectangle {
-                            anchors.fill: parent
-                            color: "transparent"
-                            border.color: Style.titleSeparatorColor
-                            border.width: 1
-                            radius: 0
-                            visible: parent.status === Image.Error
-                        }
-                    }
-                    
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: Style.spacingXXSmall
-                        
-                        MarqueeText {
-                            text: dstitem.description
-                            font.pixelSize: Style.fontSizeFormLabel
-                            font.family: Style.fontFamilyBold
-                            font.bold: true
-                            color: dstitem.unselectable ? Style.formLabelDisabledColor : Style.formLabelColor
-                            Layout.fillWidth: true
-                            Accessible.ignored: true
-                        }
-                        
-                        Text {
-                            text: imageWriter.formatSize(parseFloat(dstitem.size))
-                            font.pixelSize: Style.fontSizeDescription
-                            font.family: Style.fontFamily
-                            color: dstitem.unselectable ? Style.formLabelDisabledColor : Style.textDescriptionColor
-                            Layout.fillWidth: true
-                            Accessible.ignored: true
-                        }
-                        
-                        MarqueeText {
-                            text: dstitem.mountpoints.length > 0 ? 
-                                  qsTr("Mounted as %1").arg(dstitem.mountpoints.join(", ")) : ""
-                            font.pixelSize: Style.fontSizeSmall
-                            font.family: Style.fontFamily
-                            color: dstitem.unselectable ? Style.formLabelDisabledColor : Style.textMetadataColor
-                            Layout.fillWidth: true
-                            visible: dstitem.mountpoints.length > 0
-                            Accessible.ignored: true
-                        }
-                    }
-                    
-                    // Read-only indicator
-                    Text {
-                        text: qsTr("Read-only")
-                        font.pixelSize: Style.fontSizeDescription
-                        font.family: Style.fontFamily
-                        color: Style.formLabelErrorColor
-                        visible: dstitem.unselectable
-                        Accessible.ignored: true
-                    }
-                }
-            }
+            // Map model properties to SelectionListDelegate properties
+            delegateIndex: dstitem.index
+            itemTitle: dstitem.description
+            itemDescription: root.imageWriter.formatSize(parseFloat(dstitem.size))
+            itemIcon: dstitem.isUsb ? "../icons/ic_usb_40px.svg" :
+                      dstitem.isScsi ? "../icons/ic_storage_40px.svg" :
+                      "../icons/ic_sd_storage_40px.svg"
+            itemMetadata: dstitem.mountpoints.length > 0 ?
+                          qsTr("Mounted as %1").arg(dstitem.mountpoints.join(", ")) : ""
+
+            // State mappings
+            isHidden: dstitem.isSystem && filterSystemDrives.checked
+            isDisabled: dstitem.isReadOnly
+            disabledReason: qsTr("Read-only")
+
+            minimumHeight: 80
         }
     }
     

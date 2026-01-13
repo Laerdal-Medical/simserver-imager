@@ -51,7 +51,10 @@ ListView {
     // Touch scrolling improvements
     flickDeceleration: 1500  // Slower deceleration for smoother touch scrolling
     maximumFlickVelocity: 2500  // Reasonable max velocity
-    pressDelay: 50  // Brief delay to distinguish tap from scroll on touch
+    pressDelay: 0  // Allow immediate press delivery to delegates for click/double-click handling
+
+    // Track if selection came from mouse (for scroll preservation)
+    property bool currentSelectionIsFromMouse: false
     
     // Keep delegates instantiated beyond the visible area to prevent
     // itemAtIndex() returning null during keyboard/accessibility navigation

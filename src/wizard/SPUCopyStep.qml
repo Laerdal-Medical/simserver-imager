@@ -34,14 +34,14 @@ WizardStepBase {
     nextButtonText: {
         if (root.isCopying) {
             return qsTr("Cancel")
-        } else if (root.isComplete || root.hasError) {
+        } else if (root.isComplete) {
             return CommonStrings.continueText
         } else {
             return qsTr("Copy to USB")
         }
     }
 
-    nextButtonEnabled: true
+    nextButtonEnabled: !root.hasError
     showBackButton: true
     backButtonEnabled: !root.isCopying
 
@@ -78,6 +78,8 @@ WizardStepBase {
             root.isComplete = true
             root.hasError = false
             root.statusMessage = qsTr("SPU file copied successfully!")
+            // Auto-advance to done step
+            root.nextClicked()
         }
 
         function onSpuCopyError(msg) {
@@ -98,9 +100,8 @@ WizardStepBase {
         if (root.isCopying) {
             // Cancel
             root.imageWriter.cancelSpuCopy()
-        } else if (root.isComplete || root.hasError) {
-            // Continue to completion
-            // The wizard container will handle navigation
+        } else if (root.isComplete) {
+            // Continue to done step - handled by WizardContainer
         } else {
             // Start copy - check if drive is FAT32 first
             root.driveIsFat32 = root.imageWriter.isDriveFat32()

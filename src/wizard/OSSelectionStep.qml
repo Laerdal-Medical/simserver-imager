@@ -55,8 +55,40 @@ WizardStepBase {
     signal defaultEmbeddedDriveRequested(var drive)
     
     // Forward the nextClicked signal as next() function
+    // If an artifact is selected but not yet inspected, inspect it first
     function next() {
-        root.nextClicked()
+        if (root.selectedArtifactModel !== null) {
+            // Artifact selected but not inspected - inspect it now
+            root.inspectSelectedArtifact()
+        } else {
+            root.nextClicked()
+        }
+    }
+
+    // Inspect the currently selected artifact (deferred download)
+    function inspectSelectedArtifact() {
+        var model = root.selectedArtifactModel
+        if (!model) return
+
+        console.log("Inspecting artifact:", model.artifact_id, model.name)
+        root.pendingArtifactModel = model
+        root.selectedArtifactModel = null  // Clear so we don't re-inspect
+
+        // Show download progress dialog
+        artifactDownloadProgressDialog.artifactName = model.name
+        artifactDownloadProgressDialog.progress = 0
+        artifactDownloadProgressDialog.indeterminate = true
+        artifactDownloadProgressDialog.open()
+
+        // Request artifact inspection - this will download and scan the ZIP
+        var repoManager = imageWriter.getRepositoryManager()
+        repoManager.inspectArtifact(
+            model.artifact_id,
+            model.name,
+            model.source_owner,
+            model.source_repo,
+            typeof(model.branch) !== "undefined" ? model.branch : ""
+        )
     }
     
     // Common handler functions for OS selection
@@ -241,7 +273,7 @@ WizardStepBase {
                 )
 
                 // Update UI state for SPU mode
-                root.wizardContainer.selectedOsName = displayName
+                root.wizardContainer.selectedSpuName = displayName
                 root.wizardContainer.isSpuCopyMode = true
                 root.wizardContainer.customizationSupported = false
                 root.wizardContainer.piConnectAvailable = false
@@ -274,6 +306,13 @@ WizardStepBase {
                 root.customSelected = false
                 root.nextButtonEnabled = true
             }
+
+            // Auto-advance to next step after file selection
+            Qt.callLater(function() {
+                if (root.nextButtonEnabled) {
+                    root.nextClicked()
+                }
+            })
         }
 
         onCancelled: {
@@ -284,6 +323,9 @@ WizardStepBase {
 
     // Pending artifact selection data (stored while waiting for inspection)
     property var pendingArtifactModel: null
+
+    // Selected artifact that hasn't been inspected yet (for deferred download on double-click/Next)
+    property var selectedArtifactModel: null
 
     // Download progress dialog for artifact inspection
     ArtifactDownloadProgressDialog {
@@ -334,7 +376,7 @@ WizardStepBase {
                 if (fileType === "spu") {
                     // SPU file - set up SPU copy mode
                     imageWriter.setSrcSpuArtifact(artifactId, owner, repo, branch, file.filename, zipPath)
-                    root.wizardContainer.selectedOsName = displayName
+                    root.wizardContainer.selectedSpuName = displayName
                     root.wizardContainer.isSpuCopyMode = true
                     root.wizardContainer.customizationSupported = false
                     root.wizardContainer.piConnectAvailable = false
@@ -510,8 +552,8 @@ WizardStepBase {
     // OS delegate component
     Component {
         id: osdelegate
-        
-        Item {
+
+        SelectionListDelegate {
             id: delegateItem
 
             required property int index
@@ -545,208 +587,76 @@ WizardStepBase {
                 return date.toLocaleDateString(Qt.locale()) + " " + date.toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
             }
 
-            // Get reference to the containing ListView
-            // IMPORTANT: Cache ListView.view in a property for reliable access.
-            // This delegate is shared between the main OS list and dynamically created sublists.
-            // Using ListView.view directly in bindings can be unreliable, so we cache it here.
-            // This enables proper highlighting for both keyboard and mouse navigation in all lists.
-            property var parentListView: ListView.view
-            
-            width: parentListView ? parentListView.width : 200
-            // Let content determine height for balanced vertical padding
-            height: Math.max(80, row.implicitHeight + Style.spacingSmall + Style.spacingMedium)
-            
-            // Accessibility properties
-            Accessible.role: Accessible.ListItem
-            Accessible.name: delegateItem.name + ". " + delegateItem.description + (delegateItem.formattedReleaseDate !== "" ? ". " + qsTr("Released: %1").arg(delegateItem.formattedReleaseDate) : "")
-            Accessible.focusable: true
-            Accessible.ignored: false
-            
-            Rectangle {
-                id: osbgrect
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                // Delegate highlighting: Works together with ListView's built-in highlight system
-                // DO NOT disable ListView's highlight - both systems work in harmony
-                color: (parentListView && parentListView.currentIndex === index) ? Style.listViewHighlightColor :
-                       (osMouseArea.containsMouse ? Style.listViewHoverRowBackgroundColor : Style.listViewRowBackgroundColor)
-                radius: 0
-                anchors.rightMargin: (
-                    (parentListView && parentListView.contentHeight > parentListView.height) ? Style.scrollBarWidth : 0)
-                Accessible.ignored: true
-                
-                MouseArea {
-                    id: osMouseArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    
-                    onPressed: {
-                        if (parentListView) {
-                            if (!parentListView.activeFocus) {
-                                parentListView.forceActiveFocus()
-                            }
-                        }
-                    }
-
-                    onClicked: {
-                        // Trigger the itemSelected signal to handle selection with scroll preservation
-                        if (parentListView) {
-                            // Set flag to indicate this is a mouse click
-                            parentListView.currentSelectionIsFromMouse = true
-                            parentListView.itemSelected(index, delegateItem)
-                        }
-                    }
-                    
-                    onDoubleClicked: {
-                        // Double-click acts like pressing Return - select and advance
-                        if (parentListView) {
-                            parentListView.itemDoubleClicked(index, delegateItem)
-                        }
-                    }
+            // Cache status text for metadata line
+            readonly property string cacheStatusText: {
+                if (typeof(delegateItem.url) === "string" && delegateItem.url === "internal://custom") {
+                    var sz = root.customSelected ? root.customSelectedSize : 0
+                    return sz > 0 ? qsTr("Local - %1").arg(root.imageWriter.formatSize(sz)) : ""
                 }
-                
-                RowLayout {
-                    id: row
-                    anchors.fill: parent
-                    anchors.leftMargin: Style.listItemPadding
-                    anchors.rightMargin: Style.listItemPadding
-                    anchors.topMargin: Style.spacingSmall
-                    anchors.bottomMargin: Style.spacingMedium
-                    spacing: Style.spacingMedium
-                    
-                    // OS Icon
-                    Image {
-                        id: osicon
-                        source: delegateItem.icon
-                        cache: true
-                        asynchronous: true
-                        Layout.preferredWidth: 40
-                        Layout.preferredHeight: 40
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        mipmap: true
-                        // Rasterize vector sources at device pixel ratio to avoid aliasing/blurriness on HiDPI
-                        sourceSize: Qt.size(Math.round(Layout.preferredWidth * Screen.devicePixelRatio), Math.round(Layout.preferredHeight * Screen.devicePixelRatio))
-                        visible: source.toString().length > 0
+                if (!delegateItem.url) return ""
+                if (typeof(delegateItem.extract_sha256) !== "undefined" &&
+                    root.cacheStatusVersion >= 0 &&
+                    root.imageWriter.isCached(delegateItem.url, delegateItem.extract_sha256)) {
+                    return qsTr("Cached on your computer")
+                }
+                if (delegateItem.url.startsWith("file://")) {
+                    return qsTr("Local file")
+                }
+                return qsTr("Online - %1 download").arg(root.imageWriter.formatSize(delegateItem.image_download_size))
+            }
 
-                        Rectangle {
-                            anchors.fill: parent
-                            color: "transparent"
-                            border.color: Style.titleSeparatorColor
-                            border.width: 1
-                            radius: 0
-                            visible: parent.status === Image.Error
-                        }
-                    }
-                    
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: Style.spacingXXSmall
+            // Whether to show cache status
+            readonly property bool showCacheStatus: {
+                return (typeof(delegateItem.url) === "string" && delegateItem.url !== "internal://custom" && delegateItem.url !== "internal://format")
+                    || (typeof(delegateItem.url) === "string" && delegateItem.url === "internal://custom" && root.customSelected)
+            }
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Style.spacingSmall
+            // Map model properties to SelectionListDelegate properties
+            delegateIndex: delegateItem.index
+            itemTitle: delegateItem.name
+            itemDescription: delegateItem.description
+            itemIcon: delegateItem.icon
+            itemMetadata: delegateItem.showCacheStatus ? delegateItem.cacheStatusText : ""
+            itemMetadata2: delegateItem.formattedReleaseDate !== "" ? qsTr("Released: %1").arg(delegateItem.formattedReleaseDate) : ""
 
-                            Text {
-                                text: delegateItem.name
-                                font.pixelSize: Style.fontSizeFormLabel
-                                font.family: Style.fontFamilyBold
-                                font.bold: true
-                                color: Style.formLabelColor
-                                Layout.fillWidth: true
-                                Accessible.ignored: true
-                            }
+            minimumHeight: 80
 
-                            // Source badge for GitHub items
-                            ImBadge {
-                                visible: delegateItem.source === "github"
-                                text: delegateItem.source_type === "artifact" ? qsTr("CI Build") : qsTr("Release")
-                                variant: delegateItem.source_type === "artifact" ? "purple" : "green"
-                                accessibleName: delegateItem.source_type === "artifact" ? qsTr("CI Build from GitHub Actions") : qsTr("GitHub Release")
-                            }
+            // Custom badges using the badgeContent slot
+            ImBadge {
+                visible: delegateItem.source === "github"
+                text: delegateItem.source_type === "artifact" ? qsTr("CI Build") : qsTr("Release")
+                variant: delegateItem.source_type === "artifact" ? "purple" : "green"
+                accessibleName: delegateItem.source_type === "artifact" ? qsTr("CI Build from GitHub Actions") : qsTr("GitHub Release")
+            }
 
-                            // Image type badge (SPU/VSI/WIC) based on URL extension
-                            ImBadge {
-                                id: imageTypeBadge
-                                visible: {
-                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                                    return urlStr.length > 0 &&
-                                           !urlStr.startsWith("internal://") &&
-                                           (urlStr.endsWith(".spu") || urlStr.endsWith(".vsi") ||
-                                            urlStr.endsWith(".wic") || urlStr.endsWith(".wic.xz") ||
-                                            urlStr.endsWith(".wic.gz") || urlStr.endsWith(".wic.bz2") ||
-                                            urlStr.endsWith(".wic.zst"))
-                                }
-                                text: {
-                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                                    if (urlStr.endsWith(".spu")) return qsTr("SPU")
-                                    if (urlStr.endsWith(".vsi")) return qsTr("VSI")
-                                    return qsTr("WIC")
-                                }
-                                variant: {
-                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                                    if (urlStr.endsWith(".spu")) return "indigo"
-                                    if (urlStr.endsWith(".vsi")) return "cyan"
-                                    return "emerald"
-                                }
-                                accessibleName: {
-                                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                                    if (urlStr.endsWith(".spu")) return qsTr("Software Package Update file")
-                                    if (urlStr.endsWith(".vsi")) return qsTr("Versioned Sparse Image file")
-                                    return qsTr("Disk image file")
-                                }
-                            }
-                        }
-
-                        Text {
-                            text: delegateItem.description
-                            font.pixelSize: Style.fontSizeDescription
-                            font.family: Style.fontFamily
-                            color: Style.textDescriptionColor
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            Accessible.ignored: true
-                        }
-                        // Cache/local/online status line
-                        Text {
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            color: Style.textMetadataColor
-                            font.pixelSize: Style.fontSizeSmall
-                            font.family: Style.fontFamily
-                            // Hide for custom until a file is chosen; otherwise show status
-                            visible: (typeof(delegateItem.url) === "string" && delegateItem.url !== "internal://custom" && delegateItem.url !== "internal://format")
-                                     || (typeof(delegateItem.url) === "string" && delegateItem.url === "internal://custom" && root.customSelected)
-                            text:
-                                (typeof(delegateItem.url) === "string" && delegateItem.url === "internal://custom")
-                                ? (function(){
-                                    var sz = root.customSelected ? root.customSelectedSize : 0;
-                                    return sz > 0 ? qsTr("Local - %1").arg(imageWriter.formatSize(sz)) : "";
-                                  })()
-                                : (!delegateItem.url ? "" :
-                                  ((typeof(delegateItem.extract_sha256) !== "undefined" && 
-                                    root.cacheStatusVersion >= 0 && // Force re-evaluation when cache status changes
-                                    imageWriter.isCached(delegateItem.url, delegateItem.extract_sha256))
-                                    ? qsTr("Cached on your computer")
-                                    : (delegateItem.url.startsWith("file://")
-                                       ? qsTr("Local file")
-                                       : qsTr("Online - %1 download").arg(imageWriter.formatSize(delegateItem.image_download_size)))))
-                            Accessible.ignored: true
-                        }
-                        
-                        Text {
-                            text: delegateItem.formattedReleaseDate !== "" ? qsTr("Released: %1").arg(delegateItem.formattedReleaseDate) : ""
-                            font.pixelSize: Style.fontSizeSmall
-                            font.family: Style.fontFamily
-                            color: Style.textMetadataColor
-                            Layout.fillWidth: true
-                            visible: delegateItem.formattedReleaseDate !== ""
-                            Accessible.ignored: true
-                        }
-                    }
+            ImBadge {
+                id: imageTypeBadge
+                visible: {
+                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                    return urlStr.length > 0 &&
+                           !urlStr.startsWith("internal://") &&
+                           (urlStr.endsWith(".spu") || urlStr.endsWith(".vsi") ||
+                            urlStr.endsWith(".wic") || urlStr.endsWith(".wic.xz") ||
+                            urlStr.endsWith(".wic.gz") || urlStr.endsWith(".wic.bz2") ||
+                            urlStr.endsWith(".wic.zst"))
+                }
+                text: {
+                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                    if (urlStr.endsWith(".spu")) return qsTr("SPU")
+                    if (urlStr.endsWith(".vsi")) return qsTr("VSI")
+                    return qsTr("WIC")
+                }
+                variant: {
+                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                    if (urlStr.endsWith(".spu")) return "indigo"
+                    if (urlStr.endsWith(".vsi")) return "cyan"
+                    return "emerald"
+                }
+                accessibleName: {
+                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
+                    if (urlStr.endsWith(".spu")) return qsTr("Software Package Update file")
+                    if (urlStr.endsWith(".vsi")) return qsTr("Versioned Sparse Image file")
+                    return qsTr("Disk image file")
                 }
             }
         }
@@ -934,36 +844,16 @@ WizardStepBase {
                 // Normal OS selection - check if this is a GitHub artifact
                 if (typeof(model.source_type) === "string" && model.source_type === "artifact" &&
                     typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0) {
-                    // GitHub CI artifact - inspect contents to check for multiple files
-                    console.log("Inspecting artifact:", model.artifact_id, model.name)
-                    root.pendingArtifactModel = model
-
-                    // Show download progress dialog
-                    artifactDownloadProgressDialog.artifactName = model.name
-                    artifactDownloadProgressDialog.progress = 0
-                    artifactDownloadProgressDialog.indeterminate = true
-                    artifactDownloadProgressDialog.open()
-
-                    // Request artifact inspection - this will download and scan the ZIP
-                    var repoManager = imageWriter.getRepositoryManager()
-                    repoManager.inspectArtifact(
-                        model.artifact_id,
-                        model.name,
-                        model.source_owner,
-                        model.source_repo,
-                        typeof(model.branch) !== "undefined" ? model.branch : ""
-                    )
-
-                    // If artifact was cached, the signal fires synchronously and clears pendingArtifactModel.
-                    // In that case, onArtifactContentsReady has already set the source and selectedOsName.
-                    if (root.pendingArtifactModel === null) {
-                        return  // Already handled by the signal
-                    }
-
-                    // Don't enable next button yet - wait for inspection to complete
+                    // GitHub CI artifact - defer download until double-click or Next button
+                    // Just select/highlight the item for now
+                    console.log("Artifact selected (deferred download):", model.artifact_id, model.name)
+                    root.selectedArtifactModel = model
                     root.wizardContainer.selectedOsName = model.name
-                    root.nextButtonEnabled = false
-                    return  // Exit early - the Connections handler will complete the selection
+                    root.nextButtonEnabled = true  // Enable Next so user can click it to trigger download
+                    if (fromMouse) {
+                        Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
+                    }
+                    return  // Exit early - inspection will happen on Next/double-click
                 } else {
                     // Regular OS (CDN or GitHub release)
                     // Check if this is an SPU file based on URL extension
