@@ -250,6 +250,8 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
 {
     if (_artifactBranchFilter != branch) {
         _artifactBranchFilter = branch;
+        _settings.setValue(SETTINGS_ARTIFACT_BRANCH_FILTER, branch);
+        _settings.sync();
         emit artifactBranchFilterChanged();
         qDebug() << "RepositoryManager: Artifact branch filter set to:" << branch;
 
@@ -517,10 +519,14 @@ void RepositoryManager::loadSettings()
     // Load source type
     _selectedSourceType = _settings.value(SETTINGS_SOURCE_TYPE, "cdn").toString();
 
+    // Load artifact branch filter (last used branch selection)
+    _artifactBranchFilter = _settings.value(SETTINGS_ARTIFACT_BRANCH_FILTER).toString();
+
     qDebug() << "RepositoryManager: Loaded settings, environment:"
              << environmentName(_environment)
              << ", repos:" << _githubRepos.size()
-             << ", source type:" << _selectedSourceType;
+             << ", source type:" << _selectedSourceType
+             << ", branch filter:" << _artifactBranchFilter;
 }
 
 void RepositoryManager::saveSettings()
