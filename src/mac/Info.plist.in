@@ -47,9 +47,10 @@
       </array>
     </dict>
   </array>
-  <!-- Document type for manifest files. Extension defined in src/config.h (MANIFEST_EXTENSION) -->
+  <!-- Document types for image files and manifest files -->
   <key>CFBundleDocumentTypes</key>
   <array>
+    <!-- Manifest files. Extension defined in src/config.h (MANIFEST_EXTENSION) -->
     <dict>
       <key>CFBundleTypeName</key>
       <string>Laerdal SimServer Imager Manifest</string>
@@ -60,6 +61,45 @@
       <key>LSItemContentTypes</key>
       <array>
         <string>com.laerdal.simserver-imager-manifest</string>
+      </array>
+    </dict>
+    <!-- WIC disk image files -->
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>WIC Disk Image</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Default</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.laerdal.wic-image</string>
+      </array>
+    </dict>
+    <!-- VSI (Versioned Sparse Image) files -->
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Versioned Sparse Image</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.laerdal.vsi-image</string>
+      </array>
+    </dict>
+    <!-- SPU (Software Package Update) files -->
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Software Package Update</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.laerdal.spu-package</string>
       </array>
     </dict>
   </array>
@@ -83,6 +123,72 @@
         </array>
         <key>public.mime-type</key>
         <string>application/vnd.laerdal.imager-manifest+json</string>
+      </dict>
+    </dict>
+    <!-- WIC disk image type declaration -->
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.laerdal.wic-image</string>
+      <key>UTTypeDescription</key>
+      <string>WIC Disk Image</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.disk-image</string>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>wic</string>
+          <string>wic.xz</string>
+          <string>wic.gz</string>
+          <string>wic.bz2</string>
+          <string>wic.zst</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>application/x-wic-image</string>
+      </dict>
+    </dict>
+    <!-- VSI (Versioned Sparse Image) type declaration -->
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.laerdal.vsi-image</string>
+      <key>UTTypeDescription</key>
+      <string>Versioned Sparse Image</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.disk-image</string>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>vsi</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>application/x-vsi-image</string>
+      </dict>
+    </dict>
+    <!-- SPU (Software Package Update) type declaration -->
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.laerdal.spu-package</string>
+      <key>UTTypeDescription</key>
+      <string>Software Package Update</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>spu</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>application/x-spu-package</string>
       </dict>
     </dict>
   </array>

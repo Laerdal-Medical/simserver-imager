@@ -11,5 +11,5 @@ src/linux/icon/laerdal-simserver-imager.svg /usr/share/icons/hicolor/scalable/ap
 
 debian/com.laerdal.simserver-imager.desktop /usr/share/applications/
 debian/com.laerdal.simserver-imager.metainfo.xml /usr/share/metainfo/
-debian/com.laerdal.simserver-imager-manifest.xml /usr/share/mime/packages/
+debian/com.laerdal.simserver-imager.xml /usr/share/mime/packages/
 

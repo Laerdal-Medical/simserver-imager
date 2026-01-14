@@ -461,7 +461,8 @@ int main(int argc, char *argv[])
                  firstPos.endsWith(".wic.gz", Qt::CaseInsensitive) ||
                  firstPos.endsWith(".wic.zst", Qt::CaseInsensitive) ||
                  firstPos.endsWith(".wic.bz2", Qt::CaseInsensitive) ||
-                 firstPos.endsWith(".vsi", Qt::CaseInsensitive))
+                 firstPos.endsWith(".vsi", Qt::CaseInsensitive) ||
+                 firstPos.endsWith(".spu", Qt::CaseInsensitive))
         {
             // Image file passed as argument - pre-select it in the GUI
             QFileInfo fi(firstPos);
@@ -475,7 +476,7 @@ int main(int argc, char *argv[])
         else
         {
             cerr << "Unknown positional argument ignored: " << firstPos << endl;
-            cerr << "Supported file types: .wic, .wic.xz, .wic.gz, .wic.zst, .wic.bz2, .vsi, ." MANIFEST_EXTENSION ", .json" << endl;
+            cerr << "Supported file types: .wic, .wic.xz, .wic.gz, .wic.zst, .wic.bz2, .vsi, .spu, ." MANIFEST_EXTENSION ", .json" << endl;
         }
     }
 

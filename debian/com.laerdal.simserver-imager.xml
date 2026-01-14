@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MIME types for Laerdal SimServer Imager files.
+     Manifest extension and MIME type defined in src/config.h (MANIFEST_EXTENSION, MANIFEST_MIME_TYPE) -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <!-- Manifest files -->
+  <mime-type type="application/vnd.laerdal.imager-manifest+json">
+    <comment>Laerdal SimServer Imager Manifest</comment>
+    <glob pattern="*.laerdal-imager-manifest"/>
+    <sub-class-of type="application/json"/>
+    <icon name="laerdal-simserver-imager"/>
+  </mime-type>
+
+  <!-- WIC disk image files -->
+  <mime-type type="application/x-wic-image">
+    <comment>WIC Disk Image</comment>
+    <glob pattern="*.wic"/>
+    <glob pattern="*.wic.xz"/>
+    <glob pattern="*.wic.gz"/>
+    <glob pattern="*.wic.bz2"/>
+    <glob pattern="*.wic.zst"/>
+    <icon name="laerdal-simserver-imager"/>
+  </mime-type>
+
+  <!-- VSI (Versioned Sparse Image) files -->
+  <mime-type type="application/x-vsi-image">
+    <comment>Versioned Sparse Image</comment>
+    <glob pattern="*.vsi"/>
+    <icon name="laerdal-simserver-imager"/>
+  </mime-type>
+
+  <!-- SPU (Software Package Update) files -->
+  <mime-type type="application/x-spu-package">
+    <comment>Software Package Update</comment>
+    <glob pattern="*.spu"/>
+    <icon name="laerdal-simserver-imager"/>
+  </mime-type>
+</mime-info>
+
