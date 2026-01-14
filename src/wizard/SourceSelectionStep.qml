@@ -348,16 +348,23 @@ WizardStepBase {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Style.buttonHeightStandard
 
+                        // Make editable so user can type to filter and see their input
+                        editable: true
+
                         // Use a stable internal copy of branches to avoid model updates while popup is open
                         // This prevents focus loss during typing when branches are being fetched
                         property var availableBranches: []
                         property var pendingBranches: root.repoManager ? root.repoManager.availableBranches : []
-                        property string currentFilter: root.repoManager ? root.repoManager.artifactBranchFilter : ""
+
+                        // Track the user's selected branch name (not index) to preserve across model updates
+                        property string selectedBranchName: root.repoManager ? root.repoManager.artifactBranchFilter : ""
 
                         // Update availableBranches only when popup is closed to preserve focus
+                        // Also update currentIndex to match the selected branch in the new list
                         onPendingBranchesChanged: {
                             if (!popup.visible) {
                                 availableBranches = pendingBranches
+                                syncCurrentIndexToSelectedBranch()
                             }
                         }
 
@@ -368,13 +375,33 @@ WizardStepBase {
                                 if (!branchFilterCombo.popup.visible &&
                                     branchFilterCombo.pendingBranches !== branchFilterCombo.availableBranches) {
                                     branchFilterCombo.availableBranches = branchFilterCombo.pendingBranches
+                                    branchFilterCombo.syncCurrentIndexToSelectedBranch()
                                 }
                             }
+                        }
+
+                        // Sync currentIndex to match selectedBranchName in the current model
+                        function syncCurrentIndexToSelectedBranch() {
+                            if (!selectedBranchName || selectedBranchName === "") {
+                                currentIndex = 0
+                                return
+                            }
+                            var branches = availableBranches
+                            for (var i = 0; i < branches.length; i++) {
+                                if (branches[i] === selectedBranchName) {
+                                    currentIndex = i + 1  // +1 because "All branches" is at index 0
+                                    return
+                                }
+                            }
+                            // Branch not found in list - keep showing the selected branch name
+                            // but set index to 0 as fallback
+                            currentIndex = 0
                         }
 
                         // Initialize with current branches
                         Component.onCompleted: {
                             availableBranches = pendingBranches
+                            syncCurrentIndexToSelectedBranch()
                         }
 
                         model: {
@@ -382,28 +409,46 @@ WizardStepBase {
                             return branches
                         }
 
-                        currentIndex: {
-                            if (!currentFilter || currentFilter === "") return 0
-                            var branches = availableBranches
-                            for (var i = 0; i < branches.length; i++) {
-                                if (branches[i] === currentFilter) return i + 1
+                        // Don't use a binding for currentIndex - we manage it imperatively
+                        // to prevent it from being reset when the model changes
+                        currentIndex: 0
+
+                        // Handle text input for filtering - user can type branch name directly
+                        onEditTextChanged: {
+                            // Filter the dropdown list based on typed text
+                            // The popup will show matching items
+                        }
+
+                        // Handle when user accepts typed text (Enter key) or selects from dropdown
+                        onAccepted: {
+                            // User pressed Enter with typed text - use it as branch filter
+                            var typedText = editText.trim()
+                            if (root.repoManager) {
+                                if (typedText === "" || typedText === qsTr("All branches")) {
+                                    selectedBranchName = ""
+                                    root.repoManager.setArtifactBranchFilter("")
+                                } else {
+                                    selectedBranchName = typedText
+                                    root.repoManager.setArtifactBranchFilter(typedText)
+                                }
                             }
-                            return 0
                         }
 
                         onActivated: function(index) {
                             if (root.repoManager) {
                                 if (index === 0) {
+                                    selectedBranchName = ""
                                     root.repoManager.setArtifactBranchFilter("")
                                 } else {
-                                    root.repoManager.setArtifactBranchFilter(availableBranches[index - 1])
+                                    selectedBranchName = availableBranches[index - 1]
+                                    root.repoManager.setArtifactBranchFilter(selectedBranchName)
                                 }
                             }
                         }
 
                         Accessible.role: Accessible.ComboBox
                         Accessible.name: qsTr("Branch filter")
-                        Accessible.description: qsTr("Select which branch to fetch GitHub artifacts from. Type to search.")
+                        Accessible.description: qsTr("Select which branch to fetch GitHub artifacts from, or type to filter.")
                     }
 
                     // Refresh button to manually re-fetch branches

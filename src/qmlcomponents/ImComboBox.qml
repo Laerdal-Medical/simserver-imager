@@ -262,8 +262,8 @@ ComboBox {
                 popupComponent.close()
                 event.accepted = true
             }
-            // Handle backspace to delete last character
-            else if (event.key === Qt.Key_Backspace) {
+            // Handle backspace to delete last character (only for non-editable combobox)
+            else if (event.key === Qt.Key_Backspace && !root.editable) {
                 root.handleBackspace()
                 event.accepted = true
             }
@@ -272,8 +272,9 @@ ComboBox {
                 // Don't accept - let Tab navigate normally
                 event.accepted = false
             }
-            // Handle regular character input
-            else if (event.text && event.text.length === 1) {
+            // Handle regular character input (only for non-editable combobox)
+            // For editable combobox, let the text field handle input
+            else if (event.text && event.text.length === 1 && !root.editable) {
                 root.performSearch(event.text)
                 event.accepted = true
             }
@@ -337,21 +338,26 @@ ComboBox {
         height: Math.min(300, Math.max(150, contentItem.implicitHeight))
         closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
         
-        // Clear search string when popup opens or closes
+        // Clear search string when popup opens or closes (only for non-editable combobox)
         onVisibleChanged: {
             if (visible) {
                 // Store original selection when popup opens
                 root.originalIndex = root.currentIndex
-                root.searchString = ""
-                root.lastSearchIndex = -1
-                // Ensure ListView receives focus when popup opens for keyboard search
-                if (contentItem) {
-                    contentItem.forceActiveFocus()
+                if (!root.editable) {
+                    root.searchString = ""
+                    root.lastSearchIndex = -1
+                    // Ensure ListView receives focus when popup opens for keyboard search
+                    // (only for non-editable combobox - editable keeps focus in text field)
+                    if (contentItem) {
+                        contentItem.forceActiveFocus()
+                    }
                 }
             } else {
-                // Clear search when popup closes
-                root.searchString = ""
-                root.lastSearchIndex = -1
+                // Clear search when popup closes (only for non-editable)
+                if (!root.editable) {
+                    root.searchString = ""
+                    root.lastSearchIndex = -1
+                }
             }
         }
         
@@ -437,8 +443,8 @@ ComboBox {
                     popupComponent.close()
                     event.accepted = true
                 }
-                // Handle backspace to delete last character
-                else if (event.key === Qt.Key_Backspace) {
+                // Handle backspace to delete last character (only for non-editable combobox)
+                else if (event.key === Qt.Key_Backspace && !root.editable) {
                     root.handleBackspace()
                     event.accepted = true
                 }
@@ -447,8 +453,9 @@ ComboBox {
                     // Don't accept - let Tab navigate normally
                     event.accepted = false
                 }
-                // Handle regular character input
-                else if (event.text && event.text.length === 1) {
+                // Handle regular character input (only for non-editable combobox)
+                // For editable combobox, let the text field handle input
+                else if (event.text && event.text.length === 1 && !root.editable) {
                     root.performSearch(event.text)
                     event.accepted = true
                 }

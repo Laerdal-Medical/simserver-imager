@@ -205,7 +205,16 @@ FocusScope {
                 Layout.minimumWidth: Style.buttonWidthMinimum
                 Layout.maximumWidth: Style.buttonWidthMinimum * 1.5  // Allow some growth but cap it
                 Layout.preferredHeight: Style.buttonHeightStandard
-                onClicked: root.nextClicked()
+                onClicked: {
+                    // Call next() function if defined by the step, otherwise emit nextClicked directly
+                    // This allows steps like OSSelectionStep to intercept the Next button and perform
+                    // additional actions (e.g., inspecting CI artifacts) before advancing
+                    if (typeof root.next === "function") {
+                        root.next()
+                    } else {
+                        root.nextClicked()
+                    }
+                }
                 // After next, Tab goes to back; Shift+Tab goes to skip
                 KeyNavigation.tab: backButton
                 KeyNavigation.backtab: skipButton
