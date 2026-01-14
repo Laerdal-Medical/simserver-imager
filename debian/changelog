@@ -41,6 +41,9 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
   * Install Authorization Button: Added button to permission warning dialog
     for easier authorization flow
   * GitHub Artifact Handling: Improved artifact handling and branch filtering
+  * File Extension Registration: WIC, VSI, and SPU files are now registered
+    with the OS on all platforms (Windows, macOS, Linux). Double-click image
+    files to open them directly in the imager.
 
  -- Laerdal Medical <support@laerdal.com>  Tue, 14 Jan 2025 08:00:00 +0000
 
