@@ -12,6 +12,7 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QThread>
 
 namespace DiskFormatHelper {
 
