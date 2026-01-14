@@ -4,7 +4,9 @@
  */
 
 #include "disk_format_helper.h"
+#include "../disk_formatter.h"
 #include "../platformquirks.h"
+#include "diskpart_util.h"
 
 #include <QDebug>
 #include <QFile>
@@ -13,62 +15,62 @@
 #include <QStandardPaths>
 #include <QTextStream>
 
+#include <chrono>
+
 namespace DiskFormatHelper {
 
 FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel)
 {
+    Q_UNUSED(volumeLabel); // Volume label is set by DiskFormatter
     FormatResult result;
 
-    qDebug() << "DiskFormatHelper: Formatting device with diskpart:" << device;
+    qDebug() << "DiskFormatHelper: Formatting device:" << device;
 
-    // Extract disk number from device path (e.g., "\\.\PhysicalDrive1" -> "1")
-    QString diskNumber;
-    QRegularExpression diskRe("PhysicalDrive(\\d+)");
-    QRegularExpressionMatch match = diskRe.match(device);
-    if (match.hasMatch())
+    // Step 1: Clean the disk using diskpart (removes partitions, prepares for formatting)
+    // This is necessary because Windows needs the disk to be cleaned before we can write to it directly.
+    // Using the standard 60s timeout with 3 retries and unmount-first behavior.
+    qDebug() << "DiskFormatHelper: Cleaning disk with diskpart...";
+    auto diskpartResult = DiskpartUtil::cleanDisk(device.toLatin1(), std::chrono::seconds(60), 3, DiskpartUtil::VolumeHandling::UnmountFirst);
+    if (!diskpartResult.success)
     {
-        diskNumber = match.captured(1);
-    }
-    else
-    {
-        result.errorMessage = QString("Could not determine disk number from device path: %1").arg(device);
+        result.errorMessage = QString("Failed to clean disk: %1").arg(diskpartResult.errorMessage);
         return result;
     }
 
-    // Create diskpart script
-    // Using unit=32768 (32KB clusters) bypasses Windows' 32GB FAT32 limit.
-    // FAT32 with 32KB clusters supports volumes up to 2TB.
-    QString scriptPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/laerdal_diskpart.txt";
-    QFile scriptFile(scriptPath);
-    if (!scriptFile.open(QIODevice::WriteOnly | QIODevice::Text))
+    // Step 2: Use cross-platform DiskFormatter to write FAT32 directly
+    // This bypasses Windows' 32GB FAT32 limitation by writing the filesystem structures
+    // at the byte level, rather than using Windows format APIs.
+    qDebug() << "DiskFormatHelper: Writing FAT32 filesystem with DiskFormatter...";
+    rpi_imager::DiskFormatter formatter;
+    auto formatResult = formatter.FormatDrive(device.toStdString());
+
+    if (!formatResult)
     {
-        result.errorMessage = "Failed to create diskpart script";
+        QString errorMsg;
+        switch (formatResult.error()) {
+            case rpi_imager::FormatError::kFileOpenError:
+                errorMsg = "Error opening device for formatting";
+                break;
+            case rpi_imager::FormatError::kFileWriteError:
+                errorMsg = "Error writing to device during formatting";
+                break;
+            case rpi_imager::FormatError::kFileSeekError:
+                errorMsg = "Error seeking on device during formatting";
+                break;
+            case rpi_imager::FormatError::kInvalidParameters:
+                errorMsg = "Invalid parameters for formatting";
+                break;
+            case rpi_imager::FormatError::kInsufficientSpace:
+                errorMsg = "Insufficient space on device";
+                break;
+            default:
+                errorMsg = "Unknown formatting error";
+                break;
+        }
+        result.errorMessage = errorMsg;
         return result;
     }
 
-    QTextStream script(&scriptFile);
-    script << "select disk " << diskNumber << "\r\n";
-    script << "clean\r\n";
-    script << "create partition primary\r\n";
-    script << "format fs=fat32 quick unit=32768 label=" << volumeLabel << "\r\n";
-    script << "assign\r\n";
-    scriptFile.close();
-
-    // Run diskpart with the script
-    QProcess diskpartProc;
-    diskpartProc.start("diskpart", {"/s", scriptPath});
-
-    if (!diskpartProc.waitForFinished(120000) || diskpartProc.exitCode() != 0)
-    {
-        QString diskpartError = QString::fromUtf8(diskpartProc.readAllStandardError());
-        QString diskpartOut = QString::fromUtf8(diskpartProc.readAllStandardOutput());
-        qWarning() << "DiskFormatHelper: diskpart failed:" << diskpartError << diskpartOut;
-        QFile::remove(scriptPath);
-        result.errorMessage = QString("Failed to format drive: %1").arg(diskpartError.isEmpty() ? diskpartOut : diskpartError);
-        return result;
-    }
-
-    QFile::remove(scriptPath);
     qDebug() << "DiskFormatHelper: Format completed successfully";
 
     // Wait for the device to be ready for I/O
