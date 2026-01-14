@@ -2,6 +2,7 @@ name: Build and Package
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
   pull_request:
@@ -266,7 +267,8 @@ jobs:
     name: Create Release
     needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Run on pushes to main branch OR tag pushes (not PRs)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
 
     permissions:
       contents: write
@@ -278,15 +280,28 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Fetch tags
-        run: git fetch --tags --force
-
-      - name: Get tag message
-        id: tag_message
+      - name: Determine release parameters
+        id: release_params
         run: |
-          # Get the annotated tag message
-          TAG_MESSAGE=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
-          echo "$TAG_MESSAGE" > tag_message.txt
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # Tag push: finalize release (not draft)
+            VERSION="${{ github.ref_name }}"
+            echo "tag=$VERSION" >> $GITHUB_OUTPUT
+            echo "draft=false" >> $GITHUB_OUTPUT
+            echo "name=Release $VERSION" >> $GITHUB_OUTPUT
+          else
+            # Main branch push: create/update draft release
+            VERSION=$(git describe --tags --always)
+            echo "tag=draft" >> $GITHUB_OUTPUT
+            echo "draft=true" >> $GITHUB_OUTPUT
+            echo "name=Next Release (Draft)" >> $GITHUB_OUTPUT
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare release notes
+        run: |
+          # Replace placeholder with actual version
+          sed "s/{{VERSION}}/${{ steps.release_params.outputs.version }}/g" RELEASE_NOTES.md > RELEASE_NOTES_FINAL.md
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -296,11 +311,22 @@ jobs:
       - name: Display artifacts
         run: find artifacts -type f | head -50
 
+      - name: Delete existing draft release
+        if: steps.release_params.outputs.draft == 'true'
+        run: |
+          # Delete existing draft release and tag if they exist
+          gh release delete draft --yes || true
+          git push origin :refs/tags/draft || true
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
-          body_path: tag_message.txt
+          tag_name: ${{ steps.release_params.outputs.tag }}
+          name: ${{ steps.release_params.outputs.name }}
+          draft: ${{ steps.release_params.outputs.draft == 'true' }}
+          body_path: RELEASE_NOTES_FINAL.md
           files: |
             artifacts/**/*.AppImage
             artifacts/**/*.deb
