@@ -413,10 +413,36 @@ WizardStepBase {
                         // to prevent it from being reset when the model changes
                         currentIndex: 0
 
-                        // Handle text input for filtering - user can type branch name directly
+                        // Handle text input for filtering - find and highlight matching branch
                         onEditTextChanged: {
-                            // Filter the dropdown list based on typed text
-                            // The popup will show matching items
+                            if (!editText || editText.trim() === "") {
+                                return
+                            }
+                            var searchText = editText.trim().toLowerCase()
+                            var branches = model
+
+                            // Find first matching branch (case-insensitive prefix match)
+                            for (var i = 0; i < branches.length; i++) {
+                                if (branches[i].toLowerCase().startsWith(searchText)) {
+                                    currentIndex = i
+                                    // If popup is open, scroll to highlight the match
+                                    if (popup.visible && popup.contentItem) {
+                                        popup.contentItem.currentIndex = i
+                                    }
+                                    return
+                                }
+                            }
+
+                            // No prefix match - try contains match
+                            for (var j = 0; j < branches.length; j++) {
+                                if (branches[j].toLowerCase().indexOf(searchText) >= 0) {
+                                    currentIndex = j
+                                    if (popup.visible && popup.contentItem) {
+                                        popup.contentItem.currentIndex = j
+                                    }
+                                    return
+                                }
+                            }
                         }
 
                         // Handle when user accepts typed text (Enter key) or selects from dropdown
