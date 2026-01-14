@@ -57,7 +57,7 @@ WizardStepBase {
 
     // Format confirmation dialog state
     property bool showFormatDialog: false
-    property bool driveIsFat32: false
+    property bool driveHasCompatibleFs: false  // FAT32, exFAT, or NTFS
 
     // Connect to ImageWriter SPU signals
     Connections {
@@ -103,13 +103,13 @@ WizardStepBase {
         } else if (root.isComplete) {
             // Continue to done step - handled by WizardContainer
         } else {
-            // Start copy - check if drive is FAT32 first
-            root.driveIsFat32 = root.imageWriter.isDriveFat32()
-            if (root.driveIsFat32) {
-                // Already FAT32 - copy directly (existing SPU files will be deleted)
+            // Start copy - check if drive has a compatible filesystem (FAT32, exFAT, or NTFS)
+            root.driveHasCompatibleFs = root.imageWriter.isDriveCompatibleFilesystem()
+            if (root.driveHasCompatibleFs) {
+                // Already has compatible filesystem - copy directly (existing SPU files will be deleted)
                 startCopy(true) // skipFormat = true
             } else {
-                // Not FAT32 - ask for confirmation before formatting
+                // Not a compatible filesystem - ask for confirmation before formatting
                 root.showFormatDialog = true
             }
         }

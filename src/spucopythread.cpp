@@ -116,7 +116,7 @@ void SPUCopyThread::run()
     }
     else
     {
-        qDebug() << "SPUCopyThread: Skipping format, using existing FAT32 filesystem";
+        qDebug() << "SPUCopyThread: Skipping format, using existing compatible filesystem";
     }
 
     if (_cancelled)

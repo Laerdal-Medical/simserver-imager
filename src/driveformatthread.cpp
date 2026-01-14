@@ -4,24 +4,12 @@
  */
 
 #include "driveformatthread.h"
-#include "dependencies/drivelist/src/drivelist.hpp"
-#include "dependencies/mountutils/src/mountutils.hpp"
-#include "disk_formatter.h"
-#include "platformquirks.h"
+#include "disk_format_helper.h"
 #include <QDebug>
-#include <QProcess>
-#include <QTemporaryFile>
 #include <QElapsedTimer>
-
-#ifdef Q_OS_LINUX
-#include <unistd.h>
-#endif
 
 #ifdef Q_OS_WIN
 #include <windows.h>
-#include <regex>
-#include <chrono>
-#include "windows/diskpart_util.h"
 #endif
 
 DriveFormatThread::DriveFormatThread(const QByteArray &device, QObject *parent)
@@ -35,19 +23,6 @@ DriveFormatThread::~DriveFormatThread()
     wait();
 }
 
-std::uint64_t DriveFormatThread::getDeviceSize(const QByteArray &device)
-{
-    auto driveList = Drivelist::ListStorageDevices();
-    for (const auto &drive : driveList) {
-        if (QByteArray::fromStdString(drive.device) == device) {
-            return drive.size;
-        }
-    }
-    
-    qDebug() << "Warning: Could not find device size for" << device << ", using default";
-    return 64ULL * 1024 * 1024 * 1024;  // Default to 64GB if not found
-}
-
 void DriveFormatThread::run()
 {
 #ifdef Q_OS_WIN
@@ -59,96 +34,27 @@ void DriveFormatThread::run()
     }
 #endif
 
-#ifdef Q_OS_LINUX
-    // Linux-specific: Check permissions
-    if (::access(_device.constData(), W_OK) != 0)
-    {
-        emit error(tr("Cannot format device: insufficient permissions. Please run with elevated privileges (sudo)."));
-        return;
-    }
-#endif
+    qDebug() << "Formatting device" << _device;
+    emit preparationStatusUpdate(tr("Formatting drive as FAT32..."));
 
-#ifdef Q_OS_WIN
-    // Windows-specific disk preparation
-    emit preparationStatusUpdate(tr("Preparing disk for formatting..."));
-    
-    // Clean disk with diskpart utility (standardized to 60s timeout with 3 retries, always unmount volumes)
-    emit preparationStatusUpdate(tr("Cleaning disk..."));
-    auto diskpartResult = DiskpartUtil::cleanDisk(_device, std::chrono::seconds(60), 3, DiskpartUtil::VolumeHandling::UnmountFirst);
-    if (!diskpartResult.success)
-    {
-        emit error(diskpartResult.errorMessage);
-        return;
-    }
-#endif
-
-    // Common formatting logic for all platforms
-    qDebug() << "Formatting device" << _device << "with cross-platform implementation";
-    emit preparationStatusUpdate(tr("Writing filesystem..."));
-
-    // Unmount the device before formatting (needed for macOS and Linux)
-#if defined(Q_OS_DARWIN) || defined(Q_OS_LINUX)
-    // Use block device path for unmount (e.g., /dev/disk on macOS, not /dev/rdisk)
-    QString unmountPath = PlatformQuirks::getEjectDevicePath(QString::fromLatin1(_device));
-    qDebug() << "Unmounting:" << unmountPath;
-    MOUNTUTILS_RESULT unmountResult = unmount_disk(unmountPath.toUtf8().constData());
-    if (unmountResult != MOUNTUTILS_SUCCESS) {
-        qDebug() << "Unmount failed with result:" << unmountResult;
-#ifdef Q_OS_DARWIN
-        emit error(tr("Failed to unmount disk '%1'. Please close any applications using the disk and try again.").arg(unmountPath));
-#else
-        emit error(tr("Failed to unmount disk '%1'.").arg(unmountPath));
-#endif
-        return;
-    }
-
-    // Wait for device to be ready for writing after unmount
-    // Uses platform-specific polling instead of fixed sleep
-    qDebug() << "Waiting for device to be ready after unmount...";
-    if (!PlatformQuirks::waitForDeviceReady(QString::fromLatin1(_device), 5000)) {
-        qWarning() << "Device may not be fully ready, proceeding anyway";
-    }
-#endif
-
-#ifdef Q_OS_LINUX
-    // Get device size for logging
-    std::uint64_t deviceSize = getDeviceSize(_device);
-    qDebug() << "Device size:" << deviceSize << "bytes";
-#endif
-
-    // Use cross-platform disk formatter
     QElapsedTimer formatTimer;
     formatTimer.start();
-    
-    rpi_imager::DiskFormatter formatter;
-    auto formatResult = formatter.FormatDrive(_device.toStdString());
+
+    // Use platform-specific DiskFormatHelper which:
+    // - Linux: Uses sfdisk + mkfs.fat (native tools)
+    // - Windows: Uses diskpart + PowerShell Format-Volume (bypasses 32GB FAT32 limit)
+    // - macOS: Uses diskutil eraseDisk
+    QString device = QString::fromLatin1(_device);
+    auto result = DiskFormatHelper::formatDeviceFat32(device, "LAERDAL");
 
     quint32 formatDurationMs = static_cast<quint32>(formatTimer.elapsed());
-    
-    if (!formatResult) {
+
+    if (!result.success) {
         emit eventDriveFormat(formatDurationMs, false);
-        emit error(formatErrorToString(formatResult.error()));
+        emit error(result.errorMessage);
     } else {
         emit eventDriveFormat(formatDurationMs, true);
-        qDebug() << "Cross-platform disk formatter succeeded in" << formatDurationMs << "ms";
+        qDebug() << "Format succeeded in" << formatDurationMs << "ms";
         emit success();
-    }
-}
-
-QString DriveFormatThread::formatErrorToString(rpi_imager::FormatError error)
-{
-    switch (error) {
-        case rpi_imager::FormatError::kFileOpenError:
-            return tr("Error opening device for formatting");
-        case rpi_imager::FormatError::kFileWriteError:
-            return tr("Error writing to device during formatting");
-        case rpi_imager::FormatError::kFileSeekError:
-            return tr("Error seeking on device during formatting");
-        case rpi_imager::FormatError::kInvalidParameters:
-            return tr("Invalid parameters for formatting");
-        case rpi_imager::FormatError::kInsufficientSpace:
-            return tr("Insufficient space on device");
-        default:
-            return tr("Unknown formatting error");
     }
 }

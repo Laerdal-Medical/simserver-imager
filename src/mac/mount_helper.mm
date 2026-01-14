@@ -272,4 +272,13 @@ bool isFat32(const QString &device)
     return fsType.contains("fat32") || fsType.contains("msdos") || fsType == "fat";
 }
 
+bool isCompatibleFilesystem(const QString &device)
+{
+    QString fsType = detectFilesystem(device).toLower();
+    // FAT32, exFAT, and NTFS are all supported by the target Linux devices
+    // macOS reports: FAT32 as "msdos"/"fat32", exFAT as "exfat", NTFS as "ntfs"
+    return fsType.contains("fat32") || fsType.contains("msdos") || fsType == "fat" ||
+           fsType == "exfat" || fsType == "ntfs";
+}
+
 } // namespace MountHelper

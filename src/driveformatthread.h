@@ -7,8 +7,6 @@
  */
 
 #include <QThread>
-#include <cstdint>
-#include "disk_formatter.h"
 
 class DriveFormatThread : public QThread
 {
@@ -26,8 +24,6 @@ signals:
 
 protected:
     QByteArray _device;
-    std::uint64_t getDeviceSize(const QByteArray &device);
-    QString formatErrorToString(rpi_imager::FormatError error);
 };
 
 #endif // DRIVEFORMATTHREAD_H

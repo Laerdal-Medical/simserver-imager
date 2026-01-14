@@ -373,4 +373,12 @@ bool isFat32(const QString &device)
     return fsType.toLower() == "vfat" || fsType.toLower() == "fat32";
 }
 
+bool isCompatibleFilesystem(const QString &device)
+{
+    QString fsType = detectFilesystem(device).toLower();
+    // FAT32, exFAT, and NTFS are all supported by the target Linux devices
+    // blkid reports FAT32 as "vfat", exFAT as "exfat", NTFS as "ntfs"
+    return fsType == "vfat" || fsType == "fat32" || fsType == "exfat" || fsType == "ntfs";
+}
+
 } // namespace MountHelper

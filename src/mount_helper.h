@@ -56,6 +56,16 @@ QString detectFilesystem(const QString &device);
  */
 bool isFat32(const QString &device);
 
+/**
+ * @brief Check if a device has a compatible filesystem for SPU copy
+ * @param device The device or partition path
+ * @return true if the filesystem is FAT32, exFAT, or NTFS, false otherwise
+ *
+ * These filesystems are supported by the target Linux devices for reading SPU files.
+ * If a compatible filesystem is detected, we can skip reformatting and just copy files.
+ */
+bool isCompatibleFilesystem(const QString &device);
+
 } // namespace MountHelper
 
 #endif // MOUNT_HELPER_H

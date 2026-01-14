@@ -5120,3 +5120,12 @@ bool ImageWriter::isDriveFat32()
 
     return MountHelper::isFat32(_dst);
 }
+
+bool ImageWriter::isDriveCompatibleFilesystem()
+{
+    if (_dst.isEmpty()) {
+        return false;
+    }
+
+    return MountHelper::isCompatibleFilesystem(_dst);
+}
