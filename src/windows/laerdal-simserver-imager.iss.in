@@ -421,38 +421,19 @@ end;
 function RemovePreviousIfAny(): Boolean;
 var
   Cmd, Args: string;
-  RC: Integer;
-  UninstallAttempted: Boolean;
+  PreviousInstallExists: Boolean;
 begin
   Result := True;
-  UninstallAttempted := False;
 
-  // Old Inno (by old AppId)
-  if TryGetOldInnoUninstall(Cmd, Args) then begin
-    if MsgBox('A previous Laerdal SimServer Imager installation was detected. It will be removed before continuing. Proceed?',
-              mbConfirmation, MB_YESNO) <> IDYES then
-    begin Result := False; Exit; end;
+  // Check if a previous installation exists
+  // We don't run the old uninstaller because it would delete user data:
+  //   - Cache at {localappdata}\Laerdal Medical\Laerdal SimServer Imager
+  //   - QSettings (GitHub auth, etc.) at HKCU\Software\Laerdal Medical\Laerdal SimServer Imager
+  // Instead, we just clean up old installation directories and uninstall registry entries
+  PreviousInstallExists := TryGetOldInnoUninstall(Cmd, Args) or TryGetOldInstallerUninstall(Cmd, Args);
 
-    UninstallAttempted := True;
-    Exec(Cmd, Args, '', SW_HIDE, ewWaitUntilTerminated, RC);
-    // Ignore return code - we'll clean up manually regardless
-    Log('Old Inno uninstaller returned: ' + IntToStr(RC));
-  end
-  // Old installer (name-based)
-  else if TryGetOldInstallerUninstall(Cmd, Args) then begin
-    if MsgBox('A previous Laerdal SimServer Imager installation was detected. It will be removed before continuing. Proceed?',
-              mbConfirmation, MB_YESNO) <> IDYES then
-    begin Result := False; Exit; end;
-
-    UninstallAttempted := True;
-    Exec(Cmd, Args, '', SW_HIDE, ewWaitUntilTerminated, RC);
-    // Ignore return code - we'll clean up manually regardless
-    Log('Old installer uninstaller returned: ' + IntToStr(RC));
-  end;
-
-  // Clean up any leftovers regardless of whether uninstall succeeded
-  if UninstallAttempted then begin
-    Log('Cleaning up old installation directories and registry entries...');
+  if PreviousInstallExists then begin
+    Log('Previous installation detected - cleaning up files only (preserving user cache and settings)');
     CleanupOldInstallDirs();
     CleanupOldRegistryEntries();
   end;
