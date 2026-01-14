@@ -105,8 +105,6 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
     }
 
     // Wait for the device to be ready for I/O
-    QThread::msleep(2000);
-
     if (!PlatformQuirks::waitForDeviceReady(device, 5000)) {
         qWarning() << "DiskFormatHelper: Device may not be fully ready after format";
     }
