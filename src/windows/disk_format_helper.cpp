@@ -20,7 +20,7 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
 {
     FormatResult result;
 
-    qDebug() << "DiskFormatHelper: Formatting device with diskpart:" << device;
+    qDebug() << "DiskFormatHelper: Formatting device:" << device;
 
     // Extract disk number from device path (e.g., "\\.\PhysicalDrive1" -> "1")
     QString diskNumber;
@@ -36,9 +36,8 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
         return result;
     }
 
-    // Create diskpart script to clean, create partition, assign drive letter, and format
-    // Using diskpart's format command with unit=32K bypasses Windows' 32GB FAT32 GUI limit
-    // The key is using "format fs=fat32 unit=32K quick" directly in diskpart
+    // Step 1: Use diskpart to clean disk, create partition, and assign drive letter
+    // We DON'T format with diskpart because it has the 32GB FAT32 limit
     QString scriptPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/laerdal_diskpart.txt";
     QFile scriptFile(scriptPath);
     if (!scriptFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -53,56 +52,96 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
     script << "create partition primary\r\n";
     script << "select partition 1\r\n";
     script << "active\r\n";
-    // Format with FAT32, 32KB allocation unit, and label - this bypasses the 32GB limit
-    script << "format fs=fat32 unit=32K label=\"" << volumeLabel << "\" quick\r\n";
-    script << "assign\r\n";
+    script << "assign\r\n";  // Assign drive letter - we'll format separately
     scriptFile.close();
 
-    // Run diskpart with the script
-    qDebug() << "DiskFormatHelper: Running diskpart to prepare and format disk...";
+    qDebug() << "DiskFormatHelper: Running diskpart to prepare disk...";
     QProcess diskpartProc;
     diskpartProc.start("diskpart", {"/s", scriptPath});
 
-    // Long timeout for large drives - format can take several minutes
-    if (!diskpartProc.waitForFinished(600000))  // 10 minute timeout
+    if (!diskpartProc.waitForFinished(120000))
     {
-        QString diskpartError = QString::fromUtf8(diskpartProc.readAllStandardError());
-        QString diskpartOut = QString::fromUtf8(diskpartProc.readAllStandardOutput());
-        qWarning() << "DiskFormatHelper: diskpart timeout:" << diskpartError << diskpartOut;
         QFile::remove(scriptPath);
-        result.errorMessage = QString("Format timeout - drive may be too slow or unresponsive");
+        result.errorMessage = "Timeout preparing drive";
         return result;
     }
 
-    QString diskpartError = QString::fromUtf8(diskpartProc.readAllStandardError());
     QString diskpartOut = QString::fromUtf8(diskpartProc.readAllStandardOutput());
-
     QFile::remove(scriptPath);
 
     qDebug() << "DiskFormatHelper: diskpart output:" << diskpartOut;
 
     if (diskpartProc.exitCode() != 0)
     {
-        qWarning() << "DiskFormatHelper: diskpart failed:" << diskpartError << diskpartOut;
-        result.errorMessage = QString("Failed to format drive: %1").arg(diskpartError.isEmpty() ? diskpartOut : diskpartError);
+        QString diskpartError = QString::fromUtf8(diskpartProc.readAllStandardError());
+        result.errorMessage = QString("Failed to prepare drive: %1").arg(diskpartError.isEmpty() ? diskpartOut : diskpartError);
         return result;
     }
 
-    // Check if format actually succeeded by looking for success indicators in output
-    // Diskpart returns 0 even if format fails in some cases
-    if (diskpartOut.contains("DiskPart successfully formatted the volume", Qt::CaseInsensitive) ||
-        diskpartOut.contains("successfully formatted", Qt::CaseInsensitive) ||
-        diskpartOut.contains("formaterede", Qt::CaseInsensitive))  // Danish
+    // Wait for Windows to assign a drive letter
+    QThread::msleep(3000);
+
+    // Step 2: Find the drive letter that was assigned
+    qDebug() << "DiskFormatHelper: Finding assigned drive letter...";
+    QProcess psGetDrive;
+    QString psScript = QString(
+        "Get-Partition -DiskNumber %1 | Where-Object { $_.DriveLetter } | "
+        "Select-Object -ExpandProperty DriveLetter -First 1"
+    ).arg(diskNumber);
+
+    psGetDrive.start("powershell", {"-NoProfile", "-Command", psScript});
+    if (!psGetDrive.waitForFinished(30000))
     {
-        qDebug() << "DiskFormatHelper: Format completed successfully";
-    }
-    else if (diskpartOut.contains("Virtual Disk Service error", Qt::CaseInsensitive) ||
-             diskpartOut.contains("Virtuel disk", Qt::CaseInsensitive))  // Danish
-    {
-        qWarning() << "DiskFormatHelper: Virtual Disk Service error detected";
-        result.errorMessage = QString("Failed to format drive: %1").arg(diskpartOut);
+        result.errorMessage = "Timeout waiting for drive letter assignment";
         return result;
     }
+
+    QString driveLetter = QString::fromUtf8(psGetDrive.readAllStandardOutput()).trimmed();
+    if (driveLetter.isEmpty())
+    {
+        result.errorMessage = "Could not find assigned drive letter";
+        return result;
+    }
+
+    qDebug() << "DiskFormatHelper: Drive letter assigned:" << driveLetter;
+
+    // Step 3: Format using format.com with /FS:FAT32 /A:32K
+    // The Windows format.com command CAN format >32GB as FAT32 when called directly
+    // The 32GB limit is only in the GUI and diskpart's format command
+    qDebug() << "DiskFormatHelper: Formatting with format.com...";
+    QProcess formatProc;
+
+    // format.com requires /Y for non-interactive and /Q for quick format
+    // /A:32K sets 32KB allocation unit size for large drives
+    // /V: sets the volume label
+    QString formatCmd = QString("format %1: /FS:FAT32 /A:32K /V:%2 /Q /Y")
+        .arg(driveLetter, volumeLabel);
+
+    formatProc.start("cmd", {"/c", formatCmd});
+
+    if (!formatProc.waitForFinished(600000))  // 10 minute timeout for large drives
+    {
+        QString formatError = QString::fromUtf8(formatProc.readAllStandardError());
+        result.errorMessage = QString("Format timeout: %1").arg(formatError);
+        return result;
+    }
+
+    QString formatOut = QString::fromUtf8(formatProc.readAllStandardOutput());
+    QString formatErr = QString::fromUtf8(formatProc.readAllStandardError());
+
+    qDebug() << "DiskFormatHelper: format.com output:" << formatOut;
+    if (!formatErr.isEmpty()) {
+        qDebug() << "DiskFormatHelper: format.com stderr:" << formatErr;
+    }
+
+    if (formatProc.exitCode() != 0)
+    {
+        qWarning() << "DiskFormatHelper: format.com failed with exit code:" << formatProc.exitCode();
+        result.errorMessage = QString("Failed to format drive: %1").arg(formatErr.isEmpty() ? formatOut : formatErr);
+        return result;
+    }
+
+    qDebug() << "DiskFormatHelper: Format completed successfully";
 
     // Wait for the device to be ready for I/O
     if (!PlatformQuirks::waitForDeviceReady(device, 5000)) {
