@@ -108,9 +108,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release"
     add_link_options(-Wl,--gc-sections)
   endif()
 
-  # Enable Link Time Optimization (LTO) for non-Windows targets
+  # Enable Thin LTO for non-Windows targets (faster than full LTO with similar benefits)
   if(NOT WIN32)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    add_compile_options(-flto=thin)
+    add_link_options(-flto=thin)
   endif()
 
   # Only add build-type specific flags (optimization and sections flags are

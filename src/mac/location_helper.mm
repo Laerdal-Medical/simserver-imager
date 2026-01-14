@@ -77,8 +77,11 @@ int rpiimager_check_location_permission()
             return 0;
         }
         CLAuthorizationStatus status;
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 120000
-        status = [CLLocationManager authorizationStatus];
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 110000
+        // macOS 11.0+ uses instance property instead of class method
+        CLLocationManager *manager = [[CLLocationManager alloc] init];
+        status = manager.authorizationStatus;
+        [manager release];
 #else
         status = kCLAuthorizationStatusNotDetermined;
 #endif
@@ -94,12 +97,15 @@ int rpiimager_request_location_permission_async(rpiimager_location_callback call
         }
         
         CLAuthorizationStatus status;
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 120000
-        status = [CLLocationManager authorizationStatus];
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 110000
+        // macOS 11.0+ uses instance property instead of class method
+        CLLocationManager *manager = [[CLLocationManager alloc] init];
+        status = manager.authorizationStatus;
+        [manager release];
 #else
         status = kCLAuthorizationStatusNotDetermined;
 #endif
-        
+
         // Already authorized
         if (isAuthorizedStatus(status)) {
             return 1;

@@ -5,6 +5,7 @@
 
 #include "macwlancredentials.h"
 #include <Security/Security.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <QProcess>
 #include <QRegularExpression>
 #include "ssid_helper.h"
@@ -56,8 +57,52 @@ QByteArray MacWlanCredentials::getPSK()
         qDebug() << "MacWlanCredentials::getPSK(): _ssid still empty after getSSID(), cannot retrieve PSK";
         return QByteArray();
     }
-    
+
     return getPSKForSSID(_ssid);
+}
+
+/* Helper function to search for WiFi password using modern SecItemCopyMatching API */
+static QByteArray searchKeychainForPassword(const QByteArray &ssid, CFStringRef service)
+{
+    QByteArray psk;
+
+    CFDataRef accountData = CFDataCreate(kCFAllocatorDefault,
+                                         reinterpret_cast<const UInt8*>(ssid.constData()),
+                                         ssid.length());
+    if (!accountData)
+        return psk;
+
+    CFMutableDictionaryRef query = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
+                                                             &kCFTypeDictionaryKeyCallBacks,
+                                                             &kCFTypeDictionaryValueCallBacks);
+    if (!query)
+    {
+        CFRelease(accountData);
+        return psk;
+    }
+
+    CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
+    CFDictionarySetValue(query, kSecAttrAccount, accountData);
+    if (service)
+        CFDictionarySetValue(query, kSecAttrService, service);
+    CFDictionarySetValue(query, kSecReturnData, kCFBooleanTrue);
+    CFDictionarySetValue(query, kSecMatchLimit, kSecMatchLimitOne);
+
+    CFTypeRef result = NULL;
+    OSStatus status = SecItemCopyMatching(query, &result);
+
+    if (status == errSecSuccess && result)
+    {
+        CFDataRef passwordData = static_cast<CFDataRef>(result);
+        psk = QByteArray(reinterpret_cast<const char*>(CFDataGetBytePtr(passwordData)),
+                         CFDataGetLength(passwordData));
+        CFRelease(result);
+    }
+
+    CFRelease(query);
+    CFRelease(accountData);
+
+    return psk;
 }
 
 QByteArray MacWlanCredentials::getPSKForSSID(const QByteArray &ssid)
@@ -67,112 +112,19 @@ QByteArray MacWlanCredentials::getPSKForSSID(const QByteArray &ssid)
         qDebug() << "MacWlanCredentials::getPSKForSSID(): Empty SSID provided, cannot retrieve PSK";
         return QByteArray();
     }
-    
+
     qDebug() << "MacWlanCredentials::getPSKForSSID(): Attempting to retrieve PSK for SSID:" << ssid;
 
-    SecKeychainRef keychainRef;
     QByteArray psk;
 
-    auto fetchLatestForSsid = [&ssid](SecKeychainRef kc) -> QByteArray {
-        QByteArray bestPsk;
-        QByteArray bestModDate;
-        const char serviceName[] = "AirPort";
-        const UInt32 serviceLen = sizeof(serviceName) - 1;
+    /* Search with AirPort service name (standard for WiFi passwords) */
+    CFStringRef airportService = CFSTR("AirPort");
+    psk = searchKeychainForPassword(ssid, airportService);
 
-        SecKeychainSearchRef search = NULL;
-        SecKeychainItemRef item = NULL;
-
-        SecKeychainAttribute attrs[2];
-        attrs[0].tag = kSecServiceItemAttr; attrs[0].length = serviceLen; attrs[0].data = (void*)serviceName;
-        attrs[1].tag = kSecAccountItemAttr; attrs[1].length = ssid.length(); attrs[1].data = (void*)ssid.constData();
-        SecKeychainAttributeList attrList = { 2, attrs };
-
-        if (SecKeychainSearchCreateFromAttributes(kc, kSecGenericPasswordItemClass, &attrList, &search) == errSecSuccess && search)
-        {
-            while (SecKeychainSearchCopyNext(search, &item) == errSecSuccess && item)
-            {
-                SecKeychainAttributeList *outAttrs = NULL;
-                UInt32 pwdLen = 0; void *pwdData = NULL;
-                if (SecKeychainItemCopyAttributesAndData(item, NULL, NULL, &outAttrs, &pwdLen, &pwdData) == errSecSuccess)
-                {
-                    QByteArray modDateStr;
-                    if (outAttrs)
-                    {
-                        for (UInt32 i = 0; i < outAttrs->count; ++i)
-                        {
-                            const SecKeychainAttribute &a = outAttrs->attr[i];
-                            if (a.tag == kSecModDateItemAttr && a.length > 0 && a.data)
-                            {
-                                modDateStr = QByteArray(static_cast<const char*>(a.data), a.length);
-                                break;
-                            }
-                        }
-                    }
-
-                    // Choose the lexicographically greatest mod date (format is YYYYMMDDhhmmssZ)
-                    if (bestModDate.isEmpty() || (!modDateStr.isEmpty() && modDateStr > bestModDate))
-                    {
-                        bestModDate = modDateStr;
-                        bestPsk = QByteArray(static_cast<const char*>(pwdData), pwdLen);
-                    }
-
-                    SecKeychainItemFreeAttributesAndData(outAttrs, pwdData);
-                }
-
-                CFRelease(item);
-                item = NULL;
-            }
-            CFRelease(search);
-        }
-
-        return bestPsk;
-    };
-
-    /* First, explicitly search the System keychain as many WiFi passwords are stored there */
-    if (SecKeychainOpen("/Library/Keychains/System.keychain", &keychainRef) == errSecSuccess)
-    {
-        psk = fetchLatestForSsid(keychainRef);
-        CFRelease(keychainRef);
-    }
-
-    /* If not found in System keychain, prefer user's default keychain (login) */
-    /* Prefer user's default keychain; WiFi passwords are stored in login keychain under service "AirPort" */
-    if (psk.isEmpty() && SecKeychainCopyDefault(&keychainRef) == errSecSuccess)
-    {
-        psk = fetchLatestForSsid(keychainRef);
-        CFRelease(keychainRef);
-    }
-
-    /* Fallback: search default keychain search list with explicit service */
+    /* Fallback: search by account only without service filter */
     if (psk.isEmpty())
     {
-        UInt32 resultLen = 0;
-        void *result = NULL;
-        const char serviceName[] = "AirPort";
-        const UInt32 serviceLen = sizeof(serviceName) - 1;
-        if (SecKeychainFindGenericPassword(NULL,
-                                           serviceLen, serviceName,
-                                           ssid.length(), ssid.constData(),
-                                           &resultLen, &result, NULL) == errSecSuccess)
-        {
-            psk = QByteArray((char *) result, resultLen);
-            SecKeychainItemFreeContent(NULL, result);
-        }
-    }
-
-    /* Final fallback: search by account only (may match multiple, but better than nothing) */
-    if (psk.isEmpty())
-    {
-        UInt32 resultLen = 0;
-        void *result = NULL;
-        if (SecKeychainFindGenericPassword(NULL,
-                                           0, NULL,
-                                           ssid.length(), ssid.constData(),
-                                           &resultLen, &result, NULL) == errSecSuccess)
-        {
-            psk = QByteArray((char *) result, resultLen);
-            SecKeychainItemFreeContent(NULL, result);
-        }
+        psk = searchKeychainForPassword(ssid, NULL);
     }
 
     if (!psk.isEmpty())

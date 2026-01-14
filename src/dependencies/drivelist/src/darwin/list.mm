@@ -65,7 +65,12 @@ namespace Drivelist {
       io_iterator_t psIter;
       CFTypeRef data;
       NSString *s;
+      // Use kIOMainPortDefault (macOS 12.0+) instead of deprecated kIOMasterPortDefault
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 120000
+      io_service_t parent, p = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, diskBsdName));
+#else
       io_service_t parent, p = IOServiceGetMatchingService(kIOMasterPortDefault, IOBSDNameMatching(kIOMasterPortDefault, 0, diskBsdName));
+#endif
 
       if (p)
       {
