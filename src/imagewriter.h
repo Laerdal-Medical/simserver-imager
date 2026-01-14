@@ -138,6 +138,13 @@ public:
     /* Return true if url is in our local disk cache */
     Q_INVOKABLE bool isCached(const QUrl &url, const QByteArray &sha256);
 
+    /* Partial download (resume) support */
+    Q_INVOKABLE bool hasPartialDownload();
+    Q_INVOKABLE QVariantMap getPartialDownloadInfo();
+    Q_INVOKABLE bool isPartiallyDownloaded(const QByteArray &expectedHash);
+    Q_INVOKABLE void resumePartialDownload();
+    Q_INVOKABLE void discardPartialDownload();
+
     /* Drive list polling runs continuously in background */
 
     /* Return list of available drives. Drive polling runs continuously in background.
@@ -477,6 +484,7 @@ signals:
     void repositoryUrlReceived(const QString &url);
     void customRepoChanged();
     void cacheStatusChanged();
+    void partialDownloadAvailable();
     void osListUnavailableChanged();
     void permissionWarning(QVariant msg);
     void elevationNeeded();  // Emitted when write requires elevation (Windows)

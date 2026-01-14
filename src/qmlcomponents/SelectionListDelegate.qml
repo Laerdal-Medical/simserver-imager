@@ -22,7 +22,7 @@ import RpiImager
  *           itemDescription: model.description
  *           itemIcon: model.icon
  *           // Optional: add custom content (badges, etc.) as children
- *           ImBadge { text: "Custom"; variant: "green" }
+ *           badges: [{ type: "ci" }, { type: "wic" }]
  *       }
  *   }
  */
@@ -45,11 +45,9 @@ Item {
     property string itemMetadata: ""      // Primary metadata (e.g., size, status)
     property string itemMetadata2: ""     // Secondary metadata (e.g., release date)
 
-    // Badge support (shown next to title) - simple text/color badges
-    property var badges: []  // Array of {text: string, color: string} objects
-
-    // Custom badge content - use this slot for ImBadge components
-    default property alias badgeContent: badgeContainer.data
+    // Badge support (shown next to title)
+    // Array of {text: string, variant: string} objects where variant is an ImBadge color variant
+    property var badges: []
 
     // Selection state (for special highlighting like "selected SPU file")
     property bool isItemSelected: false
@@ -151,6 +149,7 @@ Item {
                     spacing: Style.spacingSmall
 
                     Text {
+                        id: titleText
                         text: root.itemTitle
                         font.pixelSize: Style.fontSizeFormLabel
                         font.family: Style.fontFamilyBold
@@ -163,33 +162,16 @@ Item {
                         Accessible.ignored: true
                     }
 
-                    // Simple text/color badges from badges property
+                    // Badges from badges property array
                     Repeater {
                         model: root.badges
 
-                        Rectangle {
+                        ImBadge {
                             required property var modelData
-                            width: badgeText.implicitWidth + Style.spacingSmall * 2
-                            height: badgeText.implicitHeight + Style.spacingXXSmall * 2
-                            radius: Style.listItemBorderRadius
-                            color: modelData.color || Style.laerdalBlue
-
-                            Text {
-                                id: badgeText
-                                anchors.centerIn: parent
-                                text: parent.modelData.text || ""
-                                font.pixelSize: Style.fontSizeCaption
-                                font.family: Style.fontFamily
-                                color: "white"
-                            }
+                            required property int index
+                            type: modelData.type || ""
+                            visible: type.length > 0
                         }
-                    }
-
-                    // Custom badge content slot (for ImBadge components)
-                    Row {
-                        id: badgeContainer
-                        spacing: Style.spacingSmall
-                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
 

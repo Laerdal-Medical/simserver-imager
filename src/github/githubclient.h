@@ -12,6 +12,8 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QFile>
+#include <QUrl>
 
 #ifndef CLI_ONLY_BUILD
 #include <QQmlEngine>
@@ -187,8 +189,29 @@ public:
 
     /**
      * @brief Cancel any ongoing artifact inspection download
+     * @param preserveForResume If true, keep partial file for later resume
      */
-    Q_INVOKABLE void cancelArtifactInspection();
+    Q_INVOKABLE void cancelArtifactInspection(bool preserveForResume = true);
+
+    /**
+     * @brief Check if there's a partial artifact download that can be resumed
+     */
+    Q_INVOKABLE bool hasPartialArtifactDownload() const;
+
+    /**
+     * @brief Get information about the partial artifact download
+     */
+    Q_INVOKABLE QVariantMap getPartialArtifactDownloadInfo() const;
+
+    /**
+     * @brief Resume a previously cancelled artifact download
+     */
+    Q_INVOKABLE void resumeArtifactDownload();
+
+    /**
+     * @brief Discard the partial artifact download
+     */
+    Q_INVOKABLE void discardPartialArtifactDownload();
 
     /**
      * @brief Download an artifact and inspect its contents for SPU files
@@ -395,9 +418,32 @@ private:
     };
     QHash<QNetworkReply*, RunInfo> _artifactRunInfo;
 
-    // Track ongoing artifact inspection download for cancellation
+    // Track ongoing artifact inspection download for cancellation and resume
     QNetworkReply *_activeInspectionReply = nullptr;
-    QString _activeInspectionZipPath;  // Path to delete on cancellation
+    QString _activeInspectionZipPath;  // Final path for the completed download
+    QString _activeInspectionPartialPath;  // Partial file path during download
+    QFile *_activeInspectionFile = nullptr;  // File handle for incremental writes
+    qint64 _activeInspectionBytesWritten = 0;  // Bytes written to partial file
+
+    // Metadata for resumable artifact download
+    struct PartialArtifactDownload {
+        QString partialPath;
+        QString finalPath;
+        QString owner;
+        QString repo;
+        QString branch;
+        QString artifactName;
+        qint64 artifactId = 0;
+        qint64 bytesDownloaded = 0;
+        qint64 totalSize = 0;
+        QUrl downloadUrl;  // The actual download URL (after redirect)
+        bool isValid = false;
+    };
+    PartialArtifactDownload _partialArtifactDownload;
+
+    void savePartialArtifactDownload();
+    void loadPartialArtifactDownload();
+    void clearPartialArtifactDownload();
 };
 
 #endif // GITHUBCLIENT_H

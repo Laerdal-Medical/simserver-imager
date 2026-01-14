@@ -367,6 +367,9 @@ void CacheManager::loadCacheSettings()
     
     settings_.endGroup();
     
+    // Load partial download settings
+    loadPartialDownloadSettings();
+
     // Validate cache file exists and is accessible
     if (!lastFileName.isEmpty() && !lastHash.isEmpty()) {
         QFileInfo fileInfo(lastFileName);
@@ -535,4 +538,142 @@ bool CacheVerificationWorker::ensureCacheDirectoryExists()
 QString CacheVerificationWorker::getCacheDirectory() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+}
+
+// Partial download (resume) support implementation
+
+bool CacheManager::hasPartialDownload() const
+{
+    QMutexLocker locker(&mutex_);
+    return partialDownload_.isValid;
+}
+
+bool CacheManager::isPartiallyDownloaded(const QByteArray& expectedHash) const
+{
+    QMutexLocker locker(&mutex_);
+    return partialDownload_.isValid &&
+           partialDownload_.expectedHash == expectedHash;
+}
+
+CacheManager::PartialDownloadInfo CacheManager::getPartialDownloadInfo() const
+{
+    QMutexLocker locker(&mutex_);
+    return partialDownload_;
+}
+
+void CacheManager::savePartialDownload(const QString& url, const QString& displayName,
+                                       const QByteArray& expectedHash, qint64 totalSize,
+                                       qint64 bytesDownloaded, const QString& cacheFilePath)
+{
+    qDebug() << "Saving partial download info:" << displayName
+             << bytesDownloaded << "/" << totalSize << "bytes";
+
+    {
+        QMutexLocker locker(&mutex_);
+        partialDownload_.url = url;
+        partialDownload_.displayName = displayName;
+        partialDownload_.expectedHash = expectedHash;
+        partialDownload_.totalSize = totalSize;
+        partialDownload_.bytesDownloaded = bytesDownloaded;
+        partialDownload_.timestamp = QDateTime::currentDateTime();
+        partialDownload_.cacheFilePath = cacheFilePath;
+        partialDownload_.isValid = true;
+    }
+
+    savePartialDownloadSettings();
+}
+
+void CacheManager::clearPartialDownload()
+{
+    qDebug() << "Clearing partial download info";
+
+    QString cacheFilePath;
+    {
+        QMutexLocker locker(&mutex_);
+        cacheFilePath = partialDownload_.cacheFilePath;
+        partialDownload_ = PartialDownloadInfo();  // Reset to default
+    }
+
+    // Remove the partial cache file
+    if (!cacheFilePath.isEmpty() && QFile::exists(cacheFilePath)) {
+        if (QFile::remove(cacheFilePath)) {
+            qDebug() << "Removed partial cache file:" << cacheFilePath;
+        } else {
+            qDebug() << "Failed to remove partial cache file:" << cacheFilePath;
+        }
+    }
+
+    // Clear settings
+    settings_.beginGroup("caching");
+    settings_.beginGroup("partial");
+    settings_.remove("");  // Remove all keys in partial group
+    settings_.endGroup();
+    settings_.endGroup();
+    settings_.sync();
+
+    emit partialDownloadCleared();
+}
+
+void CacheManager::loadPartialDownloadSettings()
+{
+    settings_.beginGroup("caching");
+    settings_.beginGroup("partial");
+
+    QString url = settings_.value("url").toString();
+    QString displayName = settings_.value("displayName").toString();
+    QByteArray hash = settings_.value("hash").toByteArray();
+    qint64 totalSize = settings_.value("totalSize", 0).toLongLong();
+    qint64 bytesDownloaded = settings_.value("bytesDownloaded", 0).toLongLong();
+    QDateTime timestamp = settings_.value("timestamp").toDateTime();
+    QString filePath = settings_.value("filePath").toString();
+
+    settings_.endGroup();
+    settings_.endGroup();
+
+    // Validate the partial download is still usable
+    if (!url.isEmpty() && !hash.isEmpty() && totalSize > 0 && bytesDownloaded > 0) {
+        QFileInfo fileInfo(filePath);
+        if (fileInfo.exists() && fileInfo.size() == bytesDownloaded) {
+            QMutexLocker locker(&mutex_);
+            partialDownload_.url = url;
+            partialDownload_.displayName = displayName;
+            partialDownload_.expectedHash = hash;
+            partialDownload_.totalSize = totalSize;
+            partialDownload_.bytesDownloaded = bytesDownloaded;
+            partialDownload_.timestamp = timestamp;
+            partialDownload_.cacheFilePath = filePath;
+            partialDownload_.isValid = true;
+
+            qDebug() << "Loaded partial download:" << displayName
+                     << bytesDownloaded << "/" << totalSize << "bytes"
+                     << "from" << timestamp.toString();
+        } else {
+            qDebug() << "Partial download file missing or size mismatch, clearing";
+            // Clear invalid partial download settings
+            settings_.beginGroup("caching");
+            settings_.beginGroup("partial");
+            settings_.remove("");
+            settings_.endGroup();
+            settings_.endGroup();
+            settings_.sync();
+        }
+    }
+}
+
+void CacheManager::savePartialDownloadSettings()
+{
+    QMutexLocker locker(&mutex_);
+
+    settings_.beginGroup("caching");
+    settings_.beginGroup("partial");
+    settings_.setValue("url", partialDownload_.url);
+    settings_.setValue("displayName", partialDownload_.displayName);
+    settings_.setValue("hash", partialDownload_.expectedHash);
+    settings_.setValue("totalSize", partialDownload_.totalSize);
+    settings_.setValue("bytesDownloaded", partialDownload_.bytesDownloaded);
+    settings_.setValue("timestamp", partialDownload_.timestamp);
+    settings_.setValue("filePath", partialDownload_.cacheFilePath);
+    settings_.endGroup();
+    settings_.endGroup();
+    settings_.sync();
 }

@@ -14,6 +14,7 @@
 #include <QStorageInfo>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QDateTime>
 
 class CacheVerificationWorker;
 
@@ -50,6 +51,20 @@ public:
         bool customCacheFile = false;
     };
 
+    /**
+     * @brief Information about a partial (incomplete) download that can be resumed
+     */
+    struct PartialDownloadInfo {
+        QString url;                    // Original download URL
+        QString displayName;            // OS/image display name
+        QByteArray expectedHash;        // extract_sha256 for matching
+        qint64 totalSize = 0;           // Total expected bytes
+        qint64 bytesDownloaded = 0;     // Bytes successfully written to cache
+        QDateTime timestamp;            // When download was interrupted
+        QString cacheFilePath;          // Path to partial cache file
+        bool isValid = false;           // True if partial download can be resumed
+    };
+
     explicit CacheManager(QObject *parent = nullptr);
     ~CacheManager();
 
@@ -78,6 +93,15 @@ public:
     // Cache file setup for downloads
     bool setupCacheForDownload(const QByteArray& expectedHash, qint64 downloadSize, QString& cacheFilePath);
 
+    // Partial download (resume) support
+    Q_INVOKABLE bool hasPartialDownload() const;
+    Q_INVOKABLE bool isPartiallyDownloaded(const QByteArray& expectedHash) const;
+    PartialDownloadInfo getPartialDownloadInfo() const;
+    void savePartialDownload(const QString& url, const QString& displayName,
+                             const QByteArray& expectedHash, qint64 totalSize,
+                             qint64 bytesDownloaded, const QString& cacheFilePath);
+    void clearPartialDownload();
+
 signals:
     void cacheVerificationComplete(bool isValid);
     void diskSpaceCheckComplete(qint64 availableBytes);
@@ -85,6 +109,7 @@ signals:
     void cacheVerificationProgress(qint64 bytesProcessed, qint64 totalBytes);
     void cacheInvalidated();
     void cacheFileUpdated(const QByteArray& uncompressedHash);
+    void partialDownloadCleared();
 
 private slots:
     void onVerificationComplete(bool isValid, const QString& fileName, const QByteArray& hash);
@@ -103,6 +128,11 @@ private:
     void saveCacheSettings();
     QString getDefaultCacheFilePath() const;
     bool isCachingEnabled() const;
+
+    // Partial download state
+    PartialDownloadInfo partialDownload_;
+    void loadPartialDownloadSettings();
+    void savePartialDownloadSettings();
 };
 
 /**

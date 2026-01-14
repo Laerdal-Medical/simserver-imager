@@ -57,6 +57,15 @@ ApplicationWindow {
     Component.onCompleted: {
         // Set the main window for modal file dialogs
         imageWriter.setMainWindow(window)
+
+        // Check for partial downloads after a short delay to allow UI to initialize
+        Qt.callLater(function() {
+            if (imageWriter.hasPartialDownload()) {
+                console.log("Partial download detected on startup")
+                resumeDownloadDialog.downloadInfo = imageWriter.getPartialDownloadInfo()
+                resumeDownloadDialog.open()
+            }
+        })
     }
 
     // Save window size when changed (debounced)
@@ -563,6 +572,25 @@ ApplicationWindow {
         parent: overlayRoot
         imageWriter: window.imageWriter
         wizardContainer: wizardContainer
+    }
+
+    // Resume download dialog - shown on startup if partial download exists
+    ResumeDownloadDialog {
+        id: resumeDownloadDialog
+        parent: overlayRoot
+        anchors.centerIn: parent
+        imageWriter: window.imageWriter
+
+        onResumeRequested: {
+            console.log("Resuming partial download...")
+            imageWriter.resumePartialDownload()
+            // Navigate to OS selection - the resumed image will be shown
+        }
+
+        onDiscardRequested: {
+            console.log("Discarding partial download...")
+            imageWriter.discardPartialDownload()
+        }
     }
 
     // Removed embeddedFinishedPopup; handled by Wizard Done step

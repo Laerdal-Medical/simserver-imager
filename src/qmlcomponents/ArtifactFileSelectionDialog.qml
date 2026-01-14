@@ -118,10 +118,7 @@ BaseDialog {
 
                             // File type badge
                             ImBadge {
-                                text: modelData.type === "spu" ? "SPU" : (modelData.type === "vsi" ? "VSI" : "WIC")
-                                variant: modelData.type === "spu" ? "indigo" : (modelData.type === "vsi" ? "cyan" : "emerald")
-                                accessibleName: modelData.type === "spu" ? qsTr("Software Package Update file") :
-                                               (modelData.type === "vsi" ? qsTr("Versioned Sparse Image file") : qsTr("Disk image file"))
+                                type: modelData.type === "spu" ? "spu" : (modelData.type === "vsi" ? "vsi" : "wic")
                             }
                         }
 

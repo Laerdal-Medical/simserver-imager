@@ -5,13 +5,36 @@ import QtQuick.Layouts
 Rectangle {
     id: root
 
-    // Badge text and accessibility
-    property string text: ""
+    // Badge type - sets both text and variant automatically
+    // Supported types: "ci", "release", "spu", "wic", "vsi"
+    // Or use text/variant properties directly for custom badges
+    property string type: ""
+
+    // Badge text and accessibility (auto-set from type if not specified)
+    property string text: {
+        switch (type) {
+            case "ci":      return qsTr("CI Build")
+            case "release": return qsTr("Release")
+            case "spu":     return "SPU"
+            case "wic":     return "WIC"
+            case "vsi":     return "VSI"
+            default:        return ""
+        }
+    }
     property string accessibleName: text
 
-    // Predefined color variants
+    // Predefined color variants (auto-set from type if not specified)
     // Use 'variant' for predefined colors, or set 'color' directly for custom
-    property string variant: "default"
+    property string variant: {
+        switch (type) {
+            case "ci":      return "purple"
+            case "release": return "green"
+            case "spu":     return "indigo"
+            case "wic":     return "emerald"
+            case "vsi":     return "cyan"
+            default:        return "default"
+        }
+    }
 
     // Size
     Layout.preferredHeight: badgeText.implicitHeight + 4

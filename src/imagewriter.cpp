@@ -449,7 +449,12 @@ ImageWriter::~ImageWriter()
     if (_thread) {
         if (_thread->isRunning()) {
             qDebug() << "Cancelling running thread in ImageWriter destructor";
+
+            // Save partial download info before canceling (signals won't be processed during shutdown)
+            // We need to do this synchronously since the event loop may not run
             _thread->cancelDownload();
+
+            // Wait for thread to finish
             if (!_thread->wait(10000)) {
                 qDebug() << "Thread did not finish within 10 seconds, terminating it";
                 _thread->terminate();
@@ -1390,6 +1395,15 @@ void ImageWriter::startWrite()
                         // Update cache with both uncompressed hash (imageHash) and compressed hash (cacheFileHash)
                         _cacheManager->updateCacheFile(imageHash, cacheFileHash);
                     });
+            // Connect partial cache preservation for resume support
+            // Use DirectConnection to ensure the slot executes immediately when signal is emitted,
+            // even during app shutdown when the event loop may not be processing queued connections
+            connect(_thread, &DownloadThread::partialCachePreserved,
+                    this, [this, cacheFilePath](const QString& filePath, qint64 bytesWritten) {
+                        qDebug() << "DownloadThread partial cache preserved:" << bytesWritten << "bytes at" << filePath;
+                        _cacheManager->savePartialDownload(_src.toString(), _osName, _expectedHash,
+                                                          _downloadLen, bytesWritten, cacheFilePath);
+                    }, Qt::DirectConnection);
         }
         else
         {
@@ -1515,6 +1529,57 @@ void ImageWriter::onCancelled()
 bool ImageWriter::isCached(const QUrl &, const QByteArray &sha256)
 {
     return _cacheManager->isCached(sha256);
+}
+
+/* Partial download (resume) support */
+bool ImageWriter::hasPartialDownload()
+{
+    return _cacheManager->hasPartialDownload();
+}
+
+QVariantMap ImageWriter::getPartialDownloadInfo()
+{
+    auto info = _cacheManager->getPartialDownloadInfo();
+    QVariantMap result;
+    result["url"] = info.url;
+    result["displayName"] = info.displayName;
+    result["expectedHash"] = QString(info.expectedHash);
+    result["totalSize"] = info.totalSize;
+    result["bytesDownloaded"] = info.bytesDownloaded;
+    result["timestamp"] = info.timestamp;
+    result["cacheFilePath"] = info.cacheFilePath;
+    result["percentComplete"] = info.totalSize > 0
+        ? (double)info.bytesDownloaded / info.totalSize * 100.0 : 0.0;
+    result["isValid"] = info.isValid;
+    return result;
+}
+
+bool ImageWriter::isPartiallyDownloaded(const QByteArray &expectedHash)
+{
+    return _cacheManager->isPartiallyDownloaded(expectedHash);
+}
+
+void ImageWriter::resumePartialDownload()
+{
+    auto info = _cacheManager->getPartialDownloadInfo();
+    if (!info.isValid) {
+        qDebug() << "ImageWriter::resumePartialDownload: No valid partial download";
+        return;
+    }
+
+    qDebug() << "ImageWriter::resumePartialDownload: Resuming" << info.displayName
+             << "from" << info.bytesDownloaded << "/" << info.totalSize << "bytes";
+
+    // Set the source from partial download info
+    // The DownloadThread will use the existing partial cache file
+    setSrc(QUrl(info.url), info.totalSize, 0, info.expectedHash,
+           false, QString(), info.displayName, QByteArray());
+}
+
+void ImageWriter::discardPartialDownload()
+{
+    qDebug() << "ImageWriter::discardPartialDownload: Discarding partial download";
+    _cacheManager->clearPartialDownload();
 }
 
 /* Utility function to return filename part from URL */
@@ -2365,6 +2430,11 @@ void ImageWriter::onSuccess()
 
     // Clear Pi Connect token on successful write completion
     clearConnectToken();
+
+    // Clear any partial download info since download completed successfully
+    if (_cacheManager->hasPartialDownload()) {
+        _cacheManager->clearPartialDownload();
+    }
 
     // Trigger immediate drive list refresh so UI shows updated device info
     // Use a short delay to give the OS time to recognize the new partition table
@@ -4186,6 +4256,15 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
                         // Update cache with both uncompressed hash (imageHash) and compressed hash (cacheFileHash)
                         _cacheManager->updateCacheFile(imageHash, cacheFileHash);
                     });
+            // Connect partial cache preservation for resume support
+            // Use DirectConnection to ensure the slot executes immediately when signal is emitted,
+            // even during app shutdown when the event loop may not be processing queued connections
+            connect(_thread, &DownloadThread::partialCachePreserved,
+                    this, [this, cacheFilePath](const QString& filePath, qint64 bytesWritten) {
+                        qDebug() << "DownloadThread partial cache preserved:" << bytesWritten << "bytes at" << filePath;
+                        _cacheManager->savePartialDownload(_src.toString(), _osName, _expectedHash,
+                                                          _downloadLen, bytesWritten, cacheFilePath);
+                    }, Qt::DirectConnection);
         }
         else
         {

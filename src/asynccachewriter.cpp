@@ -104,8 +104,53 @@ bool AsyncCacheWriter::open(const QString &filename, qint64 preallocateSize)
     // Start the writer thread
     start();
     
-    qDebug() << "AsyncCacheWriter: Opened" << filename 
+    qDebug() << "AsyncCacheWriter: Opened" << filename
              << "with preallocation:" << preallocateSize;
+    return true;
+}
+
+bool AsyncCacheWriter::openForAppend(const QString &filename)
+{
+    if (_isActive) {
+        qDebug() << "AsyncCacheWriter: Already active";
+        return false;
+    }
+
+    _filename = filename;
+    _file.setFileName(filename);
+
+    // Open in append mode to continue from existing data
+    if (!_file.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qDebug() << "AsyncCacheWriter: Failed to open for append" << filename << "-" << _file.errorString();
+        return false;
+    }
+
+    qint64 existingSize = _file.size();
+
+    // Reset state but track existing bytes
+    _shouldStop = false;
+    _hasError = false;
+    _finishing = false;
+    _bytesQueued = existingSize;
+    _bytesWritten = existingSize;
+    _isActive = true;
+
+    // Note: We cannot continue hashing from where we left off since we don't
+    // store intermediate hash state. The hash will only cover newly written data.
+    // This is acceptable because cache validation uses the full file hash anyway.
+    _hash.reset();
+
+    // Clear any stale queue data
+    {
+        QMutexLocker lock(&_mutex);
+        _queue.clear();
+    }
+
+    // Start the writer thread
+    start();
+
+    qDebug() << "AsyncCacheWriter: Opened for append" << filename
+             << "existing size:" << existingSize;
     return true;
 }
 
@@ -203,15 +248,15 @@ void AsyncCacheWriter::cancel()
     if (!_isActive && !isRunning()) {
         return;
     }
-    
+
     qDebug() << "AsyncCacheWriter: Cancelling";
-    
+
     _shouldStop = true;
-    
+
     // Wake the thread so it can exit
     _queueNotEmpty.wakeAll();
     _queueNotFull.wakeAll();
-    
+
     // Wait for thread to finish - give it reasonable time but don't use terminate()
     // as QThread::terminate() is dangerous and can cause undefined behavior,
     // especially on Linux where it may leave resources in inconsistent state.
@@ -225,7 +270,7 @@ void AsyncCacheWriter::cancel()
             qDebug() << "AsyncCacheWriter: Thread didn't stop after 10s total - may be stuck in I/O";
         }
     }
-    
+
     // Only do cleanup from here if the thread has stopped.
     // If thread is still running, it will do its own cleanup when it exits.
     // Calling cleanup() while thread is still writing could cause undefined behavior.
@@ -234,7 +279,49 @@ void AsyncCacheWriter::cancel()
     } else {
         qDebug() << "AsyncCacheWriter: Leaving cleanup to thread (still running)";
     }
-    
+
+    _isActive = false;
+}
+
+void AsyncCacheWriter::finishPartial()
+{
+    if (!_isActive && !isRunning()) {
+        return;
+    }
+
+    qDebug() << "AsyncCacheWriter: Finishing partial - preserving cache file with"
+             << _bytesWritten << "bytes written," << (_bytesQueued - _bytesWritten)
+             << "bytes still in queue";
+
+    // Signal thread to stop (but we won't delete the file)
+    _shouldStop = true;
+    _finishing = true;
+
+    // Wake the thread so it can process remaining data and exit
+    _queueNotEmpty.wakeAll();
+    _queueNotFull.wakeAll();
+
+    // Wait for thread to finish current writes
+    bool threadStopped = wait(5000);
+    if (!threadStopped) {
+        qDebug() << "AsyncCacheWriter: Thread still running after 5s, waiting longer...";
+        threadStopped = wait(5000);
+    }
+
+    // Flush and close without deleting
+    {
+        QMutexLocker lock(&_mutex);
+        _queue.clear();  // Discard any unwritten data
+
+        if (_file.isOpen()) {
+            _file.flush();
+            _file.close();
+            qDebug() << "AsyncCacheWriter: Closed partial cache file" << _filename
+                     << "with" << _bytesWritten << "bytes";
+        }
+        // Note: We intentionally do NOT clear _filename or delete the file
+    }
+
     _isActive = false;
 }
 

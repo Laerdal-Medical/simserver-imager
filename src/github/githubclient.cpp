@@ -13,12 +13,14 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QDir>
+#include <QSettings>
 #include <archive.h>
 #include <archive_entry.h>
 
 GitHubClient::GitHubClient(QObject *parent)
     : QObject(parent)
 {
+    loadPartialArtifactDownload();
 }
 
 GitHubClient::~GitHubClient()
@@ -36,19 +38,47 @@ GitHubClient::~GitHubClient()
         _activeInspectionReply->deleteLater();
         _activeInspectionReply = nullptr;
     }
+
+    // Clean up file handle
+    if (_activeInspectionFile) {
+        _activeInspectionFile->close();
+        delete _activeInspectionFile;
+        _activeInspectionFile = nullptr;
+    }
 }
 
-void GitHubClient::cancelArtifactInspection()
+void GitHubClient::cancelArtifactInspection(bool preserveForResume)
 {
     if (_activeInspectionReply) {
-        qDebug() << "GitHubClient: Cancelling artifact inspection download";
+        qDebug() << "GitHubClient: Cancelling artifact inspection download, preserveForResume:" << preserveForResume;
 
-        // Delete the partial cache file if it exists
-        if (!_activeInspectionZipPath.isEmpty() && QFile::exists(_activeInspectionZipPath)) {
-            qDebug() << "GitHubClient: Deleting partial cache file:" << _activeInspectionZipPath;
-            QFile::remove(_activeInspectionZipPath);
+        // Close and clean up the file handle
+        if (_activeInspectionFile) {
+            _activeInspectionFile->flush();
+            _activeInspectionFile->close();
+            delete _activeInspectionFile;
+            _activeInspectionFile = nullptr;
         }
+
+        if (preserveForResume && _activeInspectionBytesWritten > 0) {
+            // Save partial download state for resume
+            _partialArtifactDownload.bytesDownloaded = _activeInspectionBytesWritten;
+            _partialArtifactDownload.isValid = true;
+            savePartialArtifactDownload();
+            qDebug() << "GitHubClient: Preserved partial artifact download:"
+                     << _activeInspectionBytesWritten << "bytes";
+        } else {
+            // Delete the partial file
+            if (!_activeInspectionPartialPath.isEmpty() && QFile::exists(_activeInspectionPartialPath)) {
+                qDebug() << "GitHubClient: Deleting partial cache file:" << _activeInspectionPartialPath;
+                QFile::remove(_activeInspectionPartialPath);
+            }
+            clearPartialArtifactDownload();
+        }
+
         _activeInspectionZipPath.clear();
+        _activeInspectionPartialPath.clear();
+        _activeInspectionBytesWritten = 0;
 
         // Just abort - the finished handler will clean up the reply
         // and check for OperationCanceledError
@@ -481,6 +511,18 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
                                            qint64 artifactId, const QString &artifactName,
                                            const QString &branch, const QString &zipPath)
 {
+    QString partialPath = zipPath + ".partial";
+
+    // Check if we're resuming a partial download
+    qint64 startOffset = 0;
+    if (_partialArtifactDownload.isValid &&
+        _partialArtifactDownload.artifactId == artifactId &&
+        QFile::exists(_partialArtifactDownload.partialPath)) {
+        startOffset = _partialArtifactDownload.bytesDownloaded;
+        partialPath = _partialArtifactDownload.partialPath;
+        qDebug() << "GitHubClient: Resuming artifact download from offset:" << startOffset;
+    }
+
     // Check if this is a GitHub URL or an external URL
     bool isGitHubUrl = url.host().endsWith("github.com") || url.host().endsWith("githubusercontent.com");
 
@@ -494,20 +536,78 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
     // No timeout for downloads - they can take a long time for large files
     request.setTransferTimeout(0);
 
+    // Add Range header for resume support
+    if (startOffset > 0) {
+        request.setRawHeader("Range", QString("bytes=%1-").arg(startOffset).toUtf8());
+    }
+
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    // Store metadata for partial download tracking
+    _partialArtifactDownload.partialPath = partialPath;
+    _partialArtifactDownload.finalPath = zipPath;
+    _partialArtifactDownload.owner = owner;
+    _partialArtifactDownload.repo = repo;
+    _partialArtifactDownload.branch = branch;
+    _partialArtifactDownload.artifactName = artifactName;
+    _partialArtifactDownload.artifactId = artifactId;
+    _partialArtifactDownload.downloadUrl = url;
+
+    // Open the file for writing (append if resuming)
+    _activeInspectionFile = new QFile(partialPath);
+    QIODevice::OpenMode mode = startOffset > 0 ? (QIODevice::WriteOnly | QIODevice::Append)
+                                                : QIODevice::WriteOnly;
+    if (!_activeInspectionFile->open(mode)) {
+        emit error(tr("Failed to open file for writing: %1").arg(_activeInspectionFile->errorString()));
+        delete _activeInspectionFile;
+        _activeInspectionFile = nullptr;
+        return;
+    }
+    _activeInspectionBytesWritten = startOffset;
 
     QNetworkReply *reply = _networkManager.get(request);
     _activeInspectionReply = reply;
     _activeInspectionZipPath = zipPath;
+    _activeInspectionPartialPath = partialPath;
 
-    connect(reply, &QNetworkReply::downloadProgress, this, [this](qint64 bytesReceived, qint64 bytesTotal) {
-        emit artifactDownloadProgress(bytesReceived, bytesTotal);
+    // Write data incrementally as it arrives
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply]() {
+        if (this->_activeInspectionFile && this->_activeInspectionFile->isOpen()) {
+            QByteArray data = reply->readAll();
+            qint64 written = this->_activeInspectionFile->write(data);
+            if (written > 0) {
+                this->_activeInspectionBytesWritten += written;
+            }
+        }
     });
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
-        _activeInspectionReply = nullptr;
-        _activeInspectionZipPath.clear();
+    connect(reply, &QNetworkReply::downloadProgress, this, [this, startOffset](qint64 bytesReceived, qint64 bytesTotal) {
+        // Adjust for resume offset
+        qint64 totalReceived = startOffset + bytesReceived;
+        qint64 totalSize = (bytesTotal > 0) ? (startOffset + bytesTotal) : 0;
+
+        // Store total size for partial download info
+        if (totalSize > 0) {
+            _partialArtifactDownload.totalSize = totalSize;
+        }
+
+        emit artifactDownloadProgress(totalReceived, totalSize);
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath, partialPath]() {
+        this->_activeInspectionReply = nullptr;
+        this->_activeInspectionZipPath.clear();
+        this->_activeInspectionPartialPath.clear();
+
+        // Close and clean up the file
+        if (this->_activeInspectionFile) {
+            this->_activeInspectionFile->flush();
+            this->_activeInspectionFile->close();
+            delete this->_activeInspectionFile;
+            this->_activeInspectionFile = nullptr;
+        }
+
         reply->deleteLater();
 
         // Check if cancelled (OperationCanceledError)
@@ -518,20 +618,26 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
 
         if (reply->error() != QNetworkReply::NoError) {
             emit error(tr("Failed to download artifact for inspection: %1").arg(reply->errorString()));
+            // Clean up partial file on error
+            QFile::remove(partialPath);
+            clearPartialArtifactDownload();
             return;
         }
 
-        QFile file(zipPath);
-        if (!file.open(QIODevice::WriteOnly)) {
-            emit error(tr("Failed to save artifact for inspection: %1").arg(file.errorString()));
+        // Rename partial file to final path
+        if (QFile::exists(zipPath)) {
+            QFile::remove(zipPath);
+        }
+        if (!QFile::rename(partialPath, zipPath)) {
+            emit error(tr("Failed to finalize artifact download"));
             return;
         }
 
-        QByteArray data = reply->readAll();
-        file.write(data);
-        file.close();
+        qDebug() << "GitHubClient: Artifact downloaded for inspection, size:" << _activeInspectionBytesWritten;
+        _activeInspectionBytesWritten = 0;
 
-        qDebug() << "GitHubClient: Artifact downloaded for inspection, size:" << data.size();
+        // Clear partial download state since we completed successfully
+        clearPartialArtifactDownload();
 
         // Scan the ZIP for all image files (WIC + SPU)
         QJsonArray imageFiles = listImageFilesInZip(zipPath);
@@ -1185,4 +1291,147 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
 
     qDebug() << "GitHubClient: Found" << wicFiles.size() << "WIC artifacts";
     return wicFiles;
+}
+
+// Partial artifact download support
+
+bool GitHubClient::hasPartialArtifactDownload() const
+{
+    return _partialArtifactDownload.isValid;
+}
+
+QVariantMap GitHubClient::getPartialArtifactDownloadInfo() const
+{
+    QVariantMap info;
+    if (!_partialArtifactDownload.isValid) {
+        return info;
+    }
+
+    info["artifactName"] = _partialArtifactDownload.artifactName;
+    info["artifactId"] = _partialArtifactDownload.artifactId;
+    info["bytesDownloaded"] = _partialArtifactDownload.bytesDownloaded;
+    info["totalSize"] = _partialArtifactDownload.totalSize;
+    info["owner"] = _partialArtifactDownload.owner;
+    info["repo"] = _partialArtifactDownload.repo;
+    info["branch"] = _partialArtifactDownload.branch;
+
+    double percentComplete = 0;
+    if (_partialArtifactDownload.totalSize > 0) {
+        percentComplete = (double)_partialArtifactDownload.bytesDownloaded * 100.0 /
+                          (double)_partialArtifactDownload.totalSize;
+    }
+    info["percentComplete"] = percentComplete;
+
+    return info;
+}
+
+void GitHubClient::resumeArtifactDownload()
+{
+    if (!_partialArtifactDownload.isValid) {
+        qDebug() << "GitHubClient: No partial artifact download to resume";
+        return;
+    }
+
+    qDebug() << "GitHubClient: Resuming artifact download from"
+             << _partialArtifactDownload.bytesDownloaded << "bytes";
+
+    // Re-trigger the download with resume support
+    inspectArtifactContents(_partialArtifactDownload.owner,
+                            _partialArtifactDownload.repo,
+                            _partialArtifactDownload.artifactId,
+                            _partialArtifactDownload.artifactName,
+                            _partialArtifactDownload.branch);
+}
+
+void GitHubClient::discardPartialArtifactDownload()
+{
+    qDebug() << "GitHubClient: Discarding partial artifact download";
+
+    // Delete the partial file
+    if (!_partialArtifactDownload.partialPath.isEmpty() &&
+        QFile::exists(_partialArtifactDownload.partialPath)) {
+        QFile::remove(_partialArtifactDownload.partialPath);
+    }
+
+    clearPartialArtifactDownload();
+}
+
+void GitHubClient::savePartialArtifactDownload()
+{
+    QSettings settings;
+    settings.beginGroup("github");
+    settings.beginGroup("partialArtifact");
+    settings.setValue("partialPath", _partialArtifactDownload.partialPath);
+    settings.setValue("finalPath", _partialArtifactDownload.finalPath);
+    settings.setValue("owner", _partialArtifactDownload.owner);
+    settings.setValue("repo", _partialArtifactDownload.repo);
+    settings.setValue("branch", _partialArtifactDownload.branch);
+    settings.setValue("artifactName", _partialArtifactDownload.artifactName);
+    settings.setValue("artifactId", _partialArtifactDownload.artifactId);
+    settings.setValue("bytesDownloaded", _partialArtifactDownload.bytesDownloaded);
+    settings.setValue("totalSize", _partialArtifactDownload.totalSize);
+    settings.setValue("downloadUrl", _partialArtifactDownload.downloadUrl.toString());
+    settings.endGroup();
+    settings.endGroup();
+    settings.sync();
+
+    qDebug() << "GitHubClient: Saved partial artifact download state";
+}
+
+void GitHubClient::loadPartialArtifactDownload()
+{
+    QSettings settings;
+    settings.beginGroup("github");
+    settings.beginGroup("partialArtifact");
+
+    QString partialPath = settings.value("partialPath").toString();
+    qint64 bytesDownloaded = settings.value("bytesDownloaded", 0).toLongLong();
+
+    settings.endGroup();
+    settings.endGroup();
+
+    // Validate the partial file exists and has expected size
+    if (!partialPath.isEmpty() && bytesDownloaded > 0) {
+        QFileInfo fileInfo(partialPath);
+        if (fileInfo.exists() && fileInfo.size() == bytesDownloaded) {
+            settings.beginGroup("github");
+            settings.beginGroup("partialArtifact");
+
+            _partialArtifactDownload.partialPath = partialPath;
+            _partialArtifactDownload.finalPath = settings.value("finalPath").toString();
+            _partialArtifactDownload.owner = settings.value("owner").toString();
+            _partialArtifactDownload.repo = settings.value("repo").toString();
+            _partialArtifactDownload.branch = settings.value("branch").toString();
+            _partialArtifactDownload.artifactName = settings.value("artifactName").toString();
+            _partialArtifactDownload.artifactId = settings.value("artifactId", 0).toLongLong();
+            _partialArtifactDownload.bytesDownloaded = bytesDownloaded;
+            _partialArtifactDownload.totalSize = settings.value("totalSize", 0).toLongLong();
+            _partialArtifactDownload.downloadUrl = QUrl(settings.value("downloadUrl").toString());
+            _partialArtifactDownload.isValid = true;
+
+            settings.endGroup();
+            settings.endGroup();
+
+            qDebug() << "GitHubClient: Loaded partial artifact download:"
+                     << _partialArtifactDownload.artifactName
+                     << _partialArtifactDownload.bytesDownloaded << "/"
+                     << _partialArtifactDownload.totalSize << "bytes";
+        } else {
+            qDebug() << "GitHubClient: Partial artifact file missing or size mismatch, clearing";
+            clearPartialArtifactDownload();
+        }
+    }
+}
+
+void GitHubClient::clearPartialArtifactDownload()
+{
+    _partialArtifactDownload = PartialArtifactDownload();
+
+    QSettings settings;
+    settings.beginGroup("github");
+    settings.beginGroup("partialArtifact");
+    settings.remove("");  // Remove all keys in this group
+    settings.endGroup();
+    settings.endGroup();
+    settings.sync();
 }

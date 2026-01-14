@@ -601,6 +601,7 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/BaseDialog.qml
       qmlcomponents/ArtifactFileSelectionDialog.qml
       qmlcomponents/ArtifactDownloadProgressDialog.qml
+      qmlcomponents/ResumeDownloadDialog.qml
       qmlcomponents/ImButton.qml
       qmlcomponents/ImButtonRed.qml
       qmlcomponents/ImCheckBox.qml

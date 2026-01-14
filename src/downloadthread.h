@@ -205,6 +205,9 @@ signals:
     // Connected to UI with Qt::QueuedConnection for cross-thread safety
     void asyncWriteProgress(quint64 bytesWritten, quint64 totalBytes);
 
+    // Partial cache preserved signal - emitted when user cancels and cache file is kept for resume
+    void partialCachePreserved(const QString& filePath, qint64 bytesWritten);
+
 protected:
     virtual void run();
     virtual void _onDownloadSuccess();

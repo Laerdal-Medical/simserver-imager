@@ -594,6 +594,15 @@ WizardStepBase {
                     return sz > 0 ? qsTr("Local - %1").arg(root.imageWriter.formatSize(sz)) : ""
                 }
                 if (!delegateItem.url) return ""
+                // Check for partial download first (resume available)
+                if (typeof(delegateItem.extract_sha256) !== "undefined" &&
+                    root.cacheStatusVersion >= 0 &&
+                    root.imageWriter.isPartiallyDownloaded(delegateItem.extract_sha256)) {
+                    var info = root.imageWriter.getPartialDownloadInfo()
+                    var percent = Math.round(info.percentComplete)
+                    return qsTr("Resume download - %1% complete").arg(percent)
+                }
+                // Then check for fully cached
                 if (typeof(delegateItem.extract_sha256) !== "undefined" &&
                     root.cacheStatusVersion >= 0 &&
                     root.imageWriter.isCached(delegateItem.url, delegateItem.extract_sha256)) {
@@ -621,43 +630,18 @@ WizardStepBase {
 
             minimumHeight: 80
 
-            // Custom badges using the badgeContent slot
-            ImBadge {
-                visible: delegateItem.source === "github"
-                text: delegateItem.source_type === "artifact" ? qsTr("CI Build") : qsTr("Release")
-                variant: delegateItem.source_type === "artifact" ? "purple" : "green"
-                accessibleName: delegateItem.source_type === "artifact" ? qsTr("CI Build from GitHub Actions") : qsTr("GitHub Release")
-            }
-
-            ImBadge {
-                id: imageTypeBadge
-                visible: {
-                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                    return urlStr.length > 0 &&
-                           !urlStr.startsWith("internal://") &&
-                           (urlStr.endsWith(".spu") || urlStr.endsWith(".vsi") ||
-                            urlStr.endsWith(".wic") || urlStr.endsWith(".wic.xz") ||
-                            urlStr.endsWith(".wic.gz") || urlStr.endsWith(".wic.bz2") ||
-                            urlStr.endsWith(".wic.zst"))
+            // Badges: source type + image type (using ImBadge type property)
+            badges: {
+                var b = []
+                if (delegateItem.source === "github")
+                    b.push({ type: delegateItem.source_type === "artifact" ? "ci" : "release" })
+                var url = (delegateItem.url || "").toLowerCase()
+                if (url && !url.startsWith("internal://")) {
+                    if (url.endsWith(".spu"))          b.push({ type: "spu" })
+                    else if (url.endsWith(".vsi"))     b.push({ type: "vsi" })
+                    else if (url.includes(".wic"))     b.push({ type: "wic" })
                 }
-                text: {
-                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                    if (urlStr.endsWith(".spu")) return qsTr("SPU")
-                    if (urlStr.endsWith(".vsi")) return qsTr("VSI")
-                    return qsTr("WIC")
-                }
-                variant: {
-                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                    if (urlStr.endsWith(".spu")) return "indigo"
-                    if (urlStr.endsWith(".vsi")) return "cyan"
-                    return "emerald"
-                }
-                accessibleName: {
-                    var urlStr = delegateItem.url ? delegateItem.url.toString().toLowerCase() : ""
-                    if (urlStr.endsWith(".spu")) return qsTr("Software Package Update file")
-                    if (urlStr.endsWith(".vsi")) return qsTr("Versioned Sparse Image file")
-                    return qsTr("Disk image file")
-                }
+                return b
             }
         }
     }

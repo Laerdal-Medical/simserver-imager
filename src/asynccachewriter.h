@@ -51,6 +51,13 @@ public:
     bool open(const QString &filename, qint64 preallocateSize = 0);
 
     /**
+     * @brief Open cache file for appending (resume mode)
+     * @param filename Path to existing cache file
+     * @return true if file opened successfully for append
+     */
+    bool openForAppend(const QString &filename);
+
+    /**
      * @brief Queue data for async writing
      * 
      * This method returns quickly after queuing the data.
@@ -77,10 +84,30 @@ public:
 
     /**
      * @brief Cancel writing and discard pending data
-     * 
+     *
      * Stops the writer thread and removes the cache file.
      */
     void cancel();
+
+    /**
+     * @brief Finish writing for resume support (preserve partial file)
+     *
+     * Flushes pending writes and closes the file WITHOUT deleting it.
+     * Use this when the user cancels a download but wants to resume later.
+     */
+    void finishPartial();
+
+    /**
+     * @brief Get the number of bytes successfully written to disk
+     * @return Bytes written (may lag behind bytesQueued due to async I/O)
+     */
+    qint64 bytesWritten() const { return _bytesWritten; }
+
+    /**
+     * @brief Get the cache file path
+     * @return Path to the cache file being written
+     */
+    QString filename() const { return _filename; }
 
     /**
      * @brief Check if writer is in error state

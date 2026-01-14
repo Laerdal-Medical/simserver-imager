@@ -695,7 +695,15 @@ void DownloadThread::run()
     }
 #endif
 
-    emit preparationStatusUpdate(tr("Starting download..."));
+    // Set resume offset if resuming a partial download
+    if (_startOffset > 0) {
+        curl_easy_setopt(_c, CURLOPT_RESUME_FROM_LARGE, _startOffset);
+        qDebug() << "Resuming download from offset:" << _startOffset;
+        emit preparationStatusUpdate(tr("Resuming download..."));
+    } else {
+        emit preparationStatusUpdate(tr("Starting download..."));
+    }
+
     // Minimal logging during normal operation
     _timer.start();
     CURLcode ret = curl_easy_perform(_c);
@@ -803,31 +811,38 @@ void DownloadThread::run()
             break;
         }
         case CURLE_WRITE_ERROR:
-            deleteDownloadedFile();
-            // If cancelled, treat write error as clean abort (user-initiated cancellation
-            // triggers CURLE_WRITE_ERROR because _writeData returns 0)
-            if (!_cancelled)
+            // If cancelled, don't delete downloaded file (partial cache may be preserved for resume)
+            // User-initiated cancellation triggers CURLE_WRITE_ERROR because _writeData returns 0
+            if (!_cancelled) {
+                deleteDownloadedFile();
                 _onWriteError();
+            }
             break;
         case CURLE_ABORTED_BY_CALLBACK:
             // Clean cancellation via progress callback
-            deleteDownloadedFile();
+            // Don't delete file - partial cache may be preserved for resume
+            if (!_cancelled)
+                deleteDownloadedFile();
             break;
         default:
-            deleteDownloadedFile();
-            QString errorMsg;
+            // On actual errors (not cancellation), delete the file
+            // For cancellation, partial cache may be preserved for resume
+            if (!_cancelled) {
+                deleteDownloadedFile();
+                QString errorMsg;
 
-            if (!errorBuf[0])
-                /* No detailed error message text provided, use standard text for libcurl result code */
-                errorMsg += curl_easy_strerror(ret);
-            else
-                errorMsg += errorBuf;
+                if (!errorBuf[0])
+                    /* No detailed error message text provided, use standard text for libcurl result code */
+                    errorMsg += curl_easy_strerror(ret);
+                else
+                    errorMsg += errorBuf;
 
-            char *ipstr;
-            if (curl_easy_getinfo(_c, CURLINFO_PRIMARY_IP, &ipstr) == CURLE_OK && ipstr && ipstr[0])
-                errorMsg += QString(" - Server IP: ")+ipstr;
+                char *ipstr;
+                if (curl_easy_getinfo(_c, CURLINFO_PRIMARY_IP, &ipstr) == CURLE_OK && ipstr && ipstr[0])
+                    errorMsg += QString(" - Server IP: ")+ipstr;
 
-            _onDownloadError(tr("Error downloading: %1").arg(errorMsg));
+                _onDownloadError(tr("Error downloading: %1").arg(errorMsg));
+            }
     }
 }
 
@@ -893,29 +908,47 @@ void DownloadThread::_writeCache(const char *buf, size_t len)
 void DownloadThread::setCacheFile(const QString &filename, qint64 filesize)
 {
     _cacheFilename = filename;
-    
+
+    // Check if a partial cache file exists for resume
+    QFileInfo cacheInfo(filename);
+    bool resumeMode = cacheInfo.exists() && cacheInfo.size() > 0 && cacheInfo.size() < filesize;
+
     // Create async cache writer
     _asyncCacheWriter = std::make_unique<AsyncCacheWriter>(this);
-    
+
     // Connect error signal for async error propagation from writer thread
     // Using Qt::QueuedConnection to ensure thread-safe signal delivery
-    connect(_asyncCacheWriter.get(), &AsyncCacheWriter::error, 
+    connect(_asyncCacheWriter.get(), &AsyncCacheWriter::error,
             this, [this](const QString &msg) {
                 qDebug() << "AsyncCacheWriter error (async):" << msg;
                 _cacheEnabled = false;
                 // Note: Don't cancel here - we're in a different thread context
                 // The writer thread will clean up on its own
             }, Qt::QueuedConnection);
-    
-    if (_asyncCacheWriter->open(filename, filesize))
+
+    bool opened = false;
+    if (resumeMode) {
+        // Resume from existing partial cache file
+        _startOffset = cacheInfo.size();
+        qDebug() << "Resuming download from offset:" << _startOffset << "bytes";
+        opened = _asyncCacheWriter->openForAppend(filename);
+    } else {
+        // Fresh download
+        _startOffset = 0;
+        opened = _asyncCacheWriter->open(filename, filesize);
+    }
+
+    if (opened)
     {
         _cacheEnabled = true;
-        qDebug() << "Async cache writer initialized for" << filename;
+        qDebug() << "Async cache writer initialized for" << filename
+                 << (resumeMode ? "(resume mode)" : "(fresh download)");
     }
     else
     {
         qDebug() << "Error opening cache file for writing. Disabling caching.";
         _asyncCacheWriter.reset();
+        _startOffset = 0;  // Reset offset if cache setup failed
     }
 }
 
@@ -1201,12 +1234,23 @@ void DownloadThread::_header(const string &header)
 void DownloadThread::cancelDownload()
 {
     _cancelled = true;
-    
+
     // Cancel any pending async I/O to unblock waiting operations
     if (_file) {
         _file->CancelAsyncIO();
     }
-    
+
+    // Preserve partial cache for resume support
+    if (_cacheEnabled && _asyncCacheWriter && _asyncCacheWriter->isActive()) {
+        _asyncCacheWriter->finishPartial();
+        qint64 bytesWritten = _asyncCacheWriter->bytesWritten();
+        QString filePath = _asyncCacheWriter->filename();
+        if (bytesWritten > 0 && !filePath.isEmpty()) {
+            qDebug() << "DownloadThread: Preserving partial cache:" << bytesWritten << "bytes";
+            emit partialCachePreserved(filePath, bytesWritten);
+        }
+    }
+
     //deleteDownloadedFile();
 }
 
