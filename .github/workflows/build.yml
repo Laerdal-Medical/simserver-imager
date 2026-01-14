@@ -312,7 +312,6 @@ jobs:
         run: find artifacts -type f | head -50
 
       - name: Delete existing draft release
-        if: steps.release_params.outputs.draft == 'true'
         run: |
           # Delete existing draft release and tag if they exist
           gh release delete draft --yes || true
