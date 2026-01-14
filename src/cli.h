@@ -21,6 +21,7 @@ protected:
     int _lastPercent;
     QByteArray _lastMsg;
     bool _quiet;
+    bool _isSpuMode;
 
     void _printProgress(const QByteArray &msg, QVariant now, QVariant total);
     void _clearLine();
@@ -31,6 +32,11 @@ protected slots:
     void onDownloadProgress(QVariant dlnow, QVariant dltotal);
     void onVerifyProgress(QVariant now, QVariant total);
     void onPreparationStatusUpdate(QVariant msg);
+    // SPU copy slots
+    void onSpuCopySuccess();
+    void onSpuCopyError(QVariant msg);
+    void onSpuCopyProgress(QVariant now, QVariant total);
+    void onSpuPreparationStatusUpdate(QVariant msg);
 
 signals:
 

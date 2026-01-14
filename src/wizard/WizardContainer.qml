@@ -824,10 +824,25 @@ Item {
         if (fileUrl && fileUrl.toString().length > 0) {
             // Mark that we have a startup image to prevent auto-navigation
             root.hasStartupImage = true
-            // Set the source to the startup image file
-            root.imageWriter.setSrc(fileUrl)
-            root.selectedOsName = root.imageWriter.srcFileName()
-            root.customizationSupported = false  // Disabled for Laerdal SimServer Imager
+
+            var urlStr = fileUrl.toString().toLowerCase()
+            var isSpu = urlStr.endsWith(".spu")
+
+            if (isSpu) {
+                // SPU file - set up SPU copy mode (copies file to USB, not disk write)
+                console.log("SPU file passed as startup argument:", fileUrl)
+                root.imageWriter.setSrcSpuFile(fileUrl.toString().replace("file://", ""))
+                root.selectedOsName = root.imageWriter.srcFileName()
+                root.isSpuCopyMode = true
+                root.customizationSupported = false
+            } else {
+                // Regular WIC/VSI disk image
+                root.imageWriter.setSrc(fileUrl)
+                root.selectedOsName = root.imageWriter.srcFileName()
+                root.isSpuCopyMode = false
+                root.customizationSupported = false  // Disabled for Laerdal SimServer Imager
+            }
+
             // Mark previous steps as permissible so user can navigate back
             root.permissibleStepsBitmap |= (1 << root.stepSourceSelection)
             root.permissibleStepsBitmap |= (1 << root.stepOSSelection)

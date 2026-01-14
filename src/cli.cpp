@@ -19,7 +19,7 @@ static void devnullMsgHandler(QtMsgType, const QMessageLogContext &, const QStri
 {
 }
 
-Cli::Cli(int &argc, char *argv[]) : QObject(nullptr), _imageWriter(nullptr)
+Cli::Cli(int &argc, char *argv[]) : QObject(nullptr), _imageWriter(nullptr), _isSpuMode(false)
 {
     /* Attach to console for output (Windows-specific, no-op on other platforms) */
     PlatformQuirks::attachConsole();
@@ -147,7 +147,42 @@ int Cli::run()
         }
     }
 
-    if (args[0].startsWith("http:", Qt::CaseInsensitive) || args[0].startsWith("https:", Qt::CaseInsensitive))
+    // Check if source is an SPU file (copy to USB instead of writing disk image)
+    _isSpuMode = args[0].endsWith(".spu", Qt::CaseInsensitive);
+
+    if (_isSpuMode)
+    {
+        // SPU files are copied to USB, not written as disk images
+        // Connect SPU-specific signals
+        connect(_imageWriter, &ImageWriter::spuCopySuccess, this, &Cli::onSpuCopySuccess);
+        connect(_imageWriter, &ImageWriter::spuCopyError, this, &Cli::onSpuCopyError);
+        connect(_imageWriter, &ImageWriter::spuCopyProgress, this, &Cli::onSpuCopyProgress);
+        connect(_imageWriter, &ImageWriter::spuPreparationStatusUpdate, this, &Cli::onSpuPreparationStatusUpdate);
+
+        if (args[0].startsWith("http:", Qt::CaseInsensitive) || args[0].startsWith("https:", Qt::CaseInsensitive))
+        {
+            _imageWriter->setSrcSpuUrl(QUrl(args[0]), 0, QFileInfo(args[0]).fileName());
+        }
+        else
+        {
+            QFileInfo fi(args[0]);
+            if (fi.isFile())
+            {
+                _imageWriter->setSrcSpuFile(fi.absoluteFilePath());
+            }
+            else if (!fi.exists())
+            {
+                std::cerr << "Error: source file does not exist" << std::endl;
+                return 1;
+            }
+            else
+            {
+                std::cerr << "Error: source is not a regular file" << std::endl;
+                return 1;
+            }
+        }
+    }
+    else if (args[0].startsWith("http:", Qt::CaseInsensitive) || args[0].startsWith("https:", Qt::CaseInsensitive))
     {
         _imageWriter->setSrc(args[0], 0, 0, parser.value("sha256").toLatin1(), false, "", "", initFormat);
 
@@ -166,7 +201,7 @@ int Cli::run()
         }
         else if (!fi.exists())
         {
-            std::cerr << "Error: source file does not exists" << std::endl;
+            std::cerr << "Error: source file does not exist" << std::endl;
             return 1;
         }
         else
@@ -292,8 +327,19 @@ int Cli::run()
     _imageWriter->setVerifyEnabled(!parser.isSet("disable-verify"));
     _imageWriter->setSetting("eject", !parser.isSet("disable-eject"));
 
-    /* Run startWrite() in event loop (otherwise calling _app->exit() on error does not work) */
-    QTimer::singleShot(1, _imageWriter, &ImageWriter::startWrite);
+    /* Run startWrite() or startSpuCopy() in event loop (otherwise calling _app->exit() on error does not work) */
+    if (_isSpuMode)
+    {
+        if (!_quiet)
+        {
+            std::cerr << "Copying SPU file to " << args[1].toStdString() << "..." << std::endl;
+        }
+        QTimer::singleShot(1, _imageWriter, [this]() { _imageWriter->startSpuCopy(false); });
+    }
+    else
+    {
+        QTimer::singleShot(1, _imageWriter, &ImageWriter::startWrite);
+    }
     return _app->exec();
 }
 
@@ -368,5 +414,42 @@ void Cli::_printProgress(const QByteArray &msg, QVariant now, QVariant total)
     {
         std::cerr << msg.constData() << "\r";
         _lastMsg = msg;
+    }
+}
+
+void Cli::onSpuCopySuccess()
+{
+    if (!_quiet)
+    {
+        _clearLine();
+        std::cerr << "SPU copy successful." << std::endl;
+    }
+    _app->exit(0);
+}
+
+void Cli::onSpuCopyError(QVariant msg)
+{
+    QByteArray m = msg.toByteArray();
+
+    if (!_quiet)
+    {
+        _clearLine();
+    }
+    std::cerr << "Error: " << m.constData() << std::endl;
+    _app->exit(1);
+}
+
+void Cli::onSpuCopyProgress(QVariant now, QVariant total)
+{
+    _printProgress("Copying", now, total);
+}
+
+void Cli::onSpuPreparationStatusUpdate(QVariant msg)
+{
+    if (!_quiet)
+    {
+        QByteArray ascii = QByteArray("  ")+msg.toByteArray()+"\r";
+        _clearLine();
+        std::cerr << ascii.constData();
     }
 }

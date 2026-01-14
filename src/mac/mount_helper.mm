@@ -86,13 +86,43 @@ QString mountDevice(const QString &device)
         return existingMount;
     }
 
-    // Not mounted - wait for partition to appear
-    partition = waitForPartition(device);
-    if (partition.isEmpty())
+    // Also check if the whole device (superfloppy) is mounted
+    existingMount = getExistingMountPoint(device);
+    if (!existingMount.isEmpty())
     {
-        qWarning() << "No partition found for device:" << device;
-        return QString();
+        qDebug() << "Device" << device << "(superfloppy) already mounted at:" << existingMount;
+        return existingMount;
     }
+
+    // Check if partition file exists to determine the device layout
+    QFile partitionFile(partition);
+    QFile deviceFile(device);
+
+    if (!partitionFile.exists())
+    {
+        qDebug() << "Partition" << partition << "does not exist, checking for superfloppy format";
+        // Device might be in superfloppy format (filesystem on whole device, no partition table)
+        if (deviceFile.exists())
+        {
+            qDebug() << "Using superfloppy format (no partition table):" << device;
+            partition = device;
+            // Don't wait for exclusive access - just use the device path for mounting
+        }
+        else
+        {
+            // Neither partition nor device exists - wait for partition to appear
+            // This typically happens right after formatting when kernel re-reads partition table
+            partition = waitForPartition(device);
+            if (partition.isEmpty())
+            {
+                qWarning() << "No partition found for device:" << device;
+                return QString();
+            }
+        }
+    }
+    // If partition exists but is not currently mounted, we can proceed to mount it
+    // Note: We skip waitForPartition() here because we already verified the partition exists
+    // and we don't need exclusive access to mount - diskutil will handle that
 
     // On macOS, we can use diskutil to mount
     QProcess diskutil;
