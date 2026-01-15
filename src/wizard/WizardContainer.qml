@@ -121,9 +121,8 @@ Item {
     readonly property int stepWriting: 4
     readonly property int stepDone: 5
 
-    // SPU flow steps (alternative flow when SPU source is selected)
-    readonly property int stepSpuSelection: 10
-    readonly property int stepSpuCopy: 11
+    // SPU flow step (alternative flow when SPU source is selected)
+    readonly property int stepSpuCopy: 10
 
     // Track if we're in SPU copy mode
     property bool isSpuCopyMode: false
@@ -873,8 +872,7 @@ Item {
             case stepStorageSelection: return storageSelectionStep
             case stepWriting: return writingStep
             case stepDone: return doneStep
-            // SPU flow steps
-            case stepSpuSelection: return spuSelectionStep
+            // SPU flow step
             case stepSpuCopy: return spuCopyStep
             default: return null
         }
@@ -1100,25 +1098,7 @@ Item {
         }
     }
 
-    // SPU flow step components
-    Component {
-        id: spuSelectionStep
-        SPUSelectionStep {
-            imageWriter: root.imageWriter
-            wizardContainer: root
-            appOptionsButton: optionsButton
-            onNextClicked: {
-                // After SPU selection, go to storage selection, then SPU copy
-                root.jumpToStep(root.stepStorageSelection)
-            }
-            onBackClicked: {
-                // Go back to source selection
-                root.isSpuCopyMode = false
-                root.jumpToStep(root.stepSourceSelection)
-            }
-        }
-    }
-
+    // SPU flow step component
     Component {
         id: spuCopyStep
         SPUCopyStep {
@@ -1138,12 +1118,24 @@ Item {
         }
     }
 
-    // Token conflict dialog — based on your BaseDialog pattern
-    BaseDialog {
+    // Token conflict dialog — security confirmation for token replacement
+    ConfirmDialog {
         id: tokenConflictDialog
         imageWriter: root.imageWriter
         parent: root
         anchors.centerIn: parent
+
+        title: qsTr("Replace existing Remote Connect token?")
+        message: qsTr("A new Remote Connect token was received that differs from your current one.\n\n") +
+                 qsTr("Do you want to overwrite the existing token?\n\n") +
+                 qsTr("Warning: Only overwrite the token if you initiated this action.")
+
+        cancelText: qsTr("Keep existing")
+        cancelAccessibleDescription: qsTr("Keep your current Remote Connect token")
+        confirmText: allowAccept ? qsTr("Replace token") : qsTr("Please wait…")
+        confirmAccessibleDescription: qsTr("Replace the current token with the newly received one")
+        confirmEnabled: allowAccept
+        destructiveConfirm: false  // Keep existing is the "safe" choice, so confirm is not destructive
 
         // carry the new token we just received
         property string newToken: ""
@@ -1157,8 +1149,6 @@ Item {
             repeat: false
             onTriggered: {
                 tokenConflictDialog.allowAccept = true
-                // Rebuild focus order now that replace button is enabled
-                tokenConflictDialog.rebuildFocusOrder()
             }
         }
 
@@ -1169,95 +1159,15 @@ Item {
             tokenConflictDialog.open()
         }
 
-        // ESC closes
-        function escapePressed() { tokenConflictDialog.close() }
-
-        Component.onCompleted: {
-            // match your focus group style
-            registerFocusGroup("token_conflict_content", function() {
-                // Only include text elements when screen reader is active (otherwise they're not focusable)
-                if (tokenConflictDialog.imageWriter && tokenConflictDialog.imageWriter.isScreenReaderActive()) {
-                    return [titleText, bodyText]
-                }
-                return []
-            }, 0)
-            registerFocusGroup("token_conflict_buttons", function() {
-                return [keepBtn, replaceBtn]
-            }, 1)
-        }
-
         onClosed: {
             acceptEnableDelay.stop()
             allowAccept = false
             newToken = ""
         }
 
-        // ----- CONTENT -----
-        Text {
-            id: titleText
-            text: qsTr("Replace existing Remote Connect token?")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.ignored: false
-            Accessible.focusable: tokenConflictDialog.imageWriter ? tokenConflictDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (tokenConflictDialog.imageWriter && tokenConflictDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: tokenConflictDialog.imageWriter ? tokenConflictDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        // Body / security note
-        Text {
-            id: bodyText
-            text: qsTr("A new Remote Connect token was received that differs from your current one.\n\n") +
-                  qsTr("Do you want to overwrite the existing token?\n\n") +
-                  qsTr("Warning: Only overwrite the token if you initiated this action.")
-            font.pixelSize: Style.fontSizeFormLabel
-            font.family: Style.fontFamily
-            color: Style.formLabelColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-            Accessible.ignored: false
-            Accessible.focusable: tokenConflictDialog.imageWriter ? tokenConflictDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (tokenConflictDialog.imageWriter && tokenConflictDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: tokenConflictDialog.imageWriter ? tokenConflictDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        // Buttons row
-        RowLayout {
-            id: btnRow
-            Layout.fillWidth: true
-            Layout.topMargin: Style.spacingSmall
-            spacing: Style.spacingMedium
-
-            Item { Layout.fillWidth: true }
-
-            ImButton {
-                id: replaceBtn
-                text: tokenConflictDialog.allowAccept ? qsTr("Replace token") : qsTr("Please wait…")
-                accessibleDescription: qsTr("Replace the current token with the newly received one")
-                enabled: tokenConflictDialog.allowAccept
-                activeFocusOnTab: true
-                onClicked: {
-                    tokenConflictDialog.close()
-                    // Overwrite in C++ and re-emit to existing listeners
-                    root.imageWriter.overwriteConnectToken(tokenConflictDialog.newToken)
-                }
-            }
-
-            ImButtonRed {
-                id: keepBtn
-                text: qsTr("Keep existing")
-                accessibleDescription: qsTr("Keep your current Remote Connect token")
-                activeFocusOnTab: true
-                onClicked: tokenConflictDialog.close()
-            }
+        onAccepted: {
+            // Overwrite in C++ and re-emit to existing listeners
+            root.imageWriter.overwriteConnectToken(tokenConflictDialog.newToken)
         }
     }
 
@@ -1283,11 +1193,31 @@ Item {
     }
 
     // Repository URL confirmation dialog — shown when a deep link contains a custom repo URL
-    BaseDialog {
+    ConfirmDialog {
         id: repositoryUrlDialog
         imageWriter: root.imageWriter
         parent: root
         anchors.centerIn: parent
+
+        title: isLocalFile
+            ? qsTr("Open local repository file?")
+            : qsTr("Switch to a custom repository?")
+        message: isLocalFile
+            ? qsTr("You are opening a local Laerdal Imager manifest file. This will replace the current OS list with the contents of this file.")
+            : qsTr("A website is requesting to switch Laerdal SimServer Imager to use a custom OS repository.\n\n") +
+              qsTr("Only accept if you trust this source and intentionally clicked a link to open this repository.")
+
+        cancelText: qsTr("Cancel")
+        cancelAccessibleDescription: qsTr("Keep your current repository settings")
+        confirmText: {
+            if (!allowAccept) return qsTr("Please wait…")
+            return isLocalFile ? qsTr("Open") : qsTr("Switch repository")
+        }
+        confirmAccessibleDescription: isLocalFile
+            ? qsTr("Open the local manifest file and use it as the OS repository")
+            : qsTr("Switch to the custom repository from the link")
+        confirmEnabled: allowAccept
+        destructiveConfirm: false  // Cancel is the "safe" choice
 
         // carry the repository URL we just received
         property string repoUrl: ""
@@ -1302,8 +1232,6 @@ Item {
             repeat: false
             onTriggered: {
                 repositoryUrlDialog.allowAccept = true
-                // Rebuild focus order now that switch button is enabled
-                repositoryUrlDialog.rebuildFocusOrder()
             }
         }
 
@@ -1314,7 +1242,7 @@ Item {
                 console.warn("Repository dialog already open, ignoring new URL:", url)
                 return
             }
-            
+
             repoUrl = url
             // Local files are trusted, allow immediate acceptance
             if (url.startsWith("file://")) {
@@ -1326,70 +1254,20 @@ Item {
             repositoryUrlDialog.open()
         }
 
-        // ESC closes
-        function escapePressed() { repositoryUrlDialog.close() }
-
-        Component.onCompleted: {
-            // match your focus group style
-            registerFocusGroup("repo_url_content", function() {
-                // Only include text elements when screen reader is active (otherwise they're not focusable)
-                if (repositoryUrlDialog.imageWriter && repositoryUrlDialog.imageWriter.isScreenReaderActive()) {
-                    return [repoTitleText, repoBodyText, repoUrlText]
-                }
-                return []
-            }, 0)
-            registerFocusGroup("repo_url_buttons", function() {
-                return [repoCancelBtn, repoSwitchBtn]
-            }, 1)
-        }
-
         onClosed: {
             repoAcceptEnableDelay.stop()
             allowAccept = false
             repoUrl = ""
         }
 
-        // ----- CONTENT -----
-        Text {
-            id: repoTitleText
-            text: repositoryUrlDialog.isLocalFile 
-                ? qsTr("Open local repository file?")
-                : qsTr("Switch to a custom repository?")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.ignored: false
-            Accessible.focusable: repositoryUrlDialog.imageWriter ? repositoryUrlDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (repositoryUrlDialog.imageWriter && repositoryUrlDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: repositoryUrlDialog.imageWriter ? repositoryUrlDialog.imageWriter.isScreenReaderActive() : false
+        onAccepted: {
+            // Switch to the new repository and reset wizard
+            // QML auto-converts string to QUrl for C++ method
+            root.imageWriter.refreshOsListFrom(repositoryUrlDialog.repoUrl)
+            root.resetWizard()
         }
 
-        // Body / security note
-        Text {
-            id: repoBodyText
-            text: repositoryUrlDialog.isLocalFile
-                ? qsTr("You are opening a local Laerdal Imager manifest file. This will replace the current OS list with the contents of this file.")
-                : qsTr("A website is requesting to switch Laerdal SimServer Imager to use a custom OS repository.\n\n") +
-                  qsTr("Only accept if you trust this source and intentionally clicked a link to open this repository.")
-            font.pixelSize: Style.fontSizeFormLabel
-            font.family: Style.fontFamily
-            color: Style.formLabelColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-            Accessible.ignored: false
-            Accessible.focusable: repositoryUrlDialog.imageWriter ? repositoryUrlDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (repositoryUrlDialog.imageWriter && repositoryUrlDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: repositoryUrlDialog.imageWriter ? repositoryUrlDialog.imageWriter.isScreenReaderActive() : false
-        }
-        
-        // Show the URL being requested
+        // Show the URL being requested (custom content below message)
         Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: Style.spacingSmall
@@ -1398,7 +1276,7 @@ Item {
             border.color: Style.popupBorderColor
             border.width: 1
             radius: Style.listItemBorderRadius
-            
+
             Text {
                 id: repoUrlText
                 anchors.fill: parent
@@ -1413,47 +1291,6 @@ Item {
                 Accessible.role: Accessible.StaticText
                 Accessible.name: qsTr("Repository URL: %1").arg(repositoryUrlDialog.repoUrl)
                 Accessible.ignored: false
-                Accessible.focusable: repositoryUrlDialog.imageWriter ? repositoryUrlDialog.imageWriter.isScreenReaderActive() : false
-                focusPolicy: (repositoryUrlDialog.imageWriter && repositoryUrlDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-                activeFocusOnTab: repositoryUrlDialog.imageWriter ? repositoryUrlDialog.imageWriter.isScreenReaderActive() : false
-            }
-        }
-
-        // Buttons row
-        RowLayout {
-            id: repoBtnRow
-            Layout.fillWidth: true
-            Layout.topMargin: Style.spacingSmall
-            spacing: Style.spacingMedium
-
-            Item { Layout.fillWidth: true }
-
-            ImButton {
-                id: repoSwitchBtn
-                text: {
-                    if (!repositoryUrlDialog.allowAccept) return qsTr("Please wait…")
-                    return repositoryUrlDialog.isLocalFile ? qsTr("Open") : qsTr("Switch repository")
-                }
-                accessibleDescription: repositoryUrlDialog.isLocalFile
-                    ? qsTr("Open the local manifest file and use it as the OS repository")
-                    : qsTr("Switch to the custom repository from the link")
-                enabled: repositoryUrlDialog.allowAccept
-                activeFocusOnTab: true
-                onClicked: {
-                    repositoryUrlDialog.close()
-                    // Switch to the new repository and reset wizard
-                    // QML auto-converts string to QUrl for C++ method
-                    root.imageWriter.refreshOsListFrom(repositoryUrlDialog.repoUrl)
-                    root.resetWizard()
-                }
-            }
-
-            ImButtonRed {
-                id: repoCancelBtn
-                text: qsTr("Cancel")
-                accessibleDescription: qsTr("Keep your current repository settings")
-                activeFocusOnTab: true
-                onClicked: repositoryUrlDialog.close()
             }
         }
     }

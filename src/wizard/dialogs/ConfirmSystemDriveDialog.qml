@@ -5,9 +5,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import RpiImager
 
-BaseDialog {
+WarningDialog {
     id: root
-    
+
     // Override positioning for overlayParent support
     required property Item overlayParent
     parent: overlayParent
@@ -26,63 +26,65 @@ BaseDialog {
     readonly property string proceedText: CommonStrings.warningProceedText
     readonly property string systemDriveText: CommonStrings.systemDriveText
 
-    // Custom escape handling
+    // Use the message property for warning text
+    message: root.riskText + "<br><br>" + root.systemDriveText + "<br><br>" + root.proceedText
+
+    // Primary button continues (confirms the action)
+    buttonText: qsTr("CONTINUE")
+    buttonAccessibleDescription: qsTr("Proceed to write the image to this system drive after confirming the drive name")
+
+    // Override escape handling to emit cancelled
     function escapePressed() {
         root.close()
         root.cancelled()
     }
 
-    // Register focus groups when component is ready
-    Component.onCompleted: {
-        registerFocusGroup("warning", function(){ 
-            // Only include warning text when screen reader is active (otherwise it's not focusable)
-            return (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? [warningTextElement] : []
-        }, 0)
-        registerFocusGroup("input", function(){ 
-            // Only include drive name text when screen reader is active (otherwise it's not focusable)
-            var items = []
-            if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
-                items.push(driveNameText)
+    // Add cancel button before the primary button
+    footerButtons: [
+        ImButtonRed {
+            id: cancelButton
+            text: qsTr("CANCEL")
+            accessibleDescription: qsTr("Cancel operation and return to storage selection to choose a different device")
+            onClicked: {
+                root.close()
+                root.cancelled()
             }
-            items.push(nameInput)
-            return items
+        }
+    ]
+
+    // Override focus groups for custom layout
+    Component.onCompleted: {
+        registerFocusGroup("content", function(){
+            // Only include text elements when screen reader is active
+            if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
+                return [messageTextItem, driveNameText]
+            }
+            return []
+        }, 0)
+        registerFocusGroup("input", function(){
+            return [nameInput]
         }, 1)
-        registerFocusGroup("buttons", function(){ 
-            return [cancelButton, continueButton] 
+        registerFocusGroup("buttons", function(){
+            return [cancelButton, root.actionButtonItem]
         }, 2)
     }
-    
+
     onOpened: {
         nameInput.text = ""
         // Let BaseDialog handle the focus management through the focus groups
-        // The BaseDialog will automatically set focus to the first focusable item
     }
 
-    // Dialog content
-    Text {
-        id: warningTextElement
-        textFormat: Text.StyledText
-        wrapMode: Text.WordWrap
-        font.family: Style.fontFamily
-        font.pixelSize: Style.fontSizeDescription
-        color: Style.textDescriptionColor
-        Layout.fillWidth: true
-        text: root.riskText + "<br><br>" + root.systemDriveText + "<br><br>" + root.proceedText
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text.replace(/<[^>]+>/g, '')  // Strip HTML tags for accessibility
-        Accessible.ignored: false
-        Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-    }
+    // Connect to accepted signal to emit confirmed
+    onAccepted: root.confirmed()
 
+    // Custom content below the message
     Rectangle { implicitHeight: 1; Layout.fillWidth: true; color: Style.titleSeparatorColor; Accessible.ignored: true }
 
     ColumnLayout {
         Layout.fillWidth: true
         Accessible.role: Accessible.Grouping
         Accessible.name: qsTr("Drive information")
-        Text { 
+        Text {
             text: qsTr("Size: %1").arg(root.sizeStr)
             font.family: Style.fontFamily
             color: Style.textDescriptionColor
@@ -144,66 +146,17 @@ BaseDialog {
             }
         }
         onAccepted: {
-            if (continueButton.enabled) continueButton.clicked()
+            if (root.actionButtonItem.enabled) root.actionButtonItem.clicked()
         }
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.RightButton | Qt.MiddleButton
             onPressed: (mouse) => { mouse.accepted = true }
         }
-    }
 
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        Item { Layout.fillWidth: true }
-
-        ImButtonRed {
-            id: cancelButton
-            text: qsTr("CANCEL")
-            accessibleDescription: qsTr("Cancel operation and return to storage selection to choose a different device")
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                root.close()
-                root.cancelled()
-            }
+        // Enable/disable the primary button based on input validation
+        onTextChanged: {
+            root.actionButtonItem.enabled = (text === root.driveName)
         }
-
-        ImButton {
-            id: continueButton
-            text: qsTr("CONTINUE")
-            accessibleDescription: qsTr("Proceed to write the image to this system drive after confirming the drive name")
-            enabled: nameInput.text === root.driveName
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                if (!enabled) return
-                root.close()
-                root.confirmed()
-            }
-            // Rebuild focus order when enabled state changes
-            onEnabledChanged: {
-                // Use Qt.callLater to ensure the change is processed
-                Qt.callLater(function() {
-                    if (root.registerFocusGroup) {
-                        // Re-register the buttons focus group to update the focus navigation
-                        root.registerFocusGroup("buttons", function(){
-                            return [cancelButton, continueButton]
-                        }, 1)
-                    }
-                })
-            }
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
     }
-
 }

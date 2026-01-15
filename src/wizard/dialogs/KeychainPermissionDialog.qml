@@ -10,7 +10,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import RpiImager
 
-BaseDialog {
+ConfirmDialog {
     id: root
 
     property bool userAccepted: false
@@ -20,56 +20,18 @@ BaseDialog {
         open()
     }
 
-    // Custom escape handling
-    function escapePressed() {
-        root.userAccepted = false
-        root.reject()
-    }
+    title: qsTr("Keychain Access")
+    message: qsTr("Would you like to prefill the Wi‑Fi password from the system keychain?")
 
-    // Register focus groups when component is ready
-    Component.onCompleted: {
-        registerFocusGroup("content", function(){ 
-            // Only include text elements when screen reader is active (otherwise they're not focusable)
-            if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
-                return [titleText, descriptionText, subText]
-            }
-            return []
-        }, 0)
-        registerFocusGroup("buttons", function(){ 
-            return [yesButton, noButton] 
-        }, 1)
-    }
+    cancelText: CommonStrings.no
+    confirmText: CommonStrings.yes
+    cancelAccessibleDescription: qsTr("Skip keychain access and manually enter the Wi-Fi password")
+    confirmAccessibleDescription: qsTr("Retrieve the Wi-Fi password from the system keychain using administrator authentication")
 
-    // Dialog content goes directly into the BaseDialog's contentLayout
-    Text {
-        id: titleText
-        text: qsTr("Keychain Access")
-        font.pixelSize: Style.fontSizeHeading
-        font.family: Style.fontFamilyBold
-        font.bold: true
-        color: Style.formLabelColor
-        Layout.fillWidth: true
-        Accessible.role: Accessible.Heading
-        Accessible.name: text
-        Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-    }
+    // Use destructive styling for the confirm button (red = action)
+    destructiveConfirm: true
 
-    Text {
-        id: descriptionText
-        text: qsTr("Would you like to prefill the Wi‑Fi password from the system keychain?")
-        wrapMode: Text.WordWrap
-        color: Style.textDescriptionColor
-        font.pixelSize: Style.fontSizeDescription
-        Layout.fillWidth: true
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
-        Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-    }
-
+    // Custom content: sub-text below the message
     Text {
         id: subText
         text: qsTr("This will require administrator authentication on macOS.")
@@ -84,45 +46,13 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
+    // Track acceptance state
+    onAccepted: {
+        root.userAccepted = true
+    }
 
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        Item { Layout.fillWidth: true }
-
-        ImButton {
-            id: noButton
-            text: CommonStrings.no
-            accessibleDescription: qsTr("Skip keychain access and manually enter the Wi-Fi password")
-            Layout.preferredWidth: 80
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                root.userAccepted = false
-                root.reject()
-            }
-        }
-
-        ImButtonRed {
-            id: yesButton
-            text: CommonStrings.yes
-            accessibleDescription: qsTr("Retrieve the Wi-Fi password from the system keychain using administrator authentication")
-            Layout.preferredWidth: 80
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                root.userAccepted = true
-                root.accept()
-            }
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
+    onRejected: {
+        root.userAccepted = false
     }
 
     onClosed: {

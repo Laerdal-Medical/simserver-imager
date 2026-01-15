@@ -9,14 +9,14 @@ import QtQuick.Layouts
 import RpiImager
 
 // Message dialog with title, message, optional secondary action button, and primary button.
-// Extends MessageDialog to add an optional action button on the left side.
+// Extends MessageDialog to add an optional action button on the left side using footerButtons.
 //
 // Example usage:
 //   ActionMessageDialog {
 //       id: permissionDialog
 //       imageWriter: window.imageWriter
 //       parent: overlayRoot
-//       dialogTitle: qsTr("Permission Warning")
+//       title: qsTr("Permission Warning")
 //       message: warningMessage
 //       secondaryButtonText: qsTr("Install Authorization")
 //       secondaryButtonVisible: canInstallAuth
@@ -43,6 +43,19 @@ MessageDialog {
         root.open()
     }
 
+    // Add optional secondary button before the primary button
+    footerButtons: [
+        ImButton {
+            id: secondaryButton
+            text: root.secondaryButtonText
+            accessibleDescription: root.secondaryButtonAccessibleDescription
+            visible: root.secondaryButtonVisible && root.secondaryButtonText.length > 0
+            onClicked: {
+                root.secondaryAction()
+            }
+        }
+    ]
+
     // Override focus groups to include secondary button
     Component.onCompleted: {
         registerFocusGroup("content", function(){
@@ -56,47 +69,8 @@ MessageDialog {
             if (secondaryButton.visible) {
                 buttons.push(secondaryButton)
             }
-            buttons.push(actionButton)
+            buttons.push(root.actionButtonItem)
             return buttons
         }, 1)
-    }
-
-    // Override footer with optional secondary action button
-    footer: RowLayout {
-        width: parent ? parent.width : 0
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        // Optional secondary action button (left side)
-        ImButton {
-            id: secondaryButton
-            text: root.secondaryButtonText
-            accessibleDescription: root.secondaryButtonAccessibleDescription
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            visible: root.secondaryButtonVisible && root.secondaryButtonText.length > 0
-            onClicked: {
-                root.secondaryAction()
-            }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        // Primary action button (right side)
-        ImButton {
-            id: actionButton
-            text: root.buttonText
-            accessibleDescription: root.buttonAccessibleDescription
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                root.close()
-                root.accepted()
-            }
-        }
-
-        Item { Layout.preferredWidth: Style.cardPadding }
     }
 }

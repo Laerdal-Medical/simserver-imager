@@ -65,15 +65,9 @@ ListView {
     Accessible.name: root.accessibleName
     Accessible.description: root.accessibleDescription
     
-    // Standard highlight configuration
-    highlight: Rectangle {
-        // When focused: use stronger highlight color
-        // When not focused (default selected): use subtle highlight to show it's the default choice
-        color: root.activeFocus ? Style.listViewHighlightColor : Style.listViewRowBackgroundColor
-        radius: 0
-        anchors.fill: parent
-        anchors.rightMargin: (root.contentHeight > root.height ? Style.scrollBarWidth : 0)
-    }
+    // Disable ListView's built-in highlight since SelectionListDelegate handles its own
+    // background coloring based on selection/hover state
+    highlight: null
     highlightFollowsCurrentItem: true
     highlightRangeMode: ListView.ApplyRange
     preferredHighlightBegin: 0

@@ -3,12 +3,11 @@
 
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Layouts
 import RpiImager
 
-BaseDialog {
+WarningDialog {
     id: root
-    
+
     // Override positioning for overlayParent support
     closePolicy: Popup.CloseOnEscape
     required property Item overlayParent
@@ -22,84 +21,50 @@ BaseDialog {
     readonly property string proceedText: CommonStrings.warningProceedText
     readonly property string systemDriveText: CommonStrings.systemDriveText
 
-    // Custom escape handling
+    title: qsTr("Show system drives?")
+
+    // Use the message property for warning text
+    message: qsTr("By disabling system drive filtering, <b>system drives will be shown</b> in the list.")
+          + "<br><br>"
+          + root.systemDriveText
+          + "<br><br>" + root.riskText + "<br><br>" + root.proceedText
+
+    // Primary button shows system drives (confirms the action)
+    buttonText: qsTr("SHOW SYSTEM DRIVES")
+    buttonAccessibleDescription: qsTr("Remove the safety filter and display system drives in the storage device list")
+
+    // Override escape handling to emit cancelled
     function escapePressed() {
         root.close()
         root.cancelled()
     }
 
-    // Register focus groups when component is ready
-    Component.onCompleted: {
-        registerFocusGroup("warning", function(){ 
-            // Only include warning text when screen reader is active (otherwise it's not focusable)
-            return (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? [warningText] : []
-        }, 0)
-        registerFocusGroup("buttons", function(){ 
-            return [keepFilterButton, showSystemButton] 
-        }, 1)
-    }
-
-    // Dialog content
-    Text {
-        id: warningText
-        textFormat: Text.StyledText
-        text: qsTr("By disabling system drive filtering, <b>system drives will be shown</b> in the list.")
-              + "<br><br>"
-              + root.systemDriveText
-              + "<br><br>" + root.riskText + "<br><br>" + root.proceedText
-        font.pixelSize: Style.fontSizeDescription
-        font.family: Style.fontFamily
-        color: Style.textDescriptionColor
-        wrapMode: Text.WordWrap
-        Layout.fillWidth: true
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text.replace(/<[^>]+>/g, '')  // Strip HTML tags for accessibility
-        Accessible.ignored: false
-        Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-    }
-
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        Item { Layout.fillWidth: true }
-
+    // Add cancel button (keep filter on) before the primary button
+    footerButtons: [
         ImButtonRed {
             id: keepFilterButton
             text: qsTr("KEEP FILTER ON")
             accessibleDescription: qsTr("Keep system drives hidden to prevent accidental damage to your operating system")
-            Layout.preferredHeight: Style.buttonHeightStandard
             // Allow button to grow to fit text for this important warning dialog
             implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
-            activeFocusOnTab: true
             onClicked: {
                 root.close()
                 root.cancelled()
             }
         }
+    ]
 
-        ImButton {
-            id: showSystemButton
-            text: qsTr("SHOW SYSTEM DRIVES")
-            accessibleDescription: qsTr("Remove the safety filter and display system drives in the storage device list")
-            Layout.preferredHeight: Style.buttonHeightStandard
-            // Allow button to grow to fit text for this important warning dialog
-            implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
-            activeFocusOnTab: true
-            onClicked: {
-                root.close()
-                root.confirmed()
-            }
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
+    // Override focus groups for custom button layout
+    Component.onCompleted: {
+        registerFocusGroup("content", function(){
+            // Only include message text when screen reader is active
+            return (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? [messageTextItem] : []
+        }, 0)
+        registerFocusGroup("buttons", function(){
+            return [keepFilterButton, root.actionButtonItem]
+        }, 1)
     }
+
+    // Connect to accepted signal to emit confirmed
+    onAccepted: root.confirmed()
 }

@@ -11,9 +11,11 @@ import QtQuick.Window
 
 import RpiImager
 
-BaseDialog {
+ConfirmDialog {
     id: popup
-    
+
+    title: qsTr("App Options")
+
     // imageWriter is inherited from BaseDialog
     // Optional reference to the wizard container for ephemeral flags
     property var wizardContainer: null
@@ -26,6 +28,15 @@ BaseDialog {
     property bool initialized: false
     property bool isInitializing: false
 
+    // Confirm dialog button configuration
+    cancelText: CommonStrings.cancel
+    confirmText: qsTr("Save")
+    cancelAccessibleDescription: qsTr("Close the options dialog without saving any changes")
+    confirmAccessibleDescription: qsTr("Save the selected options and apply them to Laerdal SimServer Imager")
+
+    // Use destructive styling for Save button
+    destructiveConfirm: true
+
     // Listen to GitHub auth state changes
     Connections {
         target: popup.githubAuth
@@ -35,7 +46,7 @@ BaseDialog {
         }
     }
 
-    // Custom escape handling
+    // Custom escape handling - just close without saving
     function escapePressed() {
         popup.close()
     }
@@ -50,17 +61,10 @@ BaseDialog {
         githubSignInButton.naturalWidth,
         githubReposButton.visible ? githubReposButton.naturalWidth : 0
     ) + Style.cardPadding * 4  // Double padding: contentLayout + optionsLayout margins
-    
+
     // Register focus groups when component is ready
+    // Note: ConfirmDialog already registers "content" and "buttons" groups
     Component.onCompleted: {
-        // Register focus groups
-        registerFocusGroup("header", function(){ 
-            // Only include header text when screen reader is active (otherwise it's not focusable)
-            if (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) {
-                return [headerText]
-            }
-            return []
-        }, 0)
         registerFocusGroup("options", function(){
             var items = [chkBeep.focusItem, chkEject.focusItem, chkTelemetry.focusItem]
             // Include telemetry help link if visible
@@ -78,42 +82,35 @@ BaseDialog {
             items.push(clearCacheButton.focusItem)
             return items
         }, 1)
-        registerFocusGroup("buttons", function(){ 
-            return [cancelButton, saveButton]
-        }, 2)
     }
 
-    // Header
-    Text {
-        id: headerText
-        text: qsTr("App Options")
-        font.pixelSize: Style.fontSizeLargeHeading
-        font.family: Style.fontFamilyBold
-        font.bold: true
-        color: Style.formLabelColor
+    // Scrollable options section with touch/swipe support
+    Rectangle {
         Layout.fillWidth: true
-        horizontalAlignment: Text.AlignHCenter
-        Accessible.role: Accessible.Heading
-        Accessible.name: text
-        Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-    }
+        Layout.preferredHeight: Math.min(optionsLayout.implicitHeight + Style.spacingSmall * 2, 400)
+        color: Style.mainBackgroundColor
+        radius: Style.sectionBorderRadius
+        border.color: Style.popupBorderColor
+        border.width: Style.sectionBorderWidth
 
-    // Scrollable options section
-    ScrollView {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        Layout.preferredHeight: Math.min(optionsLayout.implicitHeight + Style.cardPadding * 2, 400)
-        clip: true
+        Flickable {
+            id: flickable
+            anchors.fill: parent
+            anchors.margins: Style.spacingSmall
+            clip: true
+            contentWidth: width
+            contentHeight: optionsLayout.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
 
-        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
 
-        ColumnLayout {
-            id: optionsLayout
-            width: parent.width
-            spacing: Style.spacingMedium
+            ColumnLayout {
+                id: optionsLayout
+                width: flickable.width
+                spacing: Style.spacingSmall
 
             ImOptionPill {
                 id: chkBeep
@@ -256,46 +253,6 @@ BaseDialog {
                 Layout.topMargin: Style.spacingSmall
             }
 
-            ImOptionButton {
-                id: githubSignInButton
-                text: qsTr("GitHub Account")
-                btnText: popup.isGitHubAuthenticated ? qsTr("Sign out") : qsTr("Sign in")
-                accessibleDescription: popup.isGitHubAuthenticated
-                    ? qsTr("Sign out of GitHub to disconnect from private repositories")
-                    : qsTr("Sign in with GitHub to access private Laerdal repositories")
-                Layout.fillWidth: true
-                Component.onCompleted: {
-                    focusItem.activeFocusOnTab = true
-                }
-                onClicked: {
-                    if (popup.isGitHubAuthenticated) {
-                        // Sign out
-                        if (popup.githubAuth) {
-                            popup.githubAuth.logout()
-                        }
-                    } else {
-                        // Open GitHub login dialog as overlay
-                        githubLoginDialog.open()
-                    }
-                }
-            }
-
-            ImOptionButton {
-                id: githubReposButton
-                text: qsTr("GitHub Repositories")
-                btnText: qsTr("Select...")
-                accessibleDescription: qsTr("Choose which GitHub repositories to search for WIC images")
-                Layout.fillWidth: true
-                visible: popup.isGitHubAuthenticated
-                Component.onCompleted: {
-                    focusItem.activeFocusOnTab = true
-                }
-                onClicked: {
-                    // Open as overlay on top of AppOptionsDialog
-                    repoSelectionDialog.open()
-                }
-            }
-
             // GitHub status indicator
             RowLayout {
                 Layout.fillWidth: true
@@ -322,6 +279,46 @@ BaseDialog {
                     font.pixelSize: Style.fontSizeCaption
                     font.family: Style.fontFamily
                     color: Style.textDescriptionColor
+                }
+            }
+
+            ImOptionButton {
+                id: githubReposButton
+                text: qsTr("GitHub Repositories")
+                btnText: qsTr("Select...")
+                accessibleDescription: qsTr("Choose which GitHub repositories to search for WIC images")
+                Layout.fillWidth: true
+                visible: popup.isGitHubAuthenticated
+                Component.onCompleted: {
+                    focusItem.activeFocusOnTab = true
+                }
+                onClicked: {
+                    // Open as overlay on top of AppOptionsDialog
+                    repoSelectionDialog.open()
+                }
+            }
+
+            ImOptionButton {
+                id: githubSignInButton
+                text: qsTr("GitHub Account")
+                btnText: popup.isGitHubAuthenticated ? qsTr("Sign out") : qsTr("Sign in")
+                accessibleDescription: popup.isGitHubAuthenticated
+                    ? qsTr("Sign out of GitHub to disconnect from private repositories")
+                    : qsTr("Sign in with GitHub to access private Laerdal repositories")
+                Layout.fillWidth: true
+                Component.onCompleted: {
+                    focusItem.activeFocusOnTab = true
+                }
+                onClicked: {
+                    if (popup.isGitHubAuthenticated) {
+                        // Sign out
+                        if (popup.githubAuth) {
+                            popup.githubAuth.logout()
+                        }
+                    } else {
+                        // Open GitHub login dialog as overlay
+                        githubLoginDialog.open()
+                    }
                 }
             }
 
@@ -359,14 +356,15 @@ BaseDialog {
                 }
             }
 
-            // Cache size indicator
-            Text {
-                id: cacheSizeText
-                text: qsTr("Cache size: %1").arg(popup.formatBytes(imageWriter.getArtifactCacheSize()))
-                font.pixelSize: Style.fontSizeCaption
-                font.family: Style.fontFamily
-                color: Style.textDescriptionColor
-                Layout.fillWidth: true
+                // Cache size indicator
+                Text {
+                    id: cacheSizeText
+                    text: qsTr("Cache size: %1").arg(popup.formatBytes(imageWriter.getArtifactCacheSize()))
+                    font.pixelSize: Style.fontSizeCaption
+                    font.family: Style.fontFamily
+                    color: Style.textDescriptionColor
+                    Layout.fillWidth: true
+                }
             }
         }
     }
@@ -384,44 +382,9 @@ BaseDialog {
         Layout.bottomMargin: Style.spacingSmall
     }
 
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        Item { Layout.fillWidth: true }
-
-        ImButton {
-            id: cancelButton
-            text: CommonStrings.cancel
-            accessibleDescription: qsTr("Close the options dialog without saving any changes")
-            Layout.minimumWidth: Style.buttonWidthMinimum
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                popup.close();
-            }
-        }
-
-        ImButtonRed {
-            id: saveButton
-            text: qsTr("Save")
-            accessibleDescription: qsTr("Save the selected options and apply them to Laerdal SimServer Imager")
-            Layout.minimumWidth: Style.buttonWidthMinimum
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                popup.applySettings();
-                popup.close();
-            }
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
+    // Apply settings when accepted
+    onAccepted: {
+        popup.applySettings()
     }
 
     RepositoryDialog {
@@ -542,11 +505,24 @@ BaseDialog {
     }
 
     // Confirmation dialog for disabling warnings
-    BaseDialog {
+    ConfirmDialog {
         id: confirmDisableWarnings
         imageWriter: popup.imageWriter
         parent: popup.contentItem
         anchors.centerIn: parent
+
+        title: qsTr("Disable warnings?")
+        message: qsTr("If you disable warnings, Laerdal SimServer Imager will <b>not show confirmation prompts before writing images</b>. You will still be required to <b>type the exact name</b> when selecting a system drive.")
+
+        cancelText: CommonStrings.cancel
+        confirmText: qsTr("Disable warnings")
+        cancelAccessibleDescription: qsTr("Keep warnings enabled and return to the options dialog")
+        confirmAccessibleDescription: qsTr("Disable confirmation prompts before writing images, requiring only exact name entry for system drives")
+
+        // Use destructive styling for the confirm button
+        destructiveConfirm: true
+
+        property bool confirmAccepted: false
 
         onClosed: {
             // If dialog was closed without confirming, revert the toggle
@@ -556,95 +532,10 @@ BaseDialog {
             confirmAccepted = false;
         }
 
-        property bool confirmAccepted: false
-
-        // Custom escape handling
-        function escapePressed() {
-            confirmDisableWarnings.close()
-        }
-
-        // Register focus groups when component is ready
-        Component.onCompleted: {
-            registerFocusGroup("content", function(){ 
-                // Only include text elements when screen reader is active (otherwise they're not focusable)
-                if (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) {
-                    return [confirmTitleText, confirmDescriptionText]
-                }
-                return []
-            }, 0)
-            registerFocusGroup("buttons", function(){ 
-                return [confirmCancelButton, confirmDisableButton] 
-            }, 1)
-        }
-
-        // Dialog content
-        Text {
-            id: confirmTitleText
-            text: qsTr("Disable warnings?")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-        }
-
-        Text {
-            id: confirmDescriptionText
-            textFormat: Text.StyledText
-            wrapMode: Text.WordWrap
-            font.pixelSize: Style.fontSizeDescription
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            Layout.fillWidth: true
-            text: qsTr("If you disable warnings, Laerdal SimServer Imager will <b>not show confirmation prompts before writing images</b>. You will still be required to <b>type the exact name</b> when selecting a system drive.")
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text.replace(/<[^>]+>/g, '')  // Strip HTML tags for accessibility
-            Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-        }
-
-        // Footer with action buttons
-        footer: RowLayout {
-            width: parent.width
-            height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-            spacing: Style.spacingMedium
-
-            // Left padding
-            Item { Layout.preferredWidth: Style.cardPadding }
-
-            Item { Layout.fillWidth: true }
-
-            ImButton {
-                id: confirmCancelButton
-                text: CommonStrings.cancel
-                accessibleDescription: qsTr("Keep warnings enabled and return to the options dialog")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                activeFocusOnTab: true
-                onClicked: confirmDisableWarnings.close()
-            }
-
-            ImButtonRed {
-                id: confirmDisableButton
-                text: qsTr("Disable warnings")
-                accessibleDescription: qsTr("Disable confirmation prompts before writing images, requiring only exact name entry for system drives")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                activeFocusOnTab: true
-                onClicked: {
-                    confirmDisableWarnings.confirmAccepted = true;
-                    if (popup.wizardContainer)
-                        popup.wizardContainer.disableWarnings = true;
-                    confirmDisableWarnings.close();
-                }
-            }
-
-            // Right padding
-            Item { Layout.preferredWidth: Style.cardPadding }
+        onAccepted: {
+            confirmDisableWarnings.confirmAccepted = true;
+            if (popup.wizardContainer)
+                popup.wizardContainer.disableWarnings = true;
         }
     }
 }

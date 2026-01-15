@@ -11,16 +11,19 @@ import QtQuick.Layouts
 
 import RpiImager
 
-BaseDialog {
+MessageDialog {
     id: root
 
     required property var repoManager
 
     title: qsTr("GitHub Repositories")
     implicitWidth: 480
-    // Ensure dialog is tall enough to contain all content including buttons
-    // Use larger height when add form is visible
-    height: root.showAddForm ? 500 : 420
+    // Ensure dialog is tall enough to contain all content including buttons and add form
+    height: 500
+
+    // Use "Close" as the primary button
+    buttonText: qsTr("Close")
+    buttonAccessibleDescription: qsTr("Close the repository selection dialog")
 
     // Get repos from manager
     property var repos: repoManager ? repoManager.githubRepos : []
@@ -34,7 +37,6 @@ BaseDialog {
     }
 
     // State for add repo form
-    property bool showAddForm: false
     property string newRepoOwner: ""
     property string newRepoName: ""
     property string newRepoBranch: ""  // Empty = auto-detect from GitHub
@@ -49,7 +51,7 @@ BaseDialog {
         if (repoManager) {
             repos = repoManager.githubRepos
         }
-        showAddForm = false
+        // Clear form fields
         newRepoOwner = ""
         newRepoName = ""
         newRepoBranch = ""
@@ -309,11 +311,10 @@ BaseDialog {
         }
     }
 
-    // Add repository form (collapsible)
+    // Add repository form (always visible)
     ColumnLayout {
         Layout.fillWidth: true
         spacing: Style.spacingSmall
-        visible: root.showAddForm
 
         Rectangle {
             Layout.fillWidth: true
@@ -425,57 +426,6 @@ BaseDialog {
             }
         }
 
-        // Buttons row below form fields
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingSmall
-
-            Item { Layout.fillWidth: true }
-
-            ImButton {
-                text: qsTr("Cancel")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                onClicked: {
-                    root.showAddForm = false
-                    root.newRepoOwner = ""
-                    root.newRepoName = ""
-                    root.newRepoBranch = ""
-                    ownerCombo.currentIndex = -1
-                    repoCombo.currentIndex = -1
-                }
-            }
-
-            ImButtonRed {
-                text: qsTr("Add")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                enabled: root.newRepoOwner.length > 0 && root.newRepoName.length > 0
-                onClicked: {
-                    if (root.repoManager && root.newRepoOwner && root.newRepoName) {
-                        // If branch is empty or "main", auto-detect from GitHub
-                        if (root.newRepoBranch.length === 0 || root.newRepoBranch === "main") {
-                            root.repoManager.addGitHubRepoWithAutoDetect(
-                                root.newRepoOwner,
-                                root.newRepoName
-                            )
-                            // Note: repos list will be updated via Connections when reposChanged fires
-                        } else {
-                            // Use the specified branch (synchronous add)
-                            root.repoManager.addGitHubRepo(
-                                root.newRepoOwner,
-                                root.newRepoName,
-                                root.newRepoBranch
-                            )
-                        }
-                        root.showAddForm = false
-                        root.newRepoOwner = ""
-                        root.newRepoName = ""
-                        root.newRepoBranch = ""
-                        ownerCombo.currentIndex = -1
-                        repoCombo.currentIndex = -1
-                    }
-                }
-            }
-        }
     }
 
     // Summary text
@@ -491,36 +441,31 @@ BaseDialog {
         font.family: Style.fontFamily
         color: Style.textMetadataColor
         Layout.fillWidth: true
-        visible: !root.showAddForm
     }
 
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-        visible: !root.showAddForm
+    // Helper function to add repository and clear form
+    function addRepository() {
+        if (repoManager && newRepoOwner && newRepoName) {
+            // If branch is empty or "main", auto-detect from GitHub
+            if (newRepoBranch.length === 0 || newRepoBranch === "main") {
+                repoManager.addGitHubRepoWithAutoDetect(newRepoOwner, newRepoName)
+            } else {
+                repoManager.addGitHubRepo(newRepoOwner, newRepoName, newRepoBranch)
+            }
+            // Clear form after adding
+            newRepoOwner = ""
+            newRepoName = ""
+            newRepoBranch = ""
+        }
+    }
 
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
+    // Add button in footer - enabled when owner and name are filled
+    footerButtons: [
         ImButton {
-            text: qsTr("Add Repository...")
-            onClicked: root.showAddForm = true
-            accessibleDescription: qsTr("Add a new GitHub repository to search")
-            Layout.preferredHeight: Style.buttonHeightStandard
+            text: qsTr("Add")
+            accessibleDescription: qsTr("Add the repository with the specified owner, name, and branch")
+            enabled: root.newRepoOwner.length > 0 && root.newRepoName.length > 0
+            onClicked: root.addRepository()
         }
-
-        Item { Layout.fillWidth: true }
-
-        ImButtonRed {
-            text: qsTr("Close")
-            onClicked: root.close()
-            accessibleDescription: qsTr("Close the repository selection dialog")
-            Layout.preferredHeight: Style.buttonHeightStandard
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-    }
+    ]
 }

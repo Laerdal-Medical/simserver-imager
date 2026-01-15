@@ -286,72 +286,23 @@ WizardStepBase {
     }
     
     // Invalid token dialog
-    BaseDialog {
+    ErrorDialog {
         id: invalidTokenDialog
         imageWriter: root.imageWriter
         parent: root.wizardContainer && root.wizardContainer.overlayRootRef ? root.wizardContainer.overlayRootRef : undefined
         anchors.centerIn: parent
         visible: false
-        
-        // Override height calculation to ensure proper sizing with wrapped text
-        height: contentLayout ? Math.max(200, contentLayout.implicitHeight + Style.cardPadding * 2) : 200
-        
-        function escapePressed() {
-            invalidTokenDialog.close()
-        }
-        
-        Component.onCompleted: {
-            registerFocusGroup("buttons", function(){ 
-                return [okBtn] 
-            }, 0)
-        }
-        
-        // Dialog content
-        Text {
-            id: dialogTitle
-            text: qsTr("Invalid Token")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelErrorColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            // Make accessible to screen readers
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-        }
-        
-        Text {
-            id: dialogMessage
-            text: qsTr("The token you entered is not valid. Please check the token and try again, or use the 'Open Remote Connect' button to get a valid token.")
-            font.pixelSize: Style.fontSizeFormLabel
-            font.family: Style.fontFamily
-            color: Style.formLabelColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            // Make accessible to screen readers
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-        }
-        
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-            Item { Layout.fillWidth: true }
-            
-            ImButton {
-                id: okBtn
-                text: qsTr("OK")
-                accessibleDescription: qsTr("Close this dialog and return to the token field")
-                activeFocusOnTab: true
-                onClicked: {
-                    invalidTokenDialog.close()
-                    // Clear the invalid token
-                    fieldConnectToken.text = ""
-                    root.connectToken = ""
-                    root.connectTokenReceived = false
-                }
-            }
+
+        title: qsTr("Invalid Token")
+        message: qsTr("The token you entered is not valid. Please check the token and try again, or use the 'Open Remote Connect' button to get a valid token.")
+        buttonText: qsTr("OK")
+        buttonAccessibleDescription: qsTr("Close this dialog and return to the token field")
+
+        onAccepted: {
+            // Clear the invalid token
+            fieldConnectToken.text = ""
+            root.connectToken = ""
+            root.connectTokenReceived = false
         }
     }
 

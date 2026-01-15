@@ -313,28 +313,30 @@ WizardStepBase {
         }
     }
 
-    // Confirmation dialog
-    BaseDialog {
+    // Confirmation dialog for USB Gadget Mode warning
+    ConfirmDialog {
         id: confirmDialog
         imageWriter: root.imageWriter
         parent: wizardContainer && wizardContainer.overlayRootRef ? wizardContainer.overlayRootRef : undefined
         anchors.centerIn: parent
         visible: false
+
         title: qsTr("USB Gadget Mode Warning")
 
+        // Confirm dialog button configuration
+        cancelText: CommonStrings.cancel
+        confirmText: qsTr("I understand, continue")
+        cancelAccessibleDescription: qsTr("Cancel and return to the interfaces and features settings without enabling USB Gadget Mode")
+        confirmAccessibleDescription: confirmDialog.allowAccept
+            ? qsTr("Confirm that you understand the risks and continue with USB Gadget Mode enabled")
+            : qsTr("This button will be enabled after 2 seconds")
+
+        // Use destructive styling for confirm button (it's a risky action)
+        destructiveConfirm: true
+
+        // Delay enable for 2 seconds
         property bool allowAccept: false
-
-        // Custom escape handling
-        function escapePressed() {
-            confirmDialog.close()
-        }
-
-        // Register focus groups when component is ready
-        Component.onCompleted: {
-            registerFocusGroup("buttons", function(){ 
-                return [cancelBtn, acceptBtn] 
-            }, 0)
-        }
+        confirmEnabled: allowAccept
 
         // Ensure disabled before showing to avoid flicker
         onOpened: {
@@ -389,32 +391,10 @@ WizardStepBase {
             Accessible.name: text
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-            Item { Layout.fillWidth: true }
-
-            ImButton {
-                id: cancelBtn
-                text: CommonStrings.cancel
-                accessibleDescription: qsTr("Cancel and return to the interfaces and features settings without enabling USB Gadget Mode")
-                activeFocusOnTab: true
-                onClicked: confirmDialog.close()
-            }
-
-            ImButtonRed {
-                id: acceptBtn
-                text: qsTr("I understand, continue")
-                accessibleDescription: confirmDialog.allowAccept ? qsTr("Confirm that you understand the risks and continue with USB Gadget Mode enabled") : qsTr("This button will be enabled after 2 seconds")
-                enabled: confirmDialog.allowAccept
-                activeFocusOnTab: true
-                onClicked: {
-                    confirmDialog.close()
-                    root.isConfirmed = true
-                    // Advance to next step
-                    wizardContainer.nextStep()
-                }
-            }
+        onAccepted: {
+            root.isConfirmed = true
+            // Advance to next step
+            root.wizardContainer.nextStep()
         }
     }
 

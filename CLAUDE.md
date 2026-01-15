@@ -179,3 +179,31 @@ ImBadge {
 - Platform-specific code uses `#ifdef Q_OS_LINUX`, `Q_OS_WIN`, `Q_OS_MACOS`
 - QML classes exposed via `QML_ELEMENT` macro
 - Primary namespace: `rpi_imager` (inherited from Raspberry Pi Imager)
+
+## Post-Change Workflow
+
+After completing code changes, always build the project to verify there are no compilation errors:
+
+```bash
+cmake --build build --parallel
+```
+
+This ensures QML syntax errors and C++ compilation issues are caught before committing.
+
+### QML Linting
+
+Use `qmllint` to check QML files for issues before committing:
+
+```bash
+# Lint a specific file
+/opt/Qt/6.10.1/gcc_64/bin/qmllint src/path/to/File.qml
+
+# Lint all QML files in a directory
+find src -name "*.qml" -exec /opt/Qt/6.10.1/gcc_64/bin/qmllint {} \;
+```
+
+Common issues qmllint catches:
+
+- Unqualified access to IDs from outer components (fix with `pragma ComponentBehavior: Bound` and qualified references)
+- Missing required properties in delegates
+- Type mismatches and undefined properties

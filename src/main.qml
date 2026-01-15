@@ -154,15 +154,15 @@ ApplicationWindow {
     }
 
     // Error dialog for displaying application errors
-    MessageDialog {
+    ErrorDialog {
         id: errorDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
 
         // Alias for backward compatibility with existing code
-        property alias titleText: errorDialog.dialogTitle
+        property alias titleText: errorDialog.title
 
-        dialogTitle: qsTr("Error")
+        title: qsTr("Error")
         buttonText: CommonStrings.continueText
         buttonAccessibleDescription: qsTr("Close the error dialog and continue")
     }
@@ -173,7 +173,7 @@ ApplicationWindow {
         imageWriter: window.imageWriter
         parent: overlayRoot
 
-        dialogTitle: qsTr("Storage device removed")
+        title: qsTr("Storage device removed")
         message: qsTr("The selected storage device is no longer available. Please reinsert the device or select a different one to continue.")
         buttonText: qsTr("OK")
         buttonAccessibleDescription: qsTr("Close the storage removed notification and return to storage selection")
@@ -185,7 +185,7 @@ ApplicationWindow {
         imageWriter: window.imageWriter
         parent: overlayRoot
 
-        dialogTitle: qsTr("Are you sure you want to quit?")
+        title: qsTr("Are you sure you want to quit?")
         message: qsTr("Laerdal SimServer Imager is still busy. Are you sure you want to quit?")
         cancelText: CommonStrings.no
         confirmText: CommonStrings.yes
@@ -225,7 +225,7 @@ ApplicationWindow {
         imageWriter: window.imageWriter
         parent: overlayRoot
 
-        dialogTitle: qsTr("Administrator Privileges Required")
+        title: qsTr("Administrator Privileges Required")
         message: qsTr("Writing to storage devices requires administrator privileges.\n\nClick 'Restart as Admin' to restart the application with elevated privileges and continue writing.")
         cancelText: qsTr("Cancel")
         confirmText: qsTr("Restart as Admin")
@@ -243,9 +243,11 @@ ApplicationWindow {
         imageWriter: window.imageWriter
         parent: overlayRoot
 
-        dialogTitle: qsTr("Permission Warning")
-        titleColor: Style.formLabelErrorColor
+        title: qsTr("Permission Warning")
         buttonText: qsTr("OK")
+
+        // Show warning icon in header
+        headerIconVisible: true
 
         // Install Authorization button - only shown for elevatable bundles without policy installed
         secondaryButtonText: qsTr("Install Authorization")

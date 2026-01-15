@@ -12,44 +12,88 @@ import RpiImager
 // Use for informational messages, errors, or notifications that require acknowledgment.
 //
 // This is the base for other dialog types (ConfirmDialog, WarningDialog, ActionMessageDialog).
-// Child dialogs can override the footer to provide different button layouts.
+// Child dialogs can add extra buttons using the footerButtons property without overriding footer.
 //
-// Example usage:
+// Supports flexible content:
+// - Set 'message' property for simple text content
+// - Add child components for custom content (displayed below message)
+// - Use both together for message + additional content
+//
+// Example usage (simple message):
 //   MessageDialog {
 //       id: errorDialog
 //       imageWriter: window.imageWriter
 //       parent: overlayRoot
-//       dialogTitle: qsTr("Error")
+//       title: qsTr("Error")
 //       message: "Something went wrong"
 //       buttonText: CommonStrings.continueText
 //       onAccepted: { ... }
+//   }
+//
+// Example usage (with extra buttons):
+//   MessageDialog {
+//       id: confirmDialog
+//       title: qsTr("Confirm")
+//       message: "Are you sure?"
+//       buttonText: qsTr("OK")
+//
+//       footerButtons: [
+//           ImButton {
+//               text: qsTr("Cancel")
+//               onClicked: confirmDialog.close()
+//           }
+//       ]
+//   }
+//
+// Example usage (custom content):
+//   MessageDialog {
+//       id: customDialog
+//       imageWriter: window.imageWriter
+//       parent: overlayRoot
+//       title: qsTr("Custom Dialog")
+//       buttonText: qsTr("OK")
+//
+//       ColumnLayout {
+//           Layout.fillWidth: true
+//           Text { text: "Custom content here" }
+//           ProgressBar { ... }
+//       }
 //   }
 BaseDialog {
     id: root
 
     // Dialog content properties
-    // Note: Using 'dialogTitle' instead of 'title' because Dialog.title is FINAL
-    property string dialogTitle: ""
+    // Note: 'title' is inherited from Dialog base class
     property string message: ""
     property string buttonText: CommonStrings.continueText
     property string buttonAccessibleDescription: qsTr("Close this dialog")
 
-    // Title styling (can be overridden by child dialogs)
-    property color titleColor: Style.formLabelColor
-    property int titleAlignment: Text.AlignLeft
-
     // Message styling (can be overridden by child dialogs)
     property int messageAlignment: Text.AlignLeft
 
-    // Expose text elements for focus group registration in child dialogs
-    property alias titleTextItem: titleText
+    // Custom content support - child items go into customContentContainer
+    // When custom content is provided, the default message text is hidden
+    default property alias customContent: customContentContainer.data
+    readonly property bool hasCustomContent: customContentContainer.children.length > 0
+
+    // Expose text element for focus group registration in child dialogs
     property alias messageTextItem: messageText
 
-    // Expose action button for focus group registration
-    property alias actionButtonItem: actionButton
+    // Expose action button for focus group registration (returns the visible one)
+    readonly property Item actionButtonItem: root.destructiveButton ? destructiveActionButton : actionButton
 
-    // Optional header content (displayed above title, e.g., warning icon)
-    property alias headerContent: headerLoader.sourceComponent
+    // Footer buttons - child dialogs can add buttons here (displayed before the primary action button)
+    // Use this instead of overriding footer for simpler customization
+    property list<Item> footerButtons
+
+    // Whether to use destructive (red) styling for the primary action button
+    property bool destructiveButton: false
+
+    // Whether the primary action button is enabled (for form validation)
+    property bool buttonEnabled: true
+
+    // Whether to show the footer (allows child dialogs to hide entire footer)
+    property bool showFooter: true
 
     // Note: accepted() signal is inherited from Dialog base class
 
@@ -63,7 +107,7 @@ BaseDialog {
     Component.onCompleted: {
         registerFocusGroup("content", function(){
             if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
-                return [titleText, messageText]
+                return [messageText]
             }
             return []
         }, 0)
@@ -72,34 +116,7 @@ BaseDialog {
         }, 1)
     }
 
-    // Optional header content loader (e.g., warning icon)
-    Loader {
-        id: headerLoader
-        Layout.fillWidth: true
-        Layout.alignment: Qt.AlignHCenter
-        active: sourceComponent !== null
-        visible: active
-    }
-
-    // Title text
-    Text {
-        id: titleText
-        text: root.dialogTitle
-        font.pixelSize: Style.fontSizeHeading
-        font.family: Style.fontFamilyBold
-        font.bold: true
-        color: root.titleColor
-        horizontalAlignment: root.titleAlignment
-        Layout.fillWidth: true
-        visible: text.length > 0
-        Accessible.role: Accessible.Heading
-        Accessible.name: text
-        Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-    }
-
-    // Message text
+    // Message text (shown when message is set)
     Text {
         id: messageText
         text: root.message
@@ -118,27 +135,74 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    // Footer with action button (can be overridden by child dialogs)
+    // Container for custom content (populated via default property alias)
+    // Shown below the message when custom content is provided
+    ColumnLayout {
+        id: customContentContainer
+        Layout.fillWidth: true
+        spacing: Style.spacingMedium
+        visible: root.hasCustomContent
+    }
+
+    // Footer with action button (child dialogs can add buttons via footerButtons property)
     footer: RowLayout {
+        id: footerLayout
+        // Align with content area (same x and width as contentLayout in BaseDialog)
         width: parent ? parent.width : 0
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
+        height: Style.buttonHeightStandard + (Style.spacingMedium * 2)
+        visible: root.showFooter
+
         spacing: Style.spacingMedium
 
-        Item { Layout.preferredWidth: Style.cardPadding }
+        // Spacer to push buttons to the right
         Item { Layout.fillWidth: true }
 
+        // Extra buttons from child dialogs (added before the primary action button)
+        Repeater {
+            model: root.footerButtons
+            delegate: Item {
+                id: buttonDelegate
+                required property Item modelData
+                Layout.preferredWidth: buttonDelegate.modelData.implicitWidth
+                Layout.preferredHeight: Style.buttonHeightStandard
+                Component.onCompleted: {
+                    buttonDelegate.modelData.parent = buttonDelegate
+                    buttonDelegate.modelData.anchors.fill = buttonDelegate
+                }
+            }
+        }
+
+        // Normal primary action button
         ImButton {
             id: actionButton
             text: root.buttonText
             accessibleDescription: root.buttonAccessibleDescription
             Layout.preferredHeight: Style.buttonHeightStandard
             activeFocusOnTab: true
+            visible: !root.destructiveButton
+            enabled: root.buttonEnabled
             onClicked: {
                 root.close()
                 root.accepted()
             }
         }
 
-        Item { Layout.preferredWidth: Style.cardPadding }
+        // Destructive (red) primary action button
+        ImButtonRed {
+            id: destructiveActionButton
+            text: root.buttonText
+            accessibleDescription: root.buttonAccessibleDescription
+            Layout.preferredHeight: Style.buttonHeightStandard
+            activeFocusOnTab: true
+            visible: root.destructiveButton
+            enabled: root.buttonEnabled
+            onClicked: {
+                root.close()
+                root.accepted()
+            }
+        }
+
+        // Right margin
+        Item { Layout.preferredWidth: Style.spacingSmall }
     }
 }

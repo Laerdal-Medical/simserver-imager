@@ -83,7 +83,7 @@ FocusScope {
         anchors.leftMargin: Style.stepContentMargins
         anchors.rightMargin: Style.stepContentMargins
         anchors.topMargin: Style.stepContentMargins
-        anchors.bottomMargin: Style.spacingSmall
+        anchors.bottomMargin: Style.spacingMedium
         spacing: Style.stepContentSpacing
         
         // Header section
@@ -219,6 +219,7 @@ FocusScope {
                 KeyNavigation.tab: backButton
                 KeyNavigation.backtab: skipButton
             }
+            
         }
     }
 

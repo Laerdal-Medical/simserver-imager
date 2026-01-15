@@ -11,15 +11,36 @@ import QtQuick.Window
 
 import RpiImager
 
-BaseDialog {
+ConfirmDialog {
     id: popup
-    
+
+    title: qsTr("Content Repository")
+
     // Dynamic width based on widest radio button or button row
     // Updates automatically when language/text changes
     implicitWidth: Math.max(
         Math.max(radioOfficial.naturalWidth, radioCustomFile.naturalWidth, radioCustomUri.naturalWidth),
-        cancelButton.implicitWidth + saveButton.implicitWidth + Style.spacingMedium * 2
+        400
     ) + Style.cardPadding * 4  // Double padding: contentLayout + optionsLayout margins
+
+    // Confirm dialog button configuration
+    cancelText: CommonStrings.cancel
+    confirmText: qsTr("Apply & Restart")
+    cancelAccessibleDescription: qsTr("Close the repository dialog without changing the content source")
+    confirmAccessibleDescription: qsTr("Apply the new content repository and restart the wizard from the beginning")
+
+    // Use destructive styling for Apply button
+    destructiveConfirm: true
+
+    // Enable/disable confirm button based on selection validity
+    confirmEnabled: (radioOfficial.checked
+                 || (radioCustomFile.checked && popup.selectedRepo.toString() !== "")
+                 || (radioCustomUri.checked && fieldCustomUri.isValid))
+                 // Disable while write is in progress to prevent restarting during write
+                 && (imageWriter.writeState === ImageWriter.Idle ||
+                     imageWriter.writeState === ImageWriter.Succeeded ||
+                     imageWriter.writeState === ImageWriter.Failed ||
+                     imageWriter.writeState === ImageWriter.Cancelled)
 
     // imageWriter is inherited from BaseDialog
     property var wizardContainer: null
@@ -29,14 +50,9 @@ BaseDialog {
     property string customRepoUri: ""
     property string originalRepo: ""
 
+    // Register focus groups when component is ready
+    // Note: ConfirmDialog already registers "content" and "buttons" groups
     Component.onCompleted: {
-        registerFocusGroup("header", function(){
-            // Only include header text when screen reader is active (otherwise it's not focusable)
-            if (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) {
-                return [headerText]
-            }
-            return []
-        }, 0)
         registerFocusGroup("sourceTypes", function(){
             return [radioOfficial, radioCustomFile, radioCustomUri]
         }, 1)
@@ -46,9 +62,6 @@ BaseDialog {
         registerFocusGroup("customUri", function(){
             return radioCustomUri.checked ? [fieldCustomUri] : []
         }, 3)
-        registerFocusGroup("buttons", function(){
-            return [cancelButton, saveButton]
-        }, 4)
     }
 
     Connections {
@@ -56,24 +69,6 @@ BaseDialog {
         function onFileSelected(fileUrl) {
             popup.selectedRepo = fileUrl
         }
-    }
-
-    // Header
-    Text {
-        id: headerText
-        text: qsTr("Content Repository")
-        font.pixelSize: Style.fontSizeLargeHeading
-        font.family: Style.fontFamilyBold
-        font.bold: true
-        color: Style.formLabelColor
-        Layout.fillWidth: true
-        horizontalAlignment: Text.AlignHCenter
-        Accessible.role: Accessible.Heading
-        Accessible.name: text + ", " + qsTr("Choose the source for operating system images")
-        Accessible.ignored: false
-        Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
     }
 
     // Options section
@@ -186,60 +181,14 @@ BaseDialog {
         }
     }
 
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
+    // Handle accepted (confirm button clicked)
+    onAccepted: {
+        popup.applySettings()
+    }
 
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        Item { Layout.fillWidth: true }
-
-        ImButton {
-            id: cancelButton
-            text: CommonStrings.cancel
-            accessibleDescription: qsTr("Close the repository dialog without changing the content source")
-            Layout.minimumWidth: Style.buttonWidthMinimum
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                popup.initialized = false
-                popup.close();
-            }
-        }
-
-        ImButtonRed {
-            id: saveButton
-            enabled: (radioOfficial.checked
-                     || (radioCustomFile.checked && popup.selectedRepo.toString() !== "")
-                     || (radioCustomUri.checked && fieldCustomUri.isValid))
-                     // Disable while write is in progress to prevent restarting during write
-                     && (imageWriter.writeState === ImageWriter.Idle ||
-                         imageWriter.writeState === ImageWriter.Succeeded ||
-                         imageWriter.writeState === ImageWriter.Failed ||
-                         imageWriter.writeState === ImageWriter.Cancelled)
-            // TODO: only show or enable when settings changed
-            text: qsTr("Apply & Restart")
-            accessibleDescription: qsTr("Apply the new content repository and restart the wizard from the beginning")
-            Layout.minimumWidth: Style.buttonWidthMinimum
-            Layout.preferredHeight: Style.buttonHeightStandard
-            // Allow button to grow to fit text
-            implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
-            activeFocusOnTab: true
-            onClicked: {
-                popup.applySettings();
-                popup.close();
-            }
-            onEnabledChanged: {
-                // Rebuild focus order when button becomes enabled/disabled
-                Qt.callLater(popup.rebuildFocusOrder)
-            }
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
+    // Handle rejected (cancel button clicked)
+    onRejected: {
+        popup.initialized = false
     }
 
     Connections {

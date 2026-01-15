@@ -89,7 +89,7 @@ Item {
         color: root.isItemSelected ? root.selectedBackgroundColor
              : (parentListView && parentListView.currentIndex === root.delegateIndex) ? Style.listViewHighlightColor
              : (mouseArea.containsMouse && !root.isDisabled ? Style.listViewHoverRowBackgroundColor : Style.listViewRowBackgroundColor)
-        radius: 0
+        radius: Style.sectionBorderRadius
         opacity: root.isDisabled ? 0.5 : 1.0
         Accessible.ignored: true
 

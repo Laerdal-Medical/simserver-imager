@@ -390,14 +390,29 @@ WizardStepBase {
     }
 
     // Confirmation dialog
-    BaseDialog {
+    MessageDialog {
         id: confirmDialog
         imageWriter: root.imageWriter
         parent: root.Window.window ? root.Window.window.overlayRootItem : undefined
         anchors.centerIn: parent
 
-        // Override height with maximum constraint to prevent excessive height, but allow natural sizing
-        height: Math.min(400, contentLayout ? (contentLayout.implicitHeight + Style.cardPadding * 2) : 200)
+        // Show warning icon in header
+        headerIconVisible: true
+        headerIconBackgroundColor: Style.warningTextColor
+        headerIconText: "!"
+        headerIconAccessibleName: qsTr("Warning icon")
+        title: qsTr("You are about to ERASE all data on:\n%1").arg(wizardContainer.selectedStorageName || qsTr("the storage device"))
+        titleColor: Style.formLabelErrorColor
+
+        // Message content
+        message: qsTr("This action is PERMANENT and CANNOT be undone.")
+
+        // Primary button with countdown
+        destructiveButton: true
+        buttonText: confirmDialog.allowAccept ? qsTr("Erase and write") : qsTr("Wait... %1").arg(confirmDialog.countdown)
+        buttonAccessibleDescription: confirmDialog.allowAccept
+            ? qsTr("Confirm erasure and begin writing the image to the storage device")
+            : qsTr("Please wait %1 seconds before confirming").arg(confirmDialog.countdown)
 
         property bool allowAccept: false
         property int countdown: 2
@@ -407,18 +422,19 @@ WizardStepBase {
             confirmDialog.close()
         }
 
-        // Register focus groups when component is ready
+        // Disable action button until countdown completes
         Component.onCompleted: {
-            registerFocusGroup("warning", function(){ 
-                // Only include warning texts when screen reader is active (otherwise they're not focusable)
+            actionButtonItem.enabled = Qt.binding(function() { return confirmDialog.allowAccept })
+            actionButtonItem.activeFocusOnTab = Qt.binding(function() { return confirmDialog.allowAccept })
+
+            registerFocusGroup("content", function(){
                 if (confirmDialog.imageWriter && confirmDialog.imageWriter.isScreenReaderActive()) {
-                    return [warningText, permanentText]
+                    return [messageTextItem]
                 }
                 return []
             }, 0)
-            registerFocusGroup("buttons", function(){ 
-                // Only include buttons when they're visible (after allowAccept becomes true)
-                return confirmDialog.allowAccept ? [cancelButton, acceptBtn] : []
+            registerFocusGroup("buttons", function(){
+                return [cancelButton, actionButtonItem]
             }, 1)
         }
 
@@ -433,83 +449,19 @@ WizardStepBase {
             countdown = 2
         }
 
-        // Dialog content - now using BaseDialog's contentLayout
-        Text {
-            id: warningText
-            text: qsTr("You are about to ERASE all data on: %1").arg(wizardContainer.selectedStorageName || qsTr("the storage device"))
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelErrorColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.ignored: false
-            Accessible.focusable: confirmDialog.imageWriter ? confirmDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (confirmDialog.imageWriter && confirmDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: confirmDialog.imageWriter ? confirmDialog.imageWriter.isScreenReaderActive() : false
+        onAccepted: {
+            beginWriteDelay.start()
         }
 
-        Text {
-            id: permanentText
-            text: qsTr("This action is PERMANENT and CANNOT be undone.")
-            font.pixelSize: Style.fontSizeFormLabel
-            font.family: Style.fontFamilyBold
-            color: Style.formLabelColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-            Accessible.ignored: false
-            Accessible.focusable: confirmDialog.imageWriter ? confirmDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (confirmDialog.imageWriter && confirmDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: confirmDialog.imageWriter ? confirmDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        // Flexible spacer to push buttons to the bottom
-        Item { Layout.fillHeight: true }
-
-        Text {
-            id: waitText
-            text: qsTr("Please wait... %1").arg(confirmDialog.countdown)
-            font.pixelSize: Style.fontSizeFormLabel
-            font.family: Style.fontFamily
-            color: Style.textMetadataColor
-            horizontalAlignment: Text.AlignRight
-            Layout.fillWidth: true
-            visible: !confirmDialog.allowAccept
-        }
-
-        RowLayout {
-            id: confirmButtonRow
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-            visible: confirmDialog.allowAccept
-            Item { Layout.fillWidth: true }
-
+        // Cancel button
+        footerButtons: [
             ImButton {
                 id: cancelButton
                 text: CommonStrings.cancel
                 accessibleDescription: qsTr("Cancel and return to the write summary without erasing the storage device")
-                activeFocusOnTab: true
-                Layout.preferredHeight: Style.buttonHeightStandard
                 onClicked: confirmDialog.close()
             }
-
-            ImButtonRed {
-                id: acceptBtn
-                text: confirmDialog.allowAccept ? qsTr("Erase and write") : qsTr("Please wait...")
-                accessibleDescription: qsTr("Confirm erasure and begin writing the image to the storage device")
-                enabled: confirmDialog.allowAccept
-                activeFocusOnTab: true
-                Layout.preferredHeight: Style.buttonHeightStandard
-                onClicked: {
-                    confirmDialog.close()
-                    beginWriteDelay.start()
-                }
-            }
-        }
+        ]
     }
 
     // Delay accept for 2 seconds - moved outside dialog content
@@ -523,8 +475,6 @@ WizardStepBase {
             if (confirmDialog.countdown <= 0) {
                 confirmDelay.stop()
                 confirmDialog.allowAccept = true
-                // Rebuild focus order now that buttons are visible
-                confirmDialog.rebuildFocusOrder()
             }
         }
     }

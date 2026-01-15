@@ -31,18 +31,21 @@ Dialog {
     
     // Dynamic width based on content, with min/max bounds
     // Grows to fit content (especially for long translated strings) but stays within window
-    readonly property real minDialogWidth: 400
+    readonly property real minDialogWidth: 450
     readonly property real maxDialogWidth: parent ? Math.max(minDialogWidth, parent.width - Style.cardPadding * 2) : 700
-    // Use the largest of: minDialogWidth, explicit implicitWidth, or content-based width
+    // Use the largest of: minDialogWidth, explicit implicitWidth, header-based width, or content-based width
     readonly property real contentBasedWidth: contentLayout ? (contentLayout.implicitWidth + Style.cardPadding * 2) : minDialogWidth
-    width: Math.min(maxDialogWidth, Math.max(minDialogWidth, implicitWidth, contentBasedWidth))
+    readonly property real headerBasedWidth: header ? (header.implicitWidth + Style.cardPadding * 2) : minDialogWidth
+    width: Math.min(maxDialogWidth, Math.max(minDialogWidth, implicitWidth, contentBasedWidth, headerBasedWidth))
     
     // Dynamic height based on content (can be overridden by child dialogs)
-    // contentLayout.y is top padding, and we need equal bottom padding
-    // Also add footer height if a footer is defined
+    // Include header height, content height, and footer height
+    // Note: footer height already includes its own internal padding
+    readonly property real headerHeight: header && header.visible ? header.height : 0
     readonly property real footerHeight: footer ? footer.height : 0
-    readonly property real calculatedHeight: Math.max(200, contentLayout ? (contentLayout.y + contentLayout.implicitHeight + Style.cardPadding + footerHeight) : 200)
-    implicitHeight: calculatedHeight
+    readonly property real contentLayoutHeight: contentLayout ? contentLayout.implicitHeight : 0
+    readonly property real calculatedHeight: headerHeight + Style.cardPadding + contentLayoutHeight + footerHeight
+    implicitHeight: Math.max(150, calculatedHeight)
     
     // Positioning - only set if no anchors are used
     x: anchors.centerIn ? 0 : (parent ? (parent.width - width) / 2 : 0)
@@ -66,7 +69,73 @@ Dialog {
     
     // Remove standard dialog buttons since we have custom ones
     standardButtons: Dialog.NoButton
-    
+
+    // Title styling properties (can be overridden by child dialogs)
+    property color titleColor: Style.formLabelColor
+    property int titleAlignment: Text.AlignLeft
+
+    // Header icon properties (can be overridden by child dialogs)
+    property bool headerIconVisible: false
+    property color headerIconBackgroundColor: Style.warningTextColor
+    property string headerIconText: "!"
+    property int headerIconSize: 24
+    property string headerIconAccessibleName: qsTr("Icon")
+
+    // Custom header with optional icon and styled title
+    header: Item {
+        width: parent ? parent.width : 0
+        height: root.title.length > 0 || root.headerIconVisible ? headerRow.implicitHeight + Style.cardPadding : 0
+        visible: root.title.length > 0 || root.headerIconVisible
+
+        RowLayout {
+            id: headerRow
+            x: Style.cardPadding
+            y: Style.cardPadding
+            width: parent.width - Style.cardPadding * 2
+            spacing: Style.spacingMedium
+
+            // Optional icon (shown to the left of title when visible)
+            Rectangle {
+                id: headerIcon
+                width: root.headerIconSize
+                height: root.headerIconSize
+                radius: root.headerIconSize / 2
+                color: root.headerIconBackgroundColor
+                visible: root.headerIconVisible
+                Layout.alignment: Qt.AlignVCenter
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.headerIconText
+                    font.pixelSize: root.headerIconSize * 0.53
+                    font.bold: true
+                    color: "white"
+                }
+
+                Accessible.role: Accessible.Graphic
+                Accessible.name: root.headerIconAccessibleName
+            }
+
+            // Title text
+            Text {
+                id: titleLabel
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                text: root.title
+                font.pixelSize: Style.fontSizeHeading
+                font.family: Style.fontFamilyBold
+                font.bold: true
+                color: root.titleColor
+                horizontalAlignment: root.titleAlignment
+                wrapMode: Text.WordWrap
+                visible: root.title.length > 0
+
+                Accessible.role: Accessible.Heading
+                Accessible.name: text
+            }
+        }
+    }
+
     // Set the dialog background directly
     background: Rectangle {
         color: Style.titleBackgroundColor

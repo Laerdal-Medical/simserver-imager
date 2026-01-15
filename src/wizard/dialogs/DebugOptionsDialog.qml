@@ -9,57 +9,40 @@ import QtQuick.Layouts
 
 import RpiImager
 
-BaseDialog {
+ConfirmDialog {
     id: popup
 
     width: 700
     height: parent ? Math.min(500, parent.height - Style.cardPadding * 2) : 500
 
+    title: qsTr("Debug Options")
+
     // imageWriter is inherited from BaseDialog
     property var wizardContainer: null
-    
+
     property bool initialized: false
     property bool isInitializing: false
 
-    // Custom escape handling
+    // Confirm dialog button configuration
+    cancelText: CommonStrings.cancel
+    confirmText: qsTr("Apply")
+    cancelAccessibleDescription: qsTr("Close the debug options dialog without saving any changes")
+    confirmAccessibleDescription: qsTr("Apply the selected debug options")
+
+    // Custom escape handling - just close without applying
     function escapePressed() {
         popup.close()
     }
 
     // Register focus groups when component is ready
+    // Note: ConfirmDialog already registers "content" and "buttons" groups
     Component.onCompleted: {
-        registerFocusGroup("header", function(){ 
-            if (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) {
-                return [headerText, warningText]
-            }
-            return []
-        }, 0)
-        registerFocusGroup("options", function(){ 
+        registerFocusGroup("options", function(){
             return [chkDirectIO.focusItem, chkAsyncIO.focusItem, chkPeriodicSync.focusItem, chkVerboseLogging.focusItem, chkIPv4Only.focusItem, chkSkipEndOfDevice.focusItem]
         }, 1)
-        registerFocusGroup("buttons", function(){ 
-            return [cancelButton, applyButton]
-        }, 2)
     }
 
-    // Header
-    Text {
-        id: headerText
-        text: qsTr("Debug Options")
-        font.pixelSize: Style.fontSizeLargeHeading
-        font.family: Style.fontFamilyBold
-        font.bold: true
-        color: Style.formLabelColor
-        Layout.fillWidth: true
-        horizontalAlignment: Text.AlignHCenter
-        Accessible.role: Accessible.Heading
-        Accessible.name: text
-        Accessible.focusable: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-        focusPolicy: (popup.imageWriter && popup.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-        activeFocusOnTab: popup.imageWriter ? popup.imageWriter.isScreenReaderActive() : false
-    }
-
-    // Warning banner
+    // Warning banner as custom content
     ImBanner {
         id: warningBanner
         bannerType: ImBanner.Type.Warning
@@ -67,20 +50,32 @@ BaseDialog {
     }
 
     // Scrollable options section
-    ScrollView {
-        id: scrollView
+    Rectangle {
         Layout.fillWidth: true
-        Layout.preferredHeight: popup.height - headerText.implicitHeight - warningBanner.Layout.preferredHeight - popup.footer.height - (Style.cardPadding * 2)
-        clip: true
-        contentWidth: availableWidth // Ensure content uses full width
+        Layout.preferredHeight: popup.height - popup.headerHeight - warningBanner.implicitHeight - popup.footerHeight - (Style.cardPadding * 3) - Style.spacingMedium
+        color: Style.mainBackgroundColor
+        radius: Style.sectionBorderRadius
+        border.color: Style.popupBorderColor
+        border.width: Style.sectionBorderWidth
 
-        //ScrollBar.vertical.policy: ScrollBar
-        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+        Flickable {
+            id: flickable
+            anchors.fill: parent
+            anchors.margins: Style.spacingSmall
+            clip: true
+            contentWidth: width
+            contentHeight: optionsLayout.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
 
-        ColumnLayout {
-            id: optionsLayout
-            width: scrollView.availableWidth  // Use ScrollView's available width directly
-            spacing: Style.spacingSmall
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
+
+            ColumnLayout {
+                id: optionsLayout
+                width: flickable.width
+                spacing: Style.spacingSmall
 
             // Section header for I/O options
             Text {
@@ -112,21 +107,21 @@ BaseDialog {
                     focusItem.activeFocusOnTab = true
                 }
             }
-            
+
             // Async queue depth slider (only visible when async is enabled)
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: Style.spacingLarge
                 visible: chkAsyncIO.checked
                 spacing: Style.spacingSmall
-                
+
                 Text {
                     text: qsTr("Queue Depth:")
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
                 }
-                
+
                 Slider {
                     id: asyncQueueDepthSlider
                     Layout.fillWidth: true
@@ -134,10 +129,10 @@ BaseDialog {
                     to: 512  // Max supported by ring buffer - high values mainly benefit NVMe/USB4
                     stepSize: 1
                     value: 16
-                    
+
                     // Snap to power-of-2 and convenient values for nice display
                     property var snapPoints: [1, 2, 4, 8, 16, 32, 64, 128, 256, 384, 512]
-                    
+
                     onMoved: {
                         // Snap to nearest good value
                         var closest = snapPoints[0];
@@ -151,11 +146,11 @@ BaseDialog {
                         }
                         value = closest;
                     }
-                    
+
                     Accessible.role: Accessible.Slider
                     Accessible.name: qsTr("Async queue depth: %1").arg(Math.round(value))
                 }
-                
+
                 Text {
                     text: Math.round(asyncQueueDepthSlider.value)
                     font.pixelSize: Style.fontSizeDescription
@@ -166,7 +161,7 @@ BaseDialog {
                     horizontalAlignment: Text.AlignRight
                 }
             }
-            
+
             // Memory usage estimate
             Text {
                 Layout.fillWidth: true
@@ -308,9 +303,9 @@ BaseDialog {
                             lines.push("IPv4-only: " + (chkIPv4Only.checked ? "Enabled" : "Disabled"));
                             lines.push("Counterfeit Card Mode: " + (chkSkipEndOfDevice.checked ? "Enabled" : "Disabled"));
                             if (chkDirectIO.checked && chkAsyncIO.checked) {
-                                lines.push("✓ Optimal: Direct I/O + Async I/O for best performance");
+                                lines.push("Optimal: Direct I/O + Async I/O for best performance");
                             } else if (chkDirectIO.checked) {
-                                lines.push("⚠ Consider enabling Async I/O to improve Direct I/O performance");
+                                lines.push("Consider enabling Async I/O to improve Direct I/O performance");
                             }
                             if (chkDirectIO.checked && chkPeriodicSync.checked) {
                                 lines.push("Note: Periodic sync is skipped when Direct I/O is active");
@@ -319,7 +314,7 @@ BaseDialog {
                                 lines.push("Note: Image downloads will use IPv4 only (OS list fetching unaffected)");
                             }
                             if (chkSkipEndOfDevice.checked) {
-                                lines.push("⚠ Counterfeit mode: Skipping end-of-device checks");
+                                lines.push("Counterfeit mode: Skipping end-of-device checks");
                             }
                             return lines.join("\n");
                         }
@@ -332,52 +327,13 @@ BaseDialog {
                 }
             }
         }
-    }
-
-    // Footer with action buttons
-    footer: RowLayout {
-        width: parent.width
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-
-        // Left padding
-        Item { Layout.preferredWidth: Style.cardPadding }
-
-        Item { Layout.fillWidth: true }
-
-        ImButton {
-            id: cancelButton
-            text: CommonStrings.cancel
-            accessibleDescription: qsTr("Close the debug options dialog without saving any changes")
-            Layout.minimumWidth: Style.buttonWidthMinimum
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                popup.close();
-            }
         }
-
-        ImButtonRed {
-            id: applyButton
-            text: qsTr("Apply")
-            accessibleDescription: qsTr("Apply the selected debug options")
-            Layout.minimumWidth: Style.buttonWidthMinimum
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                popup.applySettings();
-                popup.close();
-            }
-        }
-
-        // Right padding
-        Item { Layout.preferredWidth: Style.cardPadding }
     }
 
     function initialize() {
         if (!initialized) {
             isInitializing = true;
-            
+
             // Load current settings from ImageWriter
             chkDirectIO.checked = imageWriter.getDebugDirectIO();
             chkAsyncIO.checked = imageWriter.getDebugAsyncIO();
@@ -401,8 +357,8 @@ BaseDialog {
         imageWriter.setDebugVerboseLogging(chkVerboseLogging.checked);
         imageWriter.setDebugIPv4Only(chkIPv4Only.checked);
         imageWriter.setDebugSkipEndOfDevice(chkSkipEndOfDevice.checked);
-        
-        console.log("Debug options applied: DirectIO=" + chkDirectIO.checked + 
+
+        console.log("Debug options applied: DirectIO=" + chkDirectIO.checked +
                     ", AsyncIO=" + chkAsyncIO.checked +
                     ", AsyncQueueDepth=" + Math.round(asyncQueueDepthSlider.value) +
                     ", PeriodicSync=" + chkPeriodicSync.checked +
@@ -411,12 +367,17 @@ BaseDialog {
                     ", SkipEndOfDevice=" + chkSkipEndOfDevice.checked);
     }
 
+    onAccepted: {
+        applySettings();
+    }
+
     onOpened: {
         initialize();
     }
-    
+
     // Reset initialized state when closed so settings are refreshed on next open
     onClosed: {
         initialized = false;
     }
 }
+

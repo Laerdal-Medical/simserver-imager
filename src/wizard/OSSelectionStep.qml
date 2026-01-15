@@ -478,6 +478,10 @@ WizardStepBase {
                     imageWriter.beginOSListFetch()
                 }
             }
+        }        // OS selection area - fill available space without extra chrome/padding
+        Item {
+            Layout.fillWidth: true
+            Layout.minimumHeight: Style.spacingTiny
         }
         
         // OS selection area - fill available space without extra chrome/padding

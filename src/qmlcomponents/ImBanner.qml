@@ -69,6 +69,7 @@ Rectangle {
     Layout.fillWidth: true
     Layout.preferredHeight: visible ? bannerContent.implicitHeight + Style.spacingSmall * 2 : 0
     color: root.bannerColor
+    radius: Style.sectionBorderRadius
 
     Behavior on Layout.preferredHeight {
         NumberAnimation {

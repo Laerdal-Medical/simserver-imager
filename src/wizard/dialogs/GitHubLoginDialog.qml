@@ -135,11 +135,10 @@ BaseDialog {
         activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
     }
 
-    // Loading state - use explicit height calculation since Layout.fillHeight doesn't work in BaseDialog
+    // Loading state
     Item {
         Layout.fillWidth: true
-        // Calculate height: dialog height - title height - footer height - padding
-        Layout.preferredHeight: root.height - titleLabel.height - root.footerHeight - (Style.cardPadding * 3) - Style.spacingMedium
+        Layout.preferredHeight: 80
         visible: root.authState === "idle"
 
         BusyIndicator {

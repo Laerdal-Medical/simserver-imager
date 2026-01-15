@@ -9,7 +9,7 @@ import QtQuick.Layouts
 import RpiImager
 
 // Warning dialog with icon, title, message, and single action button.
-// Extends MessageDialog with a warning icon and centered text.
+// Extends MessageDialog with a warning icon to the left of the title.
 // Use for important notifications that need visual emphasis (e.g., device removed).
 //
 // Example usage:
@@ -17,7 +17,7 @@ import RpiImager
 //       id: storageRemovedDialog
 //       imageWriter: window.imageWriter
 //       parent: overlayRoot
-//       dialogTitle: qsTr("Storage device removed")
+//       title: qsTr("Storage device removed")
 //       message: qsTr("The device is no longer available.")
 //       buttonText: qsTr("OK")
 //       onAccepted: { ... }
@@ -28,57 +28,10 @@ MessageDialog {
     // Override default button text
     buttonText: qsTr("OK")
 
-    // Center align title and message for warning dialogs
-    titleAlignment: Text.AlignHCenter
-    messageAlignment: Text.AlignHCenter
+    // Enable header icon with warning styling
+    headerIconVisible: true
+    headerIconBackgroundColor: Style.warningTextColor
+    headerIconText: "!"
+    headerIconAccessibleName: qsTr("Warning icon")
 
-    // Icon customization
-    property color iconBackgroundColor: Style.warningTextColor
-    property string iconText: "!"
-    property int iconSize: 60
-
-    // Warning icon header
-    headerContent: Component {
-        Rectangle {
-            width: root.iconSize
-            height: root.iconSize
-            radius: root.iconSize / 2
-            color: root.iconBackgroundColor
-
-            Text {
-                anchors.centerIn: parent
-                text: root.iconText
-                font.pixelSize: root.iconSize * 0.53
-                font.bold: true
-                color: "white"
-            }
-
-            Accessible.role: Accessible.Graphic
-            Accessible.name: qsTr("Warning icon")
-        }
-    }
-
-    // Override footer to center the button
-    footer: RowLayout {
-        width: parent ? parent.width : 0
-        height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-        spacing: Style.spacingMedium
-
-        Item { Layout.preferredWidth: Style.cardPadding }
-        Item { Layout.fillWidth: true }
-
-        ImButton {
-            text: root.buttonText
-            accessibleDescription: root.buttonAccessibleDescription
-            Layout.preferredHeight: Style.buttonHeightStandard
-            activeFocusOnTab: true
-            onClicked: {
-                root.close()
-                root.accepted()
-            }
-        }
-
-        Item { Layout.fillWidth: true }
-        Item { Layout.preferredWidth: Style.cardPadding }
-    }
 }

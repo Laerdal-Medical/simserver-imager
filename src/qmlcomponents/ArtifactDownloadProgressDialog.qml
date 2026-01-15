@@ -31,6 +31,7 @@ BaseDialog {
 
     // Override width for this dialog
     implicitWidth: 450
+    implicitHeight: 235
 
     // Allow closing with Escape key (which triggers cancel)
     closePolicy: Popup.CloseOnEscape

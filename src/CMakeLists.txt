@@ -602,6 +602,7 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/MessageDialog.qml
       qmlcomponents/ConfirmDialog.qml
       qmlcomponents/WarningDialog.qml
+      qmlcomponents/ErrorDialog.qml
       qmlcomponents/ActionMessageDialog.qml
       qmlcomponents/ArtifactFileSelectionDialog.qml
       qmlcomponents/ArtifactDownloadProgressDialog.qml
@@ -643,7 +644,6 @@ if(NOT BUILD_CLI_ONLY)
       wizard/PiConnectCustomizationStep.qml
       wizard/WritingStep.qml
       wizard/DoneStep.qml
-      wizard/SPUSelectionStep.qml
       wizard/SPUCopyStep.qml
       wizard/components/WizardSectionContainer.qml
       wizard/components/WizardFormLabel.qml
