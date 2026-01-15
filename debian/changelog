@@ -1,4 +1,4 @@
-laerdal-simserver-imager (1.0.5) unstable; urgency=medium
+laerdal-simserver-imager (1.0.5) stable; urgency=medium
 
   * Download Resume: Add support for resuming interrupted downloads on
     startup with user confirmation dialog
@@ -15,12 +15,14 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
   * Branch Filter Search: Branch filter dropdown now supports type-ahead
     search for quickly finding branches in large repositories. Combobox now
     selects matching branch while typing and is fully editable.
+  * CLI SPU Support: Full command-line support for SPU file copy operations
+    with proper mount handling
   * Windows Upgrade Fix: Preserve user cache and settings during Windows
     installer upgrades
   * macOS Build Fix: Resolve deprecation warnings and use thin LTO for
     faster builds. Fixed QRegularExpression usage in mount helper.
   * Windows FAT32 Fix: Support formatting drives larger than 32GB as FAT32
-    by using explicit 32KB cluster size to bypass Windows' artificial limit
+    using DiskFormatter with format.com to bypass Windows' artificial limit
   * Linux io_uring Optimization: Limit async I/O queue depth to 4 when using
     O_DIRECT to prevent massive latency buildup on USB devices. Reduces
     end-of-write drain time from ~175 seconds to ~2 seconds.
@@ -33,7 +35,13 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
     user double-clicks or presses Next, reducing unnecessary downloads when
     browsing the artifact list
   * SPU Copy Flow: Improved SPU file copy workflow with auto-advance to
-    done step and dedicated completion message for SPU operations
+    done step, dedicated completion message, and display of file/drive info
+  * Dialog Components: Refactored dialog components with new BaseDialog
+    header system for consistent styling and reusable dialog patterns
+  * Storage Removed Dialog: Show storage removed dialog when device is
+    removed during write operations with improved styling
+  * SPU Device Removal Fix: Set write state during SPU copy to prevent
+    spurious device removal dialog
   * Mount Helper Fix: Check if device is already mounted before trying to
     get exclusive access, avoiding timeout when device is already in use
   * Large Artifact ID Fix: Support GitHub artifact IDs larger than 2^31 by
@@ -45,7 +53,7 @@ laerdal-simserver-imager (1.0.5) unstable; urgency=medium
     with the OS on all platforms (Windows, macOS, Linux). Double-click image
     files to open them directly in the imager.
 
- -- Laerdal Medical <support@laerdal.com>  Tue, 14 Jan 2025 08:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Wed, 15 Jan 2025 12:00:00 +0000
 
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 
