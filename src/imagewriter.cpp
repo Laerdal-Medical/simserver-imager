@@ -4989,6 +4989,9 @@ void ImageWriter::startSpuCopy(bool skipFormat)
     qDebug() << "  Skip format:" << skipFormat;
     qDebug() << "  Destination:" << _dst;
 
+    // Set write state to Writing so device removal during copy is properly detected
+    setWriteState(WriteState::Writing);
+
     // Pause drive list polling during SPU copy operation
     _drivelist.pausePolling();
 
@@ -5030,6 +5033,8 @@ void ImageWriter::startSpuCopy(bool skipFormat)
     // Connect signals
     connect(_spuCopyThread, &SPUCopyThread::success, this, [this]() {
         qDebug() << "ImageWriter: SPU copy succeeded";
+        // Set write state to Succeeded so device removal after completion is ignored
+        setWriteState(WriteState::Succeeded);
         // Resume drive list polling and trigger immediate refresh
         _drivelist.resumePolling();
         _drivelist.refreshNow();
@@ -5038,6 +5043,8 @@ void ImageWriter::startSpuCopy(bool skipFormat)
 
     connect(_spuCopyThread, &SPUCopyThread::error, this, [this](QString msg) {
         qWarning() << "ImageWriter: SPU copy error:" << msg;
+        // Set write state to Failed
+        setWriteState(WriteState::Failed);
         // Resume drive list polling and trigger immediate refresh
         _drivelist.resumePolling();
         _drivelist.refreshNow();
