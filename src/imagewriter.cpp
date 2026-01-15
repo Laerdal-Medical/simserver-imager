@@ -1458,7 +1458,14 @@ void ImageWriter::cancelWrite()
 
     if (!_thread || !_thread->isRunning())
     {
-        emit cancelled();
+        // Thread not running - emit signal directly
+        // Check if cancellation was due to device removal
+        if (_cancelledDueToDeviceRemoval) {
+            _cancelledDueToDeviceRemoval = false;
+            emit writeCancelledDueToDeviceRemoval();
+        } else {
+            emit cancelled();
+        }
     }
 }
 

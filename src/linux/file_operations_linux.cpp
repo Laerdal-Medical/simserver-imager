@@ -161,8 +161,10 @@ void LinuxFileOperations::ProcessCompletions(bool wait) {
                 error = FileError::kCancelled;
             } else {
                 error = FileError::kWriteError;
+                // Store the errno-style error code for error reporting (only preserve the first error)
                 if (first_async_error_ == FileError::kSuccess) {
                     first_async_error_ = error;
+                    last_error_code_ = -result;
                 }
                 std::ostringstream oss;
                 oss << "io_uring write failed: " << strerror(-result);
@@ -170,8 +172,10 @@ void LinuxFileOperations::ProcessCompletions(bool wait) {
             }
         } else if (static_cast<std::size_t>(result) != expected_size) {
             error = FileError::kWriteError;
+            // Short write - use EIO as the error code (only preserve the first error)
             if (first_async_error_ == FileError::kSuccess) {
                 first_async_error_ = error;
+                last_error_code_ = EIO;
             }
             std::ostringstream oss;
             oss << "io_uring short write: expected " << expected_size << ", got " << result;
@@ -390,7 +394,11 @@ FileError LinuxFileOperations::WriteSequential(const std::uint8_t* data, std::si
     ssize_t result = write(fd_, data + bytes_written, size - bytes_written);
     if (result <= 0) {
       if (result == 0 || errno != EINTR) {
-        last_error_code_ = errno;
+        // Only update last_error_code_ if we don't already have an async error
+        // This preserves the original error for better diagnostics
+        if (first_async_error_ == FileError::kSuccess) {
+          last_error_code_ = errno;
+        }
         return FileError::kWriteError;
       }
       continue;
@@ -398,7 +406,10 @@ FileError LinuxFileOperations::WriteSequential(const std::uint8_t* data, std::si
     bytes_written += static_cast<std::size_t>(result);
   }
 
-  last_error_code_ = 0;
+  // Don't clear last_error_code_ if we have an async error
+  if (first_async_error_ == FileError::kSuccess) {
+    last_error_code_ = 0;
+  }
   
   // Update async_write_offset_ so Tell() returns correct position
   // This is needed because Seek() sets async_write_offset_, and Tell()

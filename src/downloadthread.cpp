@@ -1399,6 +1399,30 @@ void DownloadThread::_onWriteError()
     {
         _onDownloadError(tr("Error writing to storage device. Please check if the device is writable, has sufficient space, and is not write-protected."));
     }
+#else
+    // Linux/macOS: Check errno for specific error conditions
+    int lastError = _file ? _file->GetLastErrorCode() : 0;
+
+    if (lastError == ENOSPC)
+    {
+        _onDownloadError(tr("Disk is full. Please use a larger storage device."));
+    }
+    else if (lastError == EROFS || lastError == EACCES || lastError == EPERM)
+    {
+        _onDownloadError(tr("The disk is write-protected or access denied. Please check if the disk has a physical write-protect switch or if you have write permissions."));
+    }
+    else if (lastError == EIO)
+    {
+        _onDownloadError(tr("I/O device error. The storage device may have been disconnected or is malfunctioning."));
+    }
+    else if (lastError == ENXIO || lastError == ENODEV)
+    {
+        _onDownloadError(tr("Storage device not found. The device may have been disconnected."));
+    }
+    else
+    {
+        _onDownloadError(tr("Error writing to storage device. Please check if the device is writable, has sufficient space, and is not write-protected."));
+    }
 #endif
 }
 
@@ -1461,7 +1485,12 @@ void DownloadThread::_writeComplete()
         emit eventAsyncIOTiming(wallClockMs, _bytesWritten.load(), writeCount);
         
         if (asyncResult != rpi_imager::FileError::kSuccess) {
-            qDebug() << "Warning: Some async writes may have failed, error:" << static_cast<int>(asyncResult);
+            qDebug() << "Async write error detected:" << static_cast<int>(asyncResult)
+                     << "errno:" << (_file ? _file->GetLastErrorCode() : 0);
+            // Call _onWriteError() before _closeFiles() so error code is still available
+            _onWriteError();
+            _closeFiles();
+            return;
         }
     }
     
