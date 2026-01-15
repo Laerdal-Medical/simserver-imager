@@ -831,8 +831,12 @@ Item {
             if (isSpu) {
                 // SPU file - set up SPU copy mode (copies file to USB, not disk write)
                 console.log("SPU file passed as startup argument:", fileUrl)
-                root.imageWriter.setSrcSpuFile(fileUrl.toString().replace("file://", ""))
-                root.selectedOsName = root.imageWriter.srcFileName()
+                var filePath = fileUrl.toString().replace("file://", "")
+                root.imageWriter.setSrcSpuFile(filePath)
+                // Extract filename from path (srcFileName() doesn't work for SPU files)
+                var spuFileName = filePath.substring(filePath.lastIndexOf('/') + 1)
+                root.selectedOsName = spuFileName
+                root.selectedSpuName = spuFileName
                 root.isSpuCopyMode = true
                 root.customizationSupported = false
             } else {

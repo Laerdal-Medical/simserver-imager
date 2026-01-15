@@ -208,7 +208,7 @@ WizardStepBase {
                         }
 
                         Text {
-                            text: wizardContainer.selectedDeviceName || qsTr("None selected")
+                            text: wizardContainer.selectedStorageName || qsTr("None selected")
                             font.pixelSize: Style.fontSizeDescription
                             font.family: Style.fontFamilyBold
                             font.bold: true
