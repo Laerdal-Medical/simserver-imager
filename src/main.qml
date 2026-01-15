@@ -244,61 +244,89 @@ ApplicationWindow {
 
         // Register focus groups when component is ready
         Component.onCompleted: {
-            registerFocusGroup("content", function(){ 
+            registerFocusGroup("content", function(){
                 // Only include text elements when screen reader is active (otherwise they're not focusable)
                 if (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) {
                     return [storageRemovedTitle, storageRemovedMessage]
                 }
                 return []
             }, 0)
-            registerFocusGroup("buttons", function(){ 
-                return [storageOkButton] 
+            registerFocusGroup("buttons", function(){
+                return [storageOkButton]
             }, 1)
         }
 
-        // Dialog content
-        Text {
-            id: storageRemovedTitle
-            text: qsTr("Storage device removed")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
+        // Dialog content with warning icon
+        ColumnLayout {
             Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.focusable: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-        }
+            spacing: Style.spacingLarge
 
-        Text {
-            id: storageRemovedMessage
-            text: qsTr("The storage device was removed while writing, so the operation was cancelled. Please reinsert the device or select a different one to continue.")
-            wrapMode: Text.WordWrap
-            font.pixelSize: Style.fontSizeDescription
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-            Accessible.focusable: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
+            // Warning icon circle
+            Rectangle {
+                Layout.preferredWidth: 60
+                Layout.preferredHeight: 60
+                Layout.alignment: Qt.AlignHCenter
+                radius: 30
+                color: Style.warningTextColor
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "!"
+                    font.pixelSize: 32
+                    font.bold: true
+                    color: "white"
+                }
+            }
+
+            Text {
+                id: storageRemovedTitle
+                text: qsTr("Storage device removed")
+                font.pixelSize: Style.fontSizeHeading
+                font.family: Style.fontFamilyBold
+                font.bold: true
+                color: Style.formLabelColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                Accessible.role: Accessible.Heading
+                Accessible.name: text
+                Accessible.focusable: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
+                focusPolicy: (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
+                activeFocusOnTab: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
+            }
+
+            Text {
+                id: storageRemovedMessage
+                text: qsTr("The selected storage device is no longer available. Please reinsert the device or select a different one to continue.")
+                wrapMode: Text.WordWrap
+                font.pixelSize: Style.fontSizeDescription
+                font.family: Style.fontFamily
+                color: Style.textDescriptionColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+                Accessible.focusable: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
+                focusPolicy: (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
+                activeFocusOnTab: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
+            }
         }
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.topMargin: Style.spacingMedium
             spacing: Style.spacingMedium
             Item {
                 Layout.fillWidth: true
             }
-            ImButtonRed {
+            ImButton {
                 id: storageOkButton
                 text: qsTr("OK")
                 accessibleDescription: qsTr("Close the storage removed notification and return to storage selection")
                 activeFocusOnTab: true
                 onClicked: storageRemovedDialog.close()
+            }
+            Item {
+                Layout.fillWidth: true
             }
         }
     }
