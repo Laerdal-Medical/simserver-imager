@@ -153,265 +153,48 @@ ApplicationWindow {
         }
     }
 
-    // Modern error dialog (replaces legacy MsgPopup for error/info cases)
-    BaseDialog {
+    // Error dialog for displaying application errors
+    MessageDialog {
         id: errorDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
-        anchors.centerIn: parent
 
-        property string titleText: qsTr("Error")
-        property string message: ""
+        // Alias for backward compatibility with existing code
+        property alias titleText: errorDialog.dialogTitle
 
-        // Custom escape handling
-        function escapePressed() {
-            errorDialog.close()
-        }
-
-        // Register focus groups when component is ready
-        Component.onCompleted: {
-            registerFocusGroup("content", function(){ 
-                // Only include text elements when screen reader is active (otherwise they're not focusable)
-                if (errorDialog.imageWriter && errorDialog.imageWriter.isScreenReaderActive()) {
-                    return [errorTitle, errorMessage]
-                }
-                return []
-            }, 0)
-            registerFocusGroup("buttons", function(){ 
-                return [errorContinueButton] 
-            }, 1)
-        }
-
-        // Dialog content
-        Text {
-            id: errorTitle
-            text: errorDialog.titleText
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.focusable: errorDialog.imageWriter ? errorDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (errorDialog.imageWriter && errorDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: errorDialog.imageWriter ? errorDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        Text {
-            id: errorMessage
-            text: errorDialog.message
-            textFormat: Text.StyledText
-            wrapMode: Text.WordWrap
-            font.pixelSize: Style.fontSizeDescription
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text.replace(/<[^>]+>/g, '')  // Strip HTML tags for accessibility
-            Accessible.focusable: errorDialog.imageWriter ? errorDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (errorDialog.imageWriter && errorDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: errorDialog.imageWriter ? errorDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-            Item {
-                Layout.fillWidth: true
-            }
-            ImButton {
-                id: errorContinueButton
-                text: CommonStrings.continueText
-                accessibleDescription: qsTr("Close the error dialog and continue")
-                activeFocusOnTab: true
-                onClicked: errorDialog.close()
-            }
-        }
+        dialogTitle: qsTr("Error")
+        buttonText: CommonStrings.continueText
+        buttonAccessibleDescription: qsTr("Close the error dialog and continue")
     }
 
-    // Specific dialog for storage removal during write
-    BaseDialog {
+    // Warning dialog for storage removal during write
+    WarningDialog {
         id: storageRemovedDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
-        anchors.centerIn: parent
 
-        // Custom escape handling
-        function escapePressed() {
-            storageRemovedDialog.close()
-        }
-
-        // Register focus groups when component is ready
-        Component.onCompleted: {
-            registerFocusGroup("content", function(){
-                // Only include text elements when screen reader is active (otherwise they're not focusable)
-                if (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) {
-                    return [storageRemovedTitle, storageRemovedMessage]
-                }
-                return []
-            }, 0)
-            registerFocusGroup("buttons", function(){
-                return [storageOkButton]
-            }, 1)
-        }
-
-        // Dialog content with warning icon
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingLarge
-
-            // Warning icon circle
-            Rectangle {
-                Layout.preferredWidth: 60
-                Layout.preferredHeight: 60
-                Layout.alignment: Qt.AlignHCenter
-                radius: 30
-                color: Style.warningTextColor
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "!"
-                    font.pixelSize: 32
-                    font.bold: true
-                    color: "white"
-                }
-            }
-
-            Text {
-                id: storageRemovedTitle
-                text: qsTr("Storage device removed")
-                font.pixelSize: Style.fontSizeHeading
-                font.family: Style.fontFamilyBold
-                font.bold: true
-                color: Style.formLabelColor
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                Accessible.role: Accessible.Heading
-                Accessible.name: text
-                Accessible.focusable: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-                focusPolicy: (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-                activeFocusOnTab: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-            }
-
-            Text {
-                id: storageRemovedMessage
-                text: qsTr("The selected storage device is no longer available. Please reinsert the device or select a different one to continue.")
-                wrapMode: Text.WordWrap
-                font.pixelSize: Style.fontSizeDescription
-                font.family: Style.fontFamily
-                color: Style.textDescriptionColor
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                Accessible.role: Accessible.StaticText
-                Accessible.name: text
-                Accessible.focusable: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-                focusPolicy: (storageRemovedDialog.imageWriter && storageRemovedDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-                activeFocusOnTab: storageRemovedDialog.imageWriter ? storageRemovedDialog.imageWriter.isScreenReaderActive() : false
-            }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.topMargin: Style.spacingMedium
-            spacing: Style.spacingMedium
-            Item {
-                Layout.fillWidth: true
-            }
-            ImButton {
-                id: storageOkButton
-                text: qsTr("OK")
-                accessibleDescription: qsTr("Close the storage removed notification and return to storage selection")
-                activeFocusOnTab: true
-                onClicked: storageRemovedDialog.close()
-            }
-            Item {
-                Layout.fillWidth: true
-            }
-        }
+        dialogTitle: qsTr("Storage device removed")
+        message: qsTr("The selected storage device is no longer available. Please reinsert the device or select a different one to continue.")
+        buttonText: qsTr("OK")
+        buttonAccessibleDescription: qsTr("Close the storage removed notification and return to storage selection")
     }
 
-    // Quit dialog (modern style)
-    BaseDialog {
+    // Quit confirmation dialog
+    ConfirmDialog {
         id: quitDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
-        anchors.centerIn: parent
 
-        // Custom escape handling
-        function escapePressed() {
-            quitDialog.close()
-        }
+        dialogTitle: qsTr("Are you sure you want to quit?")
+        message: qsTr("Laerdal SimServer Imager is still busy. Are you sure you want to quit?")
+        cancelText: CommonStrings.no
+        confirmText: CommonStrings.yes
+        cancelAccessibleDescription: qsTr("Return to Laerdal SimServer Imager and continue the current operation")
+        confirmAccessibleDescription: qsTr("Force quit Laerdal SimServer Imager and cancel the current write operation")
 
-        // Register focus groups when component is ready
-        Component.onCompleted: {
-            registerFocusGroup("content", function(){ 
-                // Only include text elements when screen reader is active (otherwise they're not focusable)
-                if (quitDialog.imageWriter && quitDialog.imageWriter.isScreenReaderActive()) {
-                    return [quitTitle, quitMessage]
-                }
-                return []
-            }, 0)
-            registerFocusGroup("buttons", function(){ 
-                return [quitNoButton, quitYesButton] 
-            }, 1)
-        }
-
-        // Dialog content
-        Text {
-            id: quitTitle
-            text: qsTr("Are you sure you want to quit?")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-            Accessible.focusable: quitDialog.imageWriter ? quitDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (quitDialog.imageWriter && quitDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: quitDialog.imageWriter ? quitDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        Text {
-            id: quitMessage
-            text: qsTr("Laerdal SimServer Imager is still busy. Are you sure you want to quit?")
-            font.pixelSize: Style.fontSizeDescription
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-            Accessible.focusable: quitDialog.imageWriter ? quitDialog.imageWriter.isScreenReaderActive() : false
-            focusPolicy: (quitDialog.imageWriter && quitDialog.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-            activeFocusOnTab: quitDialog.imageWriter ? quitDialog.imageWriter.isScreenReaderActive() : false
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-            Item {
-                Layout.fillWidth: true
-            }
-
-            ImButton {
-                id: quitNoButton
-                text: CommonStrings.no
-                accessibleDescription: qsTr("Return to Laerdal SimServer Imager and continue the current operation")
-                activeFocusOnTab: true
-                onClicked: quitDialog.close()
-            }
-            ImButtonRed {
-                id: quitYesButton
-                text: CommonStrings.yes
-                accessibleDescription: qsTr("Force quit Laerdal SimServer Imager and cancel the current write operation")
-                activeFocusOnTab: true
-                onClicked: {
-                    window.forceQuit = true;
-                    Qt.quit();
-                }
-            }
+        onAccepted: {
+            window.forceQuit = true
+            Qt.quit()
         }
     }
 
@@ -437,154 +220,41 @@ ApplicationWindow {
     }
 
     // Elevation request dialog - shown when write operation requires elevated privileges
-    BaseDialog {
+    ConfirmDialog {
         id: elevationDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
-        anchors.centerIn: parent
-        closePolicy: Popup.CloseOnEscape
 
-        // Register focus groups when component is ready
-        Component.onCompleted: {
-            registerFocusGroup("heading", function(){
-                return [elevationHeadingText]
-            }, 0)
-            registerFocusGroup("message", function(){
-                return [elevationMessageText]
-            }, 1)
-            registerFocusGroup("buttons", function(){
-                return [elevateButton, cancelElevationButton]
-            }, 2)
-        }
+        dialogTitle: qsTr("Administrator Privileges Required")
+        message: qsTr("Writing to storage devices requires administrator privileges.\n\nClick 'Restart as Admin' to restart the application with elevated privileges and continue writing.")
+        cancelText: qsTr("Cancel")
+        confirmText: qsTr("Restart as Admin")
+        cancelAccessibleDescription: qsTr("Cancel the write operation")
+        confirmAccessibleDescription: qsTr("Restart the application with administrator privileges to write images")
 
-        // Dialog content
-        Text {
-            id: elevationHeadingText
-            text: qsTr("Administrator Privileges Required")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelColor
-            Layout.fillWidth: true
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-        }
-
-        Text {
-            id: elevationMessageText
-            text: qsTr("Writing to storage devices requires administrator privileges.\n\nClick 'Restart as Admin' to restart the application with elevated privileges and continue writing.")
-            font.pixelSize: Style.fontSizeDescription
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacingMedium
-            Item {
-                Layout.fillWidth: true
-            }
-
-            ImButton {
-                id: cancelElevationButton
-                text: qsTr("Cancel")
-                accessibleDescription: qsTr("Cancel the write operation")
-                activeFocusOnTab: true
-                onClicked: {
-                    elevationDialog.close()
-                }
-            }
-
-            ImButtonRed {
-                id: elevateButton
-                text: qsTr("Restart as Admin")
-                accessibleDescription: qsTr("Restart the application with administrator privileges to write images")
-                activeFocusOnTab: true
-                // Make button wide enough to fit the text, with sensible bounds
-                Layout.minimumWidth: Style.buttonWidthMinimum
-                Layout.maximumWidth: Style.buttonWidthMinimum * 2  // Cap at 2x to handle long translations
-                implicitWidth: Math.max(Style.buttonWidthMinimum, implicitContentWidth + leftPadding + rightPadding)
-                onClicked: {
-                    elevationDialog.close()
-                    if (elevationDialog.imageWriter) {
-                        elevationDialog.imageWriter.requestElevationForWrite()
-                    }
-                }
-            }
+        onAccepted: {
+            window.imageWriter.requestElevationForWrite()
         }
     }
 
-    // Legacy permission warning dialog (kept for backward compatibility with permissionWarning signal)
-    BaseDialog {
+    // Permission warning dialog with optional Install Authorization action
+    ActionMessageDialog {
         id: permissionWarningDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
-        anchors.centerIn: parent
-        closePolicy: Popup.CloseOnEscape
 
-        property string warningMessage: ""
+        dialogTitle: qsTr("Permission Warning")
+        titleColor: Style.formLabelErrorColor
+        buttonText: qsTr("OK")
 
-        function showWarning(message) {
-            warningMessage = message
-            open()
-        }
+        // Install Authorization button - only shown for elevatable bundles without policy installed
+        secondaryButtonText: qsTr("Install Authorization")
+        secondaryButtonVisible: window.imageWriter && window.imageWriter.isElevatableBundle() && !window.imageWriter.hasElevationPolicyInstalled()
 
-        Text {
-            text: qsTr("Permission Warning")
-            font.pixelSize: Style.fontSizeHeading
-            font.family: Style.fontFamilyBold
-            font.bold: true
-            color: Style.formLabelErrorColor
-            Layout.fillWidth: true
-        }
-
-        Text {
-            text: permissionWarningDialog.warningMessage
-            font.pixelSize: Style.fontSizeDescription
-            font.family: Style.fontFamily
-            color: Style.textDescriptionColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
-
-        // Footer with action buttons
-        footer: RowLayout {
-            width: parent.width
-            height: Style.buttonHeightStandard + (Style.cardPadding * 2)
-            spacing: Style.spacingMedium
-
-            // Left padding
-            Item { Layout.preferredWidth: Style.cardPadding }
-
-            // Install Authorization button - only shown for elevatable bundles without policy installed
-            ImButton {
-                id: installAuthButton
-                text: qsTr("Install Authorization")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                activeFocusOnTab: true
-                visible: window.imageWriter && window.imageWriter.isElevatableBundle() && !window.imageWriter.hasElevationPolicyInstalled()
-                onClicked: {
-                    if (window.imageWriter.installElevationPolicy()) {
-                        permissionWarningDialog.close()
-                    }
-                }
+        onSecondaryAction: {
+            if (window.imageWriter.installElevationPolicy()) {
+                permissionWarningDialog.close()
             }
-
-            Item { Layout.fillWidth: true }
-
-            ImButton {
-                text: qsTr("OK")
-                Layout.preferredHeight: Style.buttonHeightStandard
-                activeFocusOnTab: true
-                onClicked: permissionWarningDialog.close()
-            }
-
-            // Right padding
-            Item { Layout.preferredWidth: Style.cardPadding }
         }
     }
 

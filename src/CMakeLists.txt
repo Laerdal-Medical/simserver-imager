@@ -599,6 +599,10 @@ if(NOT BUILD_CLI_ONLY)
       wizard/dialogs/RepositorySelectionDialog.qml
       wizard/LanguageSelectionStep.qml
       qmlcomponents/BaseDialog.qml
+      qmlcomponents/MessageDialog.qml
+      qmlcomponents/ConfirmDialog.qml
+      qmlcomponents/WarningDialog.qml
+      qmlcomponents/ActionMessageDialog.qml
       qmlcomponents/ArtifactFileSelectionDialog.qml
       qmlcomponents/ArtifactDownloadProgressDialog.qml
       qmlcomponents/ResumeDownloadDialog.qml
