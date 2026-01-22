@@ -192,7 +192,7 @@ This ensures QML syntax errors and C++ compilation issues are caught before comm
 
 ### QML Linting
 
-Use `qmllint` to check QML files for issues before committing:
+Use `qmllint` to check QML files for issues before committing. **Always fix all qmllint warnings** - do not leave any unresolved.
 
 ```bash
 # Lint a specific file
@@ -207,3 +207,4 @@ Common issues qmllint catches:
 - Unqualified access to IDs from outer components (fix with `pragma ComponentBehavior: Bound` and qualified references)
 - Missing required properties in delegates
 - Type mismatches and undefined properties
+- `var` properties used as functions (use proper function declarations instead)

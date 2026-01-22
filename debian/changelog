@@ -52,8 +52,15 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
   * File Extension Registration: WIC, VSI, and SPU files are now registered
     with the OS on all platforms (Windows, macOS, Linux). Double-click image
     files to open them directly in the imager.
+  * Write Progress Display: Real-time speed (MB/s) and estimated time remaining
+    shown during write operations. Completion screen now displays write
+    statistics including total bytes written, duration, and average speed.
+  * Multi-Partition Detection: Added API to detect drives with multiple
+    partitions for improved SPU copy warnings
+  * QML Lint Compliance: Fixed unqualified property access across wizard
+    components using pragma ComponentBehavior: Bound
 
- -- Laerdal Medical <support@laerdal.com>  Wed, 15 Jan 2025 12:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Wed, 22 Jan 2025 12:00:00 +0000
 
 laerdal-simserver-imager (1.0.4) unstable; urgency=medium
 
