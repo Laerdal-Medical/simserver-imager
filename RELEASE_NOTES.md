@@ -15,6 +15,7 @@
 
 ### Improvements
 
+- **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
 - **Device Readiness Polling**: Replaced fixed sleep delays with intelligent device readiness polling across all platforms (Linux, Windows, macOS). Operations complete faster when devices are ready and wait longer when devices need more time
 - **Drive List Refresh**: Improved drive list refresh and UI updates
 - **Touch Scrolling**: Improved touch screen scrolling behavior across all list views and scrollable areas with smoother deceleration and better tap vs scroll gesture detection
@@ -23,6 +24,8 @@
 - **GitHub Artifact Handling**: Improved artifact handling and branch filtering
 - **Linux io_uring Optimization**: Limit async I/O queue depth to 4 when using O_DIRECT to prevent massive latency buildup on USB devices. Reduces end-of-write drain time from ~175 seconds to ~2 seconds
 - **Write Progress Logging**: Added periodic progress logging showing MB written, speed in MB/s, and pending writes for better diagnostics
+- **Multi-Partition Detection**: Added API to detect drives with multiple partitions for improved SPU copy warnings
+- **QML Lint Compliance**: Fixed unqualified property access across wizard components using `pragma ComponentBehavior: Bound`
 
 ### Bug Fixes
 
