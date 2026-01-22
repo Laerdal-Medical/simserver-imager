@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QThread>
 
 #include <windows.h>
@@ -256,6 +257,51 @@ bool isCompatibleFilesystem(const QString &device)
     QString fsType = detectFilesystem(device).toLower();
     // FAT32, exFAT, and NTFS are all supported by the target Linux devices
     return fsType == "fat32" || fsType == "fat" || fsType == "exfat" || fsType == "ntfs";
+}
+
+int getPartitionCount(const QString &device)
+{
+    // On Windows, we can use wmic or diskpart to get partition count
+    // For simplicity, we'll use wmic which doesn't require elevation
+
+    // Extract disk number from device path (e.g., "\\.\PhysicalDrive1" -> "1")
+    QString diskNum;
+    QRegularExpression rx("PhysicalDrive(\\d+)");
+    QRegularExpressionMatch match = rx.match(device);
+    if (match.hasMatch())
+    {
+        diskNum = match.captured(1);
+    }
+    else
+    {
+        qWarning() << "Could not parse disk number from device:" << device;
+        return 0;
+    }
+
+    // Use wmic to count partitions on this disk
+    QProcess wmic;
+    wmic.start("wmic", {"partition", "where", QString("DiskIndex=%1").arg(diskNum), "get", "Index", "/format:list"});
+
+    if (!wmic.waitForFinished(5000) || wmic.exitCode() != 0)
+    {
+        qWarning() << "Failed to run wmic for device:" << device;
+        return 0;
+    }
+
+    QString output = QString::fromUtf8(wmic.readAllStandardOutput());
+    QStringList lines = output.split('\n');
+
+    int partitionCount = 0;
+    for (const QString &line : lines)
+    {
+        if (line.trimmed().startsWith("Index="))
+        {
+            partitionCount++;
+        }
+    }
+
+    qDebug() << "Partition count for" << device << ":" << partitionCount;
+    return partitionCount;
 }
 
 } // namespace MountHelper

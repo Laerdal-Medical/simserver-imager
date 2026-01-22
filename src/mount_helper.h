@@ -66,6 +66,16 @@ bool isFat32(const QString &device);
  */
 bool isCompatibleFilesystem(const QString &device);
 
+/**
+ * @brief Count the number of partitions on a device
+ * @param device The device path (e.g., "/dev/sdb" on Linux)
+ * @return Number of partitions found, 0 if no partitions or device not found
+ *
+ * This is used to detect if a drive has multiple partitions, which would require
+ * formatting before SPU copy to ensure a clean single-partition layout.
+ */
+int getPartitionCount(const QString &device);
+
 } // namespace MountHelper
 
 #endif // MOUNT_HELPER_H

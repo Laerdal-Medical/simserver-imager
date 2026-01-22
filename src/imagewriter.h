@@ -457,6 +457,9 @@ public:
     /* Check if the selected drive has a compatible filesystem (FAT32, exFAT, or NTFS) */
     Q_INVOKABLE bool isDriveCompatibleFilesystem();
 
+    /* Check if the selected drive has more than one partition */
+    Q_INVOKABLE bool driveHasMultiplePartitions();
+
 signals:
     /* We are emiting signals with QVariant as parameters because QML likes it that way */
 

@@ -5143,3 +5143,12 @@ bool ImageWriter::isDriveCompatibleFilesystem()
 
     return MountHelper::isCompatibleFilesystem(_dst);
 }
+
+bool ImageWriter::driveHasMultiplePartitions()
+{
+    if (_dst.isEmpty()) {
+        return false;
+    }
+
+    return MountHelper::getPartitionCount(_dst) > 1;
+}

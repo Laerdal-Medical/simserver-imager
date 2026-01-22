@@ -10,6 +10,9 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QThread>
@@ -409,6 +412,78 @@ bool isCompatibleFilesystem(const QString &device)
     // FAT32, exFAT, and NTFS are all supported by the target Linux devices
     // blkid reports FAT32 as "vfat", exFAT as "exfat", NTFS as "ntfs"
     return fsType == "vfat" || fsType == "fat32" || fsType == "exfat" || fsType == "ntfs";
+}
+
+int getPartitionCount(const QString &device)
+{
+    // Extract device name from path (e.g., "/dev/sdb" -> "sdb")
+    QString devName = device;
+    if (devName.startsWith("/dev/"))
+    {
+        devName = devName.mid(5);
+    }
+
+    // Use lsblk to list partitions in JSON format
+    QProcess lsblk;
+    lsblk.start("lsblk", {"-J", "-o", "NAME,TYPE", device});
+
+    if (!lsblk.waitForFinished(5000) || lsblk.exitCode() != 0)
+    {
+        qWarning() << "Failed to run lsblk for device:" << device;
+        // Fallback: check /sys/block for partitions
+        QDir sysBlock(QString("/sys/block/%1").arg(devName));
+        if (!sysBlock.exists())
+        {
+            return 0;
+        }
+
+        int count = 0;
+        const QStringList entries = sysBlock.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &entry : entries)
+        {
+            // Partition entries start with the device name
+            if (entry.startsWith(devName))
+            {
+                count++;
+            }
+        }
+        qDebug() << "Partition count (via /sys/block) for" << device << ":" << count;
+        return count;
+    }
+
+    // Parse JSON output from lsblk
+    QString output = QString::fromUtf8(lsblk.readAllStandardOutput());
+    QJsonDocument doc = QJsonDocument::fromJson(output.toUtf8());
+
+    if (doc.isNull() || !doc.isObject())
+    {
+        qWarning() << "Failed to parse lsblk JSON output";
+        return 0;
+    }
+
+    QJsonObject root = doc.object();
+    QJsonArray blockdevices = root["blockdevices"].toArray();
+
+    int partitionCount = 0;
+
+    for (const QJsonValue &devVal : blockdevices)
+    {
+        QJsonObject devObj = devVal.toObject();
+        QJsonArray children = devObj["children"].toArray();
+
+        for (const QJsonValue &childVal : children)
+        {
+            QJsonObject childObj = childVal.toObject();
+            QString type = childObj["type"].toString();
+            if (type == "part")
+            {
+                partitionCount++;
+            }
+        }
+    }
+
+    qDebug() << "Partition count for" << device << ":" << partitionCount;
+    return partitionCount;
 }
 
 } // namespace MountHelper

@@ -311,4 +311,41 @@ bool isCompatibleFilesystem(const QString &device)
            fsType == "exfat" || fsType == "ntfs";
 }
 
+int getPartitionCount(const QString &device)
+{
+    // Use diskutil list to get partition information
+    QProcess diskutil;
+    diskutil.start("diskutil", {"list", device});
+
+    if (!diskutil.waitForFinished(5000) || diskutil.exitCode() != 0)
+    {
+        qWarning() << "Failed to run diskutil list for device:" << device;
+        return 0;
+    }
+
+    QString output = QString::fromUtf8(diskutil.readAllStandardOutput());
+    QStringList lines = output.split('\n');
+
+    int partitionCount = 0;
+    // Count lines that match partition pattern
+    // Skip the header lines and count actual partition entries
+    // Lines like "1: EFI EFI 209.7 MB disk2s1" represent partitions
+    QRegularExpression partRx("^\\s*\\d+:");
+    for (const QString &line : lines)
+    {
+        QString trimmed = line.trimmed();
+        // Skip partition scheme lines (e.g., "GUID_partition_scheme", "FDisk_partition_scheme")
+        if (partRx.match(line).hasMatch() &&
+            !trimmed.contains("GUID_partition_scheme") &&
+            !trimmed.contains("FDisk_partition_scheme") &&
+            !trimmed.contains("Apple_partition_scheme"))
+        {
+            partitionCount++;
+        }
+    }
+
+    qDebug() << "Partition count for" << device << ":" << partitionCount;
+    return partitionCount;
+}
+
 } // namespace MountHelper
