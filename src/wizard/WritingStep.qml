@@ -79,6 +79,13 @@ WizardStepBase {
     property real lastVerifyTime: 0
     property int verifyThroughputKBps: 0
 
+    // Download speed tracking
+    property real lastDownloadBytes: 0
+    property real lastDownloadTime: 0
+    property int downloadThroughputKBps: 0
+    property real downloadBytesNow: 0
+    property real downloadBytesTotal: 0
+
     // Write statistics for completion summary
     property real writeStartTime: 0
     property real writeBytesTotal: 0
@@ -353,19 +360,33 @@ WizardStepBase {
                 id: speedTimeText
                 text: {
                     var parts = []
-                    // Show verification speed during verify, write speed otherwise
-                    var throughput = root.isVerifying ? root.verifyThroughputKBps : root.writeThroughputKBps
-                    if (throughput > 0) {
-                        parts.push(Math.round(throughput / 1024) + " MB/s")
-                    }
-                    // Only show time remaining during write phase (not verification)
-                    if (!root.isVerifying) {
-                        var timeRemaining = root.calculateTimeRemaining()
-                        var timeStr = root.formatTimeRemaining(timeRemaining)
-                        if (timeStr !== "") {
-                            parts.push(timeStr)
+
+                    // Show download speed during preparation/download phase
+                    if (root.imageWriter.writeState === ImageWriter.Preparing && root.downloadThroughputKBps > 0) {
+                        parts.push(Math.round(root.downloadThroughputKBps / 1024) + " MB/s")
+                        var downloadTimeRemaining = root.calculateDownloadTimeRemaining()
+                        var downloadTimeStr = root.formatTimeRemaining(downloadTimeRemaining)
+                        if (downloadTimeStr !== "") {
+                            parts.push(downloadTimeStr)
                         }
                     }
+                    // Show write/verify speed during write phase
+                    else if (root.isWriting && !root.isFinalising) {
+                        // Show verification speed during verify, write speed otherwise
+                        var throughput = root.isVerifying ? root.verifyThroughputKBps : root.writeThroughputKBps
+                        if (throughput > 0) {
+                            parts.push(Math.round(throughput / 1024) + " MB/s")
+                        }
+                        // Only show time remaining during write phase (not verification)
+                        if (!root.isVerifying) {
+                            var timeRemaining = root.calculateTimeRemaining()
+                            var timeStr = root.formatTimeRemaining(timeRemaining)
+                            if (timeStr !== "") {
+                                parts.push(timeStr)
+                            }
+                        }
+                    }
+
                     return parts.join("  •  ")
                 }
                 font.pixelSize: Style.fontSizeDescription
@@ -373,7 +394,7 @@ WizardStepBase {
                 color: Style.formLabelColor
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                visible: root.isWriting && !root.isFinalising && (root.writeThroughputKBps > 0 || root.verifyThroughputKBps > 0)
+                visible: root.isWriting && !root.isFinalising && (root.downloadThroughputKBps > 0 || root.writeThroughputKBps > 0 || root.verifyThroughputKBps > 0)
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
             }
@@ -431,6 +452,19 @@ WizardStepBase {
         }
         // throughput is in KB/s, convert to bytes/s
         var bytesPerSecond = root.writeThroughputKBps * 1024
+        return Math.ceil(remainingBytes / bytesPerSecond)
+    }
+
+    function calculateDownloadTimeRemaining(): int {
+        if (root.downloadThroughputKBps <= 0 || root.downloadBytesTotal <= 0) {
+            return -1
+        }
+        var remainingBytes = root.downloadBytesTotal - root.downloadBytesNow
+        if (remainingBytes <= 0) {
+            return 0
+        }
+        // throughput is in KB/s, convert to bytes/s
+        var bytesPerSecond = root.downloadThroughputKBps * 1024
         return Math.ceil(remainingBytes / bytesPerSecond)
     }
 
@@ -623,6 +657,12 @@ WizardStepBase {
             root.writeThroughputKBps = 0
             root.progressBytesNow = 0
             root.progressBytesTotal = 0
+            // Reset download tracking
+            root.downloadThroughputKBps = 0
+            root.lastDownloadBytes = 0
+            root.lastDownloadTime = 0
+            root.downloadBytesNow = 0
+            root.downloadBytesTotal = 0
             // Reset timing stats
             root.writeStartTime = Date.now()
             root.writeBytesTotal = 0
@@ -642,6 +682,34 @@ WizardStepBase {
             var progress = total > 0 ? (now / total) * 100 : 0
             progressBar.value = progress
             progressText.text = qsTr("Downloading... %1%").arg(Math.round(progress))
+
+            // Store current download bytes for time remaining calculation
+            root.downloadBytesNow = now
+            root.downloadBytesTotal = total
+
+            // Calculate download speed every 500ms using EMA smoothing
+            var currentTime = Date.now()
+            if (root.lastDownloadTime > 0) {
+                var timeElapsed = (currentTime - root.lastDownloadTime) / 1000  // seconds
+                if (timeElapsed >= 0.5) {  // Update every 500ms
+                    var bytesDelta = now - root.lastDownloadBytes
+                    if (bytesDelta > 0 && timeElapsed > 0) {
+                        var instantThroughputKBps = (bytesDelta / timeElapsed) / 1024
+                        // Apply exponential moving average with alpha=0.3 for smoothing
+                        var alpha = 0.3
+                        if (root.downloadThroughputKBps === 0) {
+                            root.downloadThroughputKBps = instantThroughputKBps
+                        } else {
+                            root.downloadThroughputKBps = alpha * instantThroughputKBps + (1 - alpha) * root.downloadThroughputKBps
+                        }
+                    }
+                    root.lastDownloadBytes = now
+                    root.lastDownloadTime = currentTime
+                }
+            } else {
+                root.lastDownloadTime = currentTime
+                root.lastDownloadBytes = now
+            }
         }
     }
 
@@ -651,6 +719,8 @@ WizardStepBase {
             if (root.writePhaseStartTime === 0 && now > 0) {
                 root.writePhaseStartTime = Date.now()
             }
+            // Clear download throughput when write phase begins
+            root.downloadThroughputKBps = 0
             root.progressBytesNow = now
             root.progressBytesTotal = total
             root.writeBytesTotal = total
