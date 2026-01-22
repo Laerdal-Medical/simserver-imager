@@ -3,8 +3,11 @@
  * Copyright (C) 2020 Raspberry Pi Ltd
  */
 
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 import RpiImager
@@ -30,7 +33,7 @@ WizardStepBase {
     nextButtonText: {
         if (root.isWriting) {
             // Show specific cancel text based on write state
-            if (imageWriter.writeState === ImageWriter.Verifying) {
+            if (root.imageWriter.writeState === ImageWriter.Verifying) {
                 return qsTr("Skip verification")
             } else {
                 return qsTr("Cancel write")
@@ -43,7 +46,7 @@ WizardStepBase {
     }
     nextButtonAccessibleDescription: {
         if (root.isWriting) {
-            if (imageWriter.writeState === ImageWriter.Verifying) {
+            if (root.imageWriter.writeState === ImageWriter.Verifying) {
                 return qsTr("Skip verification and finish the write process")
             } else {
                 return qsTr("Cancel the write operation and return to the summary")
@@ -55,7 +58,7 @@ WizardStepBase {
         }
     }
     backButtonAccessibleDescription: qsTr("Return to previous customization step")
-    nextButtonEnabled: root.isWriting || root.isComplete || imageWriter.readyToWrite()
+    nextButtonEnabled: root.isWriting || root.isComplete || root.imageWriter.readyToWrite()
     showBackButton: true
 
     property bool isWriting: false
@@ -66,15 +69,32 @@ WizardStepBase {
     property bool confirmOpen: false
     property string bottleneckStatus: ""
     property int writeThroughputKBps: 0
+
+    // Progress tracking for speed and time estimation
+    property real progressBytesNow: 0
+    property real progressBytesTotal: 0
+
+    // Verification speed tracking
+    property real lastVerifyBytes: 0
+    property real lastVerifyTime: 0
+    property int verifyThroughputKBps: 0
+
+    // Write statistics for completion summary
+    property real writeStartTime: 0
+    property real writeBytesTotal: 0
+    property real writeDurationSecs: 0
+    property real verifyDurationSecs: 0
+    property real writePhaseStartTime: 0
+    property real verifyPhaseStartTime: 0
     readonly property bool anyCustomizationsApplied: (
-        wizardContainer.customizationSupported && (
-            wizardContainer.hostnameConfigured ||
-            wizardContainer.localeConfigured ||
-            wizardContainer.userConfigured ||
-            wizardContainer.wifiConfigured ||
-            wizardContainer.sshEnabled ||
-            wizardContainer.piConnectEnabled ||
-            wizardContainer.featUsbGadgetEnabled
+        root.wizardContainer.customizationSupported && (
+            root.wizardContainer.hostnameConfigured ||
+            root.wizardContainer.localeConfigured ||
+            root.wizardContainer.userConfigured ||
+            root.wizardContainer.wifiConfigured ||
+            root.wizardContainer.sshEnabled ||
+            root.wizardContainer.piConnectEnabled ||
+            root.wizardContainer.featUsbGadgetEnabled
         )
     )
 
@@ -129,7 +149,7 @@ WizardStepBase {
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
                     Accessible.role: Accessible.StaticText
-                    Accessible.name: text + ": " + (wizardContainer.selectedDeviceName || CommonStrings.noDeviceSelected)
+                    Accessible.name: text + ": " + (root.wizardContainer.selectedDeviceName || CommonStrings.noDeviceSelected)
                     Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
                     focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
                     activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
@@ -137,7 +157,7 @@ WizardStepBase {
 
                 MarqueeText {
                     id: deviceValue
-                    text: wizardContainer.selectedDeviceName || CommonStrings.noDeviceSelected
+                    text: root.wizardContainer.selectedDeviceName || CommonStrings.noDeviceSelected
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamilyBold
                     font.bold: true
@@ -153,7 +173,7 @@ WizardStepBase {
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
                     Accessible.role: Accessible.StaticText
-                    Accessible.name: text + " " + (wizardContainer.selectedOsName || CommonStrings.noImageSelected)
+                    Accessible.name: text + " " + (root.wizardContainer.selectedOsName || CommonStrings.noImageSelected)
                     Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
                     focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
                     activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
@@ -161,7 +181,7 @@ WizardStepBase {
 
                 MarqueeText {
                     id: osValue
-                    text: wizardContainer.selectedOsName || CommonStrings.noImageSelected
+                    text: root.wizardContainer.selectedOsName || CommonStrings.noImageSelected
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamilyBold
                     font.bold: true
@@ -177,7 +197,7 @@ WizardStepBase {
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
                     Accessible.role: Accessible.StaticText
-                    Accessible.name: text + ": " + (wizardContainer.selectedStorageName || CommonStrings.noStorageSelected)
+                    Accessible.name: text + ": " + (root.wizardContainer.selectedStorageName || CommonStrings.noStorageSelected)
                     Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
                     focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
                     activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
@@ -185,7 +205,7 @@ WizardStepBase {
 
                 MarqueeText {
                     id: storageValue
-                    text: wizardContainer.selectedStorageName || CommonStrings.noStorageSelected
+                    text: root.wizardContainer.selectedStorageName || CommonStrings.noStorageSelected
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamilyBold
                     font.bold: true
@@ -231,18 +251,18 @@ WizardStepBase {
                 Accessible.name: {
                     // Build a list of visible customizations to announce
                     var items = []
-                    if (wizardContainer.hostnameConfigured) items.push(CommonStrings.hostnameConfigured)
-                    if (wizardContainer.localeConfigured) items.push(CommonStrings.localeConfigured)
-                    if (wizardContainer.userConfigured) items.push(CommonStrings.userAccountConfigured)
-                    if (wizardContainer.wifiConfigured) items.push(CommonStrings.wifiConfigured)
-                    if (wizardContainer.sshEnabled) items.push(CommonStrings.sshEnabled)
-                    if (wizardContainer.piConnectEnabled) items.push(CommonStrings.piConnectEnabled)
-                    if (wizardContainer.featUsbGadgetEnabled) items.push(CommonStrings.usbGadgetEnabled)
-                    if (wizardContainer.ifI2cEnabled) items.push(CommonStrings.i2cEnabled)
-                    if (wizardContainer.ifSpiEnabled) items.push(CommonStrings.spiEnabled)
-                    if (wizardContainer.if1WireEnabled) items.push(CommonStrings.onewireEnabled)
-                    if (wizardContainer.ifSerial !== "" && wizardContainer.ifSerial !== "Disabled") items.push(CommonStrings.serialConfigured)
-                    
+                    if (root.wizardContainer.hostnameConfigured) items.push(CommonStrings.hostnameConfigured)
+                    if (root.wizardContainer.localeConfigured) items.push(CommonStrings.localeConfigured)
+                    if (root.wizardContainer.userConfigured) items.push(CommonStrings.userAccountConfigured)
+                    if (root.wizardContainer.wifiConfigured) items.push(CommonStrings.wifiConfigured)
+                    if (root.wizardContainer.sshEnabled) items.push(CommonStrings.sshEnabled)
+                    if (root.wizardContainer.piConnectEnabled) items.push(CommonStrings.piConnectEnabled)
+                    if (root.wizardContainer.featUsbGadgetEnabled) items.push(CommonStrings.usbGadgetEnabled)
+                    if (root.wizardContainer.ifI2cEnabled) items.push(CommonStrings.i2cEnabled)
+                    if (root.wizardContainer.ifSpiEnabled) items.push(CommonStrings.spiEnabled)
+                    if (root.wizardContainer.if1WireEnabled) items.push(CommonStrings.onewireEnabled)
+                    if (root.wizardContainer.ifSerial !== "" && root.wizardContainer.ifSerial !== "Disabled") items.push(CommonStrings.serialConfigured)
+
                     return items.length + " " + (items.length === 1 ? qsTr("customization") : qsTr("customizations")) + ": " + items.join(", ")
                 }
                 contentItem: Flickable {
@@ -267,17 +287,17 @@ WizardStepBase {
                         id: customizationsColumn
                         width: parent.width
                         spacing: Style.spacingXSmall
-                        Text { text: "• " + CommonStrings.hostnameConfigured;      font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.hostnameConfigured;         Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.localeConfigured;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.localeConfigured;           Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.userAccountConfigured;   font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.userConfigured;             Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.wifiConfigured;          font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.wifiConfigured;             Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.sshEnabled;              font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.sshEnabled;                 Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.piConnectEnabled;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.piConnectEnabled;           Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.usbGadgetEnabled;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.featUsbGadgetEnabled;       Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.i2cEnabled;              font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.ifI2cEnabled;               Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.spiEnabled;              font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.ifSpiEnabled;               Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.onewireEnabled;          font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.if1WireEnabled;             Accessible.role: Accessible.ListItem; Accessible.name: text }
-                        Text { text: "• " + CommonStrings.serialConfigured;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: wizardContainer.ifSerial !== "" && wizardContainer.ifSerial !== "Disabled"; Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.hostnameConfigured;      font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.hostnameConfigured;         Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.localeConfigured;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.localeConfigured;           Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.userAccountConfigured;   font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.userConfigured;             Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.wifiConfigured;          font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.wifiConfigured;             Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.sshEnabled;              font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.sshEnabled;                 Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.piConnectEnabled;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.piConnectEnabled;           Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.usbGadgetEnabled;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.featUsbGadgetEnabled;       Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.i2cEnabled;              font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.ifI2cEnabled;               Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.spiEnabled;              font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.ifSpiEnabled;               Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.onewireEnabled;          font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.if1WireEnabled;             Accessible.role: Accessible.ListItem; Accessible.name: text }
+                        Text { text: "• " + CommonStrings.serialConfigured;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.ifSerial !== "" && root.wizardContainer.ifSerial !== "Disabled"; Accessible.role: Accessible.ListItem; Accessible.name: text }
                     }
                 }
                 ScrollBar.vertical: ScrollBar {
@@ -328,24 +348,46 @@ WizardStepBase {
                 Accessible.description: progressText.text
             }
             
+            // Speed and time remaining display
+            Text {
+                id: speedTimeText
+                text: {
+                    var parts = []
+                    // Show verification speed during verify, write speed otherwise
+                    var throughput = root.isVerifying ? root.verifyThroughputKBps : root.writeThroughputKBps
+                    if (throughput > 0) {
+                        parts.push(Math.round(throughput / 1024) + " MB/s")
+                    }
+                    // Only show time remaining during write phase (not verification)
+                    if (!root.isVerifying) {
+                        var timeRemaining = root.calculateTimeRemaining()
+                        var timeStr = root.formatTimeRemaining(timeRemaining)
+                        if (timeStr !== "") {
+                            parts.push(timeStr)
+                        }
+                    }
+                    return parts.join("  •  ")
+                }
+                font.pixelSize: Style.fontSizeDescription
+                font.family: Style.fontFamily
+                color: Style.formLabelColor
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                visible: root.isWriting && !root.isFinalising && (root.writeThroughputKBps > 0 || root.verifyThroughputKBps > 0)
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
+
             // Bottleneck status indicator - shows what's limiting progress
             Text {
                 id: bottleneckText
-                text: {
-                    if (root.bottleneckStatus !== "") {
-                        if (root.writeThroughputKBps > 0) {
-                            return root.bottleneckStatus + " (" + Math.round(root.writeThroughputKBps / 1024) + " MB/s)"
-                        }
-                        return root.bottleneckStatus
-                    }
-                    return ""
-                }
+                text: root.bottleneckStatus
                 font.pixelSize: Style.fontSizeSmall
                 font.family: Style.fontFamily
                 color: Style.formLabelDisabledColor
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                visible: root.isWriting && root.bottleneckStatus !== ""
+                visible: root.isWriting && root.bottleneckStatus !== "" && !root.isFinalising
             }
         }
 
@@ -354,12 +396,98 @@ WizardStepBase {
     }
     ]
 
+    // Format seconds into a human-readable time string
+    function formatTimeRemaining(seconds: int): string {
+        if (seconds < 0 || !isFinite(seconds)) {
+            return ""
+        }
+        if (seconds < 60) {
+            return qsTr("%n second(s) remaining", "", seconds)
+        }
+        var minutes = Math.floor(seconds / 60)
+        var remainingSeconds = seconds % 60
+        if (minutes < 60) {
+            if (remainingSeconds > 0) {
+                return qsTr("%1 min %2 sec remaining").arg(minutes).arg(remainingSeconds)
+            }
+            return qsTr("%n minute(s) remaining", "", minutes)
+        }
+        var hours = Math.floor(minutes / 60)
+        var remainingMinutes = minutes % 60
+        if (remainingMinutes > 0) {
+            return qsTr("%1 hr %2 min remaining").arg(hours).arg(remainingMinutes)
+        }
+        return qsTr("%n hour(s) remaining", "", hours)
+    }
+
+    // Calculate estimated time remaining based on current speed
+    function calculateTimeRemaining(): int {
+        if (root.writeThroughputKBps <= 0 || root.progressBytesTotal <= 0) {
+            return -1
+        }
+        var remainingBytes = root.progressBytesTotal - root.progressBytesNow
+        if (remainingBytes <= 0) {
+            return 0
+        }
+        // throughput is in KB/s, convert to bytes/s
+        var bytesPerSecond = root.writeThroughputKBps * 1024
+        return Math.ceil(remainingBytes / bytesPerSecond)
+    }
+
+    // Format duration in seconds to a human-readable string
+    function formatDuration(seconds: real): string {
+        if (seconds < 0 || !isFinite(seconds)) {
+            return ""
+        }
+        var secs = Math.round(seconds)
+        if (secs < 60) {
+            return qsTr("%n second(s)", "", secs)
+        }
+        var minutes = Math.floor(secs / 60)
+        var remainingSecs = secs % 60
+        if (minutes < 60) {
+            if (remainingSecs > 0) {
+                return qsTr("%1 min %2 sec").arg(minutes).arg(remainingSecs)
+            }
+            return qsTr("%n minute(s)", "", minutes)
+        }
+        var hours = Math.floor(minutes / 60)
+        var remainingMins = minutes % 60
+        if (remainingMins > 0) {
+            return qsTr("%1 hr %2 min").arg(hours).arg(remainingMins)
+        }
+        return qsTr("%n hour(s)", "", hours)
+    }
+
+    // Format bytes to human-readable size
+    function formatBytes(bytes: real): string {
+        if (bytes < 1024) {
+            return qsTr("%1 B").arg(Math.round(bytes))
+        }
+        if (bytes < 1024 * 1024) {
+            return qsTr("%1 KB").arg(Math.round(bytes / 1024))
+        }
+        if (bytes < 1024 * 1024 * 1024) {
+            return qsTr("%1 MB").arg((bytes / (1024 * 1024)).toFixed(1))
+        }
+        return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(2))
+    }
+
+    // Calculate average speed in MB/s
+    function calculateAverageSpeed(bytes: real, seconds: real): string {
+        if (seconds <= 0 || bytes <= 0) {
+            return ""
+        }
+        var mbps = bytes / (1024 * 1024) / seconds
+        return qsTr("%1 MB/s").arg(mbps.toFixed(1))
+    }
+
     // Handle next button clicks based on current state
     onNextClicked: {
         if (root.isWriting) {
             // If we're in verification phase, skip verification and let write complete successfully
-            if (imageWriter.writeState === ImageWriter.Verifying) {
-                imageWriter.skipCurrentVerification()
+            if (root.imageWriter.writeState === ImageWriter.Verifying) {
+                root.imageWriter.skipCurrentVerification()
             } else {
                 // Cancel the actual write operation
                 root.cancelPending = true
@@ -367,11 +495,11 @@ WizardStepBase {
                 root.isFinalising = true
                 progressBar.value = 100
                 progressText.text = qsTr("Finalising…")
-                imageWriter.cancelWrite()
+                root.imageWriter.cancelWrite()
             }
         } else if (!root.isComplete) {
             // If warnings are disabled, skip the confirmation dialog
-            if (wizardContainer.disableWarnings) {
+            if (root.wizardContainer.disableWarnings) {
                 beginWriteDelay.start()
             } else {
                 // Open confirmation dialog before starting
@@ -379,7 +507,7 @@ WizardStepBase {
             }
         } else {
             // Writing is complete, advance to next step
-            wizardContainer.nextStep()
+            root.wizardContainer.nextStep()
         }
     }
 
@@ -401,7 +529,7 @@ WizardStepBase {
         headerIconBackgroundColor: Style.warningTextColor
         headerIconText: "!"
         headerIconAccessibleName: qsTr("Warning icon")
-        title: qsTr("You are about to ERASE all data on:\n%1").arg(wizardContainer.selectedStorageName || qsTr("the storage device"))
+        title: qsTr("You are about to ERASE all data on:\n%1").arg(root.wizardContainer.selectedStorageName || qsTr("the storage device"))
         titleColor: Style.formLabelErrorColor
 
         // Message content
@@ -490,12 +618,21 @@ WizardStepBase {
             // Ensure our window regains focus before elevating privileges
             root.forceActiveFocus()
             root.isWriting = true
-            wizardContainer.isWriting = true
+            root.wizardContainer.isWriting = true
             root.bottleneckStatus = ""
             root.writeThroughputKBps = 0
+            root.progressBytesNow = 0
+            root.progressBytesTotal = 0
+            // Reset timing stats
+            root.writeStartTime = Date.now()
+            root.writeBytesTotal = 0
+            root.writeDurationSecs = 0
+            root.verifyDurationSecs = 0
+            root.writePhaseStartTime = 0
+            root.verifyPhaseStartTime = 0
             progressText.text = qsTr("Starting write process...")
             progressBar.value = 0
-            Qt.callLater(function(){ imageWriter.startWrite() })
+            Qt.callLater(function(){ root.imageWriter.startWrite() })
         }
     }
 
@@ -510,6 +647,13 @@ WizardStepBase {
 
     function onWriteProgress(now, total) {
         if (root.isWriting) {
+            // Track when write phase actually starts
+            if (root.writePhaseStartTime === 0 && now > 0) {
+                root.writePhaseStartTime = Date.now()
+            }
+            root.progressBytesNow = now
+            root.progressBytesTotal = total
+            root.writeBytesTotal = total
             var progress = total > 0 ? (now / total) * 100 : 0
             progressBar.value = progress
             progressText.text = qsTr("Writing... %1%").arg(Math.round(progress))
@@ -518,7 +662,33 @@ WizardStepBase {
 
     function onVerifyProgress(now, total) {
         if (root.isWriting) {
-            root.isVerifying = true
+            // When verification starts, record write phase duration
+            if (!root.isVerifying) {
+                root.isVerifying = true
+                if (root.writePhaseStartTime > 0) {
+                    root.writeDurationSecs = (Date.now() - root.writePhaseStartTime) / 1000
+                }
+                root.verifyPhaseStartTime = Date.now()
+                root.lastVerifyBytes = 0
+                root.lastVerifyTime = Date.now()
+                root.verifyThroughputKBps = 0
+            }
+
+            // Calculate verification throughput
+            var currentTime = Date.now()
+            var timeDelta = currentTime - root.lastVerifyTime
+            if (timeDelta >= 500) {  // Update every 500ms for smooth display
+                var bytesDelta = now - root.lastVerifyBytes
+                if (bytesDelta > 0 && timeDelta > 0) {
+                    // Calculate KB/s: (bytes / 1024) / (ms / 1000) = bytes * 1000 / 1024 / ms
+                    root.verifyThroughputKBps = Math.round((bytesDelta * 1000) / (1024 * timeDelta))
+                }
+                root.lastVerifyBytes = now
+                root.lastVerifyTime = currentTime
+            }
+
+            root.progressBytesNow = now
+            root.progressBytesTotal = total
             root.bottleneckStatus = ""  // Clear write bottleneck during verification
             var progress = total > 0 ? (now / total) * 100 : 0
             progressBar.value = progress
@@ -534,21 +704,69 @@ WizardStepBase {
 
     // Update isWriting state when write completes
     Connections {
-        target: imageWriter
+        target: root.imageWriter
         function onSuccess() {
             root.isWriting = false
-            wizardContainer.isWriting = false
+            root.wizardContainer.isWriting = false
             root.cancelPending = false
             root.isFinalising = false
             root.isComplete = true
-            progressText.text = qsTr("Write completed successfully!")
+
+            // Calculate final timing stats
+            var now = Date.now()
+            if (root.verifyPhaseStartTime > 0) {
+                root.verifyDurationSecs = (now - root.verifyPhaseStartTime) / 1000
+            } else if (root.writePhaseStartTime > 0 && root.writeDurationSecs === 0) {
+                // No verification phase, write lasted until now
+                root.writeDurationSecs = (now - root.writePhaseStartTime) / 1000
+            }
+
+            // Build completion summary
+            var summary = qsTr("Write completed successfully!")
+            var details = []
+            if (root.writeBytesTotal > 0 && root.writeDurationSecs > 0) {
+                details.push(qsTr("Write: %1 in %2 (%3)")
+                    .arg(root.formatBytes(root.writeBytesTotal))
+                    .arg(root.formatDuration(root.writeDurationSecs))
+                    .arg(root.calculateAverageSpeed(root.writeBytesTotal, root.writeDurationSecs)))
+            }
+            if (root.verifyDurationSecs > 0) {
+                details.push(qsTr("Verify: %1 (%2)")
+                    .arg(root.formatDuration(root.verifyDurationSecs))
+                    .arg(root.calculateAverageSpeed(root.writeBytesTotal, root.verifyDurationSecs)))
+            }
+            if (details.length > 0) {
+                summary += "\n" + details.join("\n")
+            }
+            progressText.text = summary
+
+            // Save write statistics to completion snapshot for display on Done screen
+            root.wizardContainer.completionSnapshot = {
+                // Customization flags
+                customizationSupported: root.wizardContainer.customizationSupported,
+                hostnameConfigured: root.wizardContainer.hostnameConfigured,
+                localeConfigured: root.wizardContainer.localeConfigured,
+                userConfigured: root.wizardContainer.userConfigured,
+                wifiConfigured: root.wizardContainer.wifiConfigured,
+                sshEnabled: root.wizardContainer.sshEnabled,
+                piConnectEnabled: root.wizardContainer.piConnectEnabled,
+                ifI2cEnabled: root.wizardContainer.ifI2cEnabled,
+                ifSpiEnabled: root.wizardContainer.ifSpiEnabled,
+                if1WireEnabled: root.wizardContainer.if1WireEnabled,
+                ifSerial: root.wizardContainer.ifSerial,
+                featUsbGadgetEnabled: root.wizardContainer.featUsbGadgetEnabled,
+                // Write statistics
+                writeBytesTotal: root.writeBytesTotal,
+                writeDurationSecs: root.writeDurationSecs,
+                verifyDurationSecs: root.verifyDurationSecs
+            }
 
             // Automatically advance to the done screen
-            wizardContainer.nextStep()
+            root.wizardContainer.nextStep()
         }
         function onError(msg) {
             root.isWriting = false
-            wizardContainer.isWriting = false
+            root.wizardContainer.isWriting = false
             root.cancelPending = false
             root.isFinalising = false
             progressText.text = qsTr("Write failed: %1").arg(msg)

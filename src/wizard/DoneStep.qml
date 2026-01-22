@@ -39,7 +39,43 @@ WizardStepBase {
             wizardContainer.completionSnapshot.featUsbGadgetEnabled
         )
     )
-    
+
+    // Check if we have write statistics to display
+    readonly property bool hasWriteStats: (
+        wizardContainer.completionSnapshot.writeBytesTotal > 0 &&
+        wizardContainer.completionSnapshot.writeDurationSecs > 0
+    )
+
+    // Helper functions for formatting statistics
+    function formatDuration(seconds) {
+        if (seconds < 60) {
+            return qsTr("%1 sec").arg(Math.round(seconds))
+        } else {
+            var mins = Math.floor(seconds / 60)
+            var secs = Math.round(seconds % 60)
+            if (secs === 0) {
+                return qsTr("%1 min").arg(mins)
+            }
+            return qsTr("%1 min %2 sec").arg(mins).arg(secs)
+        }
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024 * 1024) {
+            return qsTr("%1 KB").arg((bytes / 1024).toFixed(1))
+        } else if (bytes < 1024 * 1024 * 1024) {
+            return qsTr("%1 MB").arg((bytes / (1024 * 1024)).toFixed(1))
+        } else {
+            return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(2))
+        }
+    }
+
+    function calculateAverageSpeed(bytes, seconds) {
+        if (seconds <= 0) return ""
+        var mbps = bytes / (1024 * 1024) / seconds
+        return qsTr("%1 MB/s").arg(mbps.toFixed(1))
+    }
+
     // Content
     content: [
     ColumnLayout {
@@ -322,6 +358,72 @@ WizardStepBase {
                 }
                 ScrollBar.vertical: ScrollBar { policy: contentItem.implicitHeight > height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff; width: Style.scrollBarWidth }
             }
+
+            // Write statistics section
+            Text {
+                id: statsHeading
+                text: qsTr("Write statistics:")
+                font.pixelSize: Style.fontSizeFormLabel
+                font.family: Style.fontFamilyBold
+                font.bold: true
+                color: Style.formLabelColor
+                Layout.fillWidth: true
+                Layout.topMargin: Style.spacingSmall
+                visible: root.hasWriteStats
+                Accessible.role: Accessible.Heading
+                Accessible.name: text
+            }
+
+            GridLayout {
+                id: statsGrid
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: Style.formColumnSpacing
+                rowSpacing: Style.spacingSmall
+                visible: root.hasWriteStats
+
+                // Write row
+                Text {
+                    text: qsTr("Write:")
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamily
+                    color: Style.formLabelColor
+                    visible: wizardContainer.completionSnapshot.writeBytesTotal > 0 && wizardContainer.completionSnapshot.writeDurationSecs > 0
+                }
+                Text {
+                    text: qsTr("%1 in %2 (%3)")
+                        .arg(root.formatBytes(wizardContainer.completionSnapshot.writeBytesTotal))
+                        .arg(root.formatDuration(wizardContainer.completionSnapshot.writeDurationSecs))
+                        .arg(root.calculateAverageSpeed(wizardContainer.completionSnapshot.writeBytesTotal, wizardContainer.completionSnapshot.writeDurationSecs))
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamilyBold
+                    font.bold: true
+                    color: Style.formLabelColor
+                    Layout.fillWidth: true
+                    visible: wizardContainer.completionSnapshot.writeBytesTotal > 0 && wizardContainer.completionSnapshot.writeDurationSecs > 0
+                }
+
+                // Verify row
+                Text {
+                    text: qsTr("Verify:")
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamily
+                    color: Style.formLabelColor
+                    visible: wizardContainer.completionSnapshot.verifyDurationSecs > 0
+                }
+                Text {
+                    text: qsTr("%1 (%2)")
+                        .arg(root.formatDuration(wizardContainer.completionSnapshot.verifyDurationSecs))
+                        .arg(root.calculateAverageSpeed(wizardContainer.completionSnapshot.writeBytesTotal, wizardContainer.completionSnapshot.verifyDurationSecs))
+                    font.pixelSize: Style.fontSizeDescription
+                    font.family: Style.fontFamilyBold
+                    font.bold: true
+                    color: Style.formLabelColor
+                    Layout.fillWidth: true
+                    visible: wizardContainer.completionSnapshot.verifyDurationSecs > 0
+                }
+            }
+
             Text {
                 id: ejectInstruction
                 text: root.autoEjectEnabled ? qsTr("The storage device was ejected automatically. You can now remove it safely.") : qsTr("Please eject the storage device before removing it from your computer.")

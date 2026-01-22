@@ -108,7 +108,11 @@ Item {
         ifSpiEnabled: false,
         if1WireEnabled: false,
         ifSerial: "",
-        featUsbGadgetEnabled: false
+        featUsbGadgetEnabled: false,
+        // Write statistics
+        writeBytesTotal: 0,
+        writeDurationSecs: 0,
+        verifyDurationSecs: 0
     })
     
     // Laerdal simplified wizard steps enum
