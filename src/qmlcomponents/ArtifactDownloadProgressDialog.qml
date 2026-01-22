@@ -23,6 +23,11 @@ BaseDialog {
     property string artifactName: ""
     property bool indeterminate: false
 
+    // Download speed tracking
+    property real downloadSpeedMbps: 0  // Megabits per second
+    property real lastBytesReceived: 0
+    property real lastUpdateTime: 0
+
     // Signal emitted when user cancels download
     signal cancelled()
 
@@ -136,7 +141,16 @@ BaseDialog {
             // Progress text centered over the bar
             Text {
                 anchors.centerIn: parent
-                text: root.indeterminate ? qsTr("Connecting...") : qsTr("%1%").arg(root.progressPercent)
+                text: {
+                    if (root.indeterminate) {
+                        return qsTr("Connecting...")
+                    }
+                    var parts = [qsTr("%1%").arg(root.progressPercent)]
+                    if (root.downloadSpeedMbps > 0) {
+                        parts.push(Math.round(root.downloadSpeedMbps) + " Mbps")
+                    }
+                    return parts.join("  •  ")
+                }
                 color: Style.formLabelColor
                 font.pixelSize: Style.fontSizeSm
                 font.family: Style.fontFamily
@@ -168,7 +182,28 @@ BaseDialog {
     onOpened: {
         root.progress = 0
         root.indeterminate = true
+        root.downloadSpeedMbps = 0
+        root.lastBytesReceived = 0
+        root.lastUpdateTime = 0
         cancelButton.forceActiveFocus()
+    }
+
+    // Update download speed calculation
+    function updateDownloadSpeed(bytesReceived) {
+        var result = Utils.calculateThroughputMbps(
+            bytesReceived,
+            root.lastBytesReceived,
+            root.lastUpdateTime,
+            root.downloadSpeedMbps,
+            500,  // Update every 500ms
+            0.3   // EMA smoothing factor
+        )
+
+        if (result !== null) {
+            root.downloadSpeedMbps = result.throughputMbps
+            root.lastBytesReceived = result.newLastBytes
+            root.lastUpdateTime = result.newLastTime
+        }
     }
 
     // Handle escape key

@@ -82,7 +82,7 @@ WizardStepBase {
     // Download speed tracking
     property real lastDownloadBytes: 0
     property real lastDownloadTime: 0
-    property int downloadThroughputKBps: 0
+    property real downloadThroughputMbps: 0  // Megabits per second
     property real downloadBytesNow: 0
     property real downloadBytesTotal: 0
 
@@ -362,8 +362,8 @@ WizardStepBase {
                     var parts = []
 
                     // Show download speed during preparation/download phase
-                    if (root.imageWriter.writeState === ImageWriter.Preparing && root.downloadThroughputKBps > 0) {
-                        parts.push(Math.round(root.downloadThroughputKBps / 1024) + " MB/s")
+                    if (root.imageWriter.writeState === ImageWriter.Preparing && root.downloadThroughputMbps > 0) {
+                        parts.push(Math.round(root.downloadThroughputMbps) + " Mbps")
                         var downloadTimeRemaining = root.calculateDownloadTimeRemaining()
                         var downloadTimeStr = root.formatTimeRemaining(downloadTimeRemaining)
                         if (downloadTimeStr !== "") {
@@ -394,7 +394,7 @@ WizardStepBase {
                 color: Style.formLabelColor
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                visible: root.isWriting && !root.isFinalising && (root.downloadThroughputKBps > 0 || root.writeThroughputKBps > 0 || root.verifyThroughputKBps > 0)
+                visible: root.isWriting && !root.isFinalising && (root.downloadThroughputMbps > 0 || root.writeThroughputKBps > 0 || root.verifyThroughputKBps > 0)
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
             }
@@ -456,15 +456,15 @@ WizardStepBase {
     }
 
     function calculateDownloadTimeRemaining(): int {
-        if (root.downloadThroughputKBps <= 0 || root.downloadBytesTotal <= 0) {
+        if (root.downloadThroughputMbps <= 0 || root.downloadBytesTotal <= 0) {
             return -1
         }
         var remainingBytes = root.downloadBytesTotal - root.downloadBytesNow
         if (remainingBytes <= 0) {
             return 0
         }
-        // throughput is in KB/s, convert to bytes/s
-        var bytesPerSecond = root.downloadThroughputKBps * 1024
+        // throughput is in Mbps (megabits/s), convert to bytes/s: Mbps * 1,000,000 / 8
+        var bytesPerSecond = (root.downloadThroughputMbps * 1000000) / 8
         return Math.ceil(remainingBytes / bytesPerSecond)
     }
 
@@ -658,7 +658,7 @@ WizardStepBase {
             root.progressBytesNow = 0
             root.progressBytesTotal = 0
             // Reset download tracking
-            root.downloadThroughputKBps = 0
+            root.downloadThroughputMbps = 0
             root.lastDownloadBytes = 0
             root.lastDownloadTime = 0
             root.downloadBytesNow = 0
@@ -688,27 +688,19 @@ WizardStepBase {
             root.downloadBytesTotal = total
 
             // Calculate download speed every 500ms using EMA smoothing
-            var currentTime = Date.now()
-            if (root.lastDownloadTime > 0) {
-                var timeElapsed = (currentTime - root.lastDownloadTime) / 1000  // seconds
-                if (timeElapsed >= 0.5) {  // Update every 500ms
-                    var bytesDelta = now - root.lastDownloadBytes
-                    if (bytesDelta > 0 && timeElapsed > 0) {
-                        var instantThroughputKBps = (bytesDelta / timeElapsed) / 1024
-                        // Apply exponential moving average with alpha=0.3 for smoothing
-                        var alpha = 0.3
-                        if (root.downloadThroughputKBps === 0) {
-                            root.downloadThroughputKBps = instantThroughputKBps
-                        } else {
-                            root.downloadThroughputKBps = alpha * instantThroughputKBps + (1 - alpha) * root.downloadThroughputKBps
-                        }
-                    }
-                    root.lastDownloadBytes = now
-                    root.lastDownloadTime = currentTime
-                }
-            } else {
-                root.lastDownloadTime = currentTime
-                root.lastDownloadBytes = now
+            var result = Utils.calculateThroughputMbps(
+                now,
+                root.lastDownloadBytes,
+                root.lastDownloadTime,
+                root.downloadThroughputMbps,
+                500,  // Update every 500ms
+                0.3   // EMA smoothing factor
+            )
+
+            if (result !== null) {
+                root.downloadThroughputMbps = result.throughputMbps
+                root.lastDownloadBytes = result.newLastBytes
+                root.lastDownloadTime = result.newLastTime
             }
         }
     }
@@ -720,7 +712,7 @@ WizardStepBase {
                 root.writePhaseStartTime = Date.now()
             }
             // Clear download throughput when write phase begins
-            root.downloadThroughputKBps = 0
+            root.downloadThroughputMbps = 0
             root.progressBytesNow = now
             root.progressBytesTotal = total
             root.writeBytesTotal = total
@@ -745,16 +737,17 @@ WizardStepBase {
             }
 
             // Calculate verification throughput
-            var currentTime = Date.now()
-            var timeDelta = currentTime - root.lastVerifyTime
-            if (timeDelta >= 500) {  // Update every 500ms for smooth display
-                var bytesDelta = now - root.lastVerifyBytes
-                if (bytesDelta > 0 && timeDelta > 0) {
-                    // Calculate KB/s: (bytes / 1024) / (ms / 1000) = bytes * 1000 / 1024 / ms
-                    root.verifyThroughputKBps = Math.round((bytesDelta * 1000) / (1024 * timeDelta))
-                }
-                root.lastVerifyBytes = now
-                root.lastVerifyTime = currentTime
+            var result = Utils.calculateThroughputKBps(
+                now,
+                root.lastVerifyBytes,
+                root.lastVerifyTime,
+                500  // Update every 500ms
+            )
+
+            if (result !== null) {
+                root.verifyThroughputKBps = result.throughputKBps
+                root.lastVerifyBytes = result.newLastBytes
+                root.lastVerifyTime = result.newLastTime
             }
 
             root.progressBytesNow = now

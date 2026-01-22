@@ -55,6 +55,8 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
   * Write Progress Display: Real-time speed (MB/s) and estimated time remaining
     shown during write operations. Completion screen now displays write
     statistics including total bytes written, duration, and average speed.
+  * Download Speed Display: Real-time download speed (MB/s) and estimated time
+    remaining shown during artifact downloads from GitHub CI
   * Multi-Partition Detection: Added API to detect drives with multiple
     partitions for improved SPU copy warnings
   * QML Lint Compliance: Fixed unqualified property access across wizard

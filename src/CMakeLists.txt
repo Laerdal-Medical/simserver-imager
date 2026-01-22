@@ -588,6 +588,7 @@ if(NOT BUILD_CLI_ONLY)
       main.qml
       CommonStrings.qml
       Style.qml
+      Utils.qml
       wizard/dialogs/ConfirmUnfilterDialog.qml
       wizard/dialogs/ConfirmSystemDriveDialog.qml
       wizard/dialogs/KeychainPermissionDialog.qml
@@ -651,8 +652,8 @@ if(NOT BUILD_CLI_ONLY)
       wizard/components/SshKeyManager.qml)
 
   set_source_files_properties(Style.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-  set_source_files_properties(CommonStrings.qml PROPERTIES QT_QML_SINGLETON_TYPE
-                                                           TRUE)
+  set_source_files_properties(CommonStrings.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+  set_source_files_properties(Utils.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
   # C++ types exposed to QML
   set(IMAGER_QML_CPP_TYPES imagewriter.cpp hwlistmodel.cpp oslistmodel.cpp

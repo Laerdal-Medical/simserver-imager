@@ -16,6 +16,7 @@
 ### Improvements
 
 - **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
+- **Download Speed Display**: Real-time download speed (MB/s) and estimated time remaining shown during artifact downloads from GitHub CI
 - **Device Readiness Polling**: Replaced fixed sleep delays with intelligent device readiness polling across all platforms (Linux, Windows, macOS). Operations complete faster when devices are ready and wait longer when devices need more time
 - **Drive List Refresh**: Improved drive list refresh and UI updates
 - **Touch Scrolling**: Improved touch screen scrolling behavior across all list views and scrollable areas with smoother deceleration and better tap vs scroll gesture detection
