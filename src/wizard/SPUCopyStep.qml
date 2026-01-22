@@ -58,6 +58,7 @@ WizardStepBase {
     // Format confirmation dialog state
     property bool showFormatDialog: false
     property bool driveHasCompatibleFs: false  // FAT32, exFAT, or NTFS
+    property bool driveHasMultiplePartitions: false  // Multiple partitions require formatting
 
     // Connect to ImageWriter SPU signals
     Connections {
@@ -105,8 +106,13 @@ WizardStepBase {
         } else {
             // Start copy - check if drive has a compatible filesystem (FAT32, exFAT, or NTFS)
             root.driveHasCompatibleFs = root.imageWriter.isDriveCompatibleFilesystem()
-            if (root.driveHasCompatibleFs) {
-                // Already has compatible filesystem - copy directly (existing SPU files will be deleted)
+            root.driveHasMultiplePartitions = root.imageWriter.driveHasMultiplePartitions()
+
+            if (root.driveHasMultiplePartitions) {
+                // Multiple partitions - must format to create a single FAT32 partition
+                root.showFormatDialog = true
+            } else if (root.driveHasCompatibleFs) {
+                // Single partition with compatible filesystem - copy directly (existing SPU files will be deleted)
                 startCopy(true) // skipFormat = true
             } else {
                 // Not a compatible filesystem - ask for confirmation before formatting
@@ -268,7 +274,9 @@ WizardStepBase {
                             }
 
                             Text {
-                                text: qsTr("The USB drive is not FAT32 formatted. It must be formatted before copying the SPU file. All data on the drive will be erased.")
+                                text: root.driveHasMultiplePartitions
+                                    ? qsTr("The USB drive has multiple partitions. It must be formatted to create a single FAT32 partition before copying the SPU file. All data on the drive will be erased.")
+                                    : qsTr("The USB drive is not FAT32 formatted. It must be formatted before copying the SPU file. All data on the drive will be erased.")
                                 font.pixelSize: Style.fontSizeDescription
                                 font.family: Style.fontFamily
                                 color: Style.formLabelColor

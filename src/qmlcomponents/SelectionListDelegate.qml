@@ -70,10 +70,34 @@ Item {
     // Icon size
     property int iconSize: 40
 
+    // Cached style properties for use in nested components
+    readonly property int styleScrollBarWidth: Style.scrollBarWidth
+    readonly property color styleListViewHighlightColor: Style.listViewHighlightColor
+    readonly property color styleListViewHoverRowBackgroundColor: Style.listViewHoverRowBackgroundColor
+    readonly property color styleListViewRowBackgroundColor: Style.listViewRowBackgroundColor
+    readonly property int styleSectionBorderRadius: Style.sectionBorderRadius
+    readonly property int styleListItemPadding: Style.listItemPadding
+    readonly property int styleSpacingSmall: Style.spacingSmall
+    readonly property int styleSpacingMedium: Style.spacingMedium
+    readonly property int styleSpacingXXSmall: Style.spacingXXSmall
+    readonly property color styleTitleSeparatorColor: Style.titleSeparatorColor
+    readonly property int styleFontSizeFormLabel: Style.fontSizeFormLabel
+    readonly property string styleFontFamilyBold: Style.fontFamilyBold
+    readonly property string styleFontFamily: Style.fontFamily
+    readonly property color styleFormLabelDisabledColor: Style.formLabelDisabledColor
+    readonly property color styleFormLabelColor: Style.formLabelColor
+    readonly property int styleFontSizeDescription: Style.fontSizeDescription
+    readonly property color styleTextDescriptionColor: Style.textDescriptionColor
+    readonly property int styleFontSizeCaption: Style.fontSizeCaption
+    readonly property color styleTextMetadataColor: Style.textMetadataColor
+    readonly property int styleFontSizeSmall: Style.fontSizeSmall
+    readonly property color styleFormLabelErrorColor: Style.formLabelErrorColor
+    readonly property int styleFontSizeHeading: Style.fontSizeHeading
+
     // Sizing
-    width: parentListView ? parentListView.width : 200
-    height: isHidden ? 0 : Math.max(minimumHeight, contentRow.implicitHeight + Style.spacingSmall + Style.spacingMedium)
-    visible: !isHidden
+    width: root.parentListView ? root.parentListView.width : 200
+    height: root.isHidden ? 0 : Math.max(root.minimumHeight, contentRow.implicitHeight + root.styleSpacingSmall + root.styleSpacingMedium)
+    visible: !root.isHidden
 
     // Accessibility
     Accessible.role: Accessible.ListItem
@@ -84,23 +108,23 @@ Item {
     Rectangle {
         id: backgroundRect
         anchors.fill: parent
-        anchors.rightMargin: (parentListView && parentListView.contentHeight > parentListView.height) ? Style.scrollBarWidth : 0
+        anchors.rightMargin: (root.parentListView && root.parentListView.contentHeight > root.parentListView.height) ? root.styleScrollBarWidth : 0
 
         color: root.isItemSelected ? root.selectedBackgroundColor
-             : (parentListView && parentListView.currentIndex === root.delegateIndex) ? Style.listViewHighlightColor
-             : (mouseArea.containsMouse && !root.isDisabled ? Style.listViewHoverRowBackgroundColor : Style.listViewRowBackgroundColor)
-        radius: Style.sectionBorderRadius
+             : (root.parentListView && root.parentListView.currentIndex === root.delegateIndex) ? root.styleListViewHighlightColor
+             : (mouseArea.containsMouse && !root.isDisabled ? root.styleListViewHoverRowBackgroundColor : root.styleListViewRowBackgroundColor)
+        radius: root.styleSectionBorderRadius
         opacity: root.isDisabled ? 0.5 : 1.0
         Accessible.ignored: true
 
         RowLayout {
             id: contentRow
             anchors.fill: parent
-            anchors.leftMargin: Style.listItemPadding
-            anchors.rightMargin: Style.listItemPadding
-            anchors.topMargin: Style.spacingSmall
-            anchors.bottomMargin: Style.spacingMedium
-            spacing: Style.spacingMedium
+            anchors.leftMargin: root.styleListItemPadding
+            anchors.rightMargin: root.styleListItemPadding
+            anchors.topMargin: root.styleSpacingSmall
+            anchors.bottomMargin: root.styleSpacingMedium
+            spacing: root.styleSpacingMedium
 
             // Emoji icon (alternative to image icon)
             Text {
@@ -131,32 +155,32 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     color: "transparent"
-                    border.color: Style.titleSeparatorColor
+                    border.color: root.styleTitleSeparatorColor
                     border.width: 1
                     radius: 0
-                    visible: parent.status === Image.Error
+                    visible: imageIcon.status === Image.Error
                 }
             }
 
             // Text content
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: Style.spacingXXSmall
+                spacing: root.styleSpacingXXSmall
 
                 // Title row with badges
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Style.spacingSmall
+                    spacing: root.styleSpacingSmall
 
                     Text {
                         id: titleText
                         text: root.itemTitle
-                        font.pixelSize: Style.fontSizeFormLabel
-                        font.family: Style.fontFamilyBold
+                        font.pixelSize: root.styleFontSizeFormLabel
+                        font.family: root.styleFontFamilyBold
                         font.bold: true
-                        color: root.isDisabled ? Style.formLabelDisabledColor
+                        color: root.isDisabled ? root.styleFormLabelDisabledColor
                              : root.isItemSelected ? root.selectedTextColor
-                             : Style.formLabelColor
+                             : root.styleFormLabelColor
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                         Accessible.ignored: true
@@ -178,11 +202,11 @@ Item {
                 // Description
                 Text {
                     text: root.itemDescription
-                    font.pixelSize: Style.fontSizeDescription
-                    font.family: Style.fontFamily
-                    color: root.isDisabled ? Style.formLabelDisabledColor
+                    font.pixelSize: root.styleFontSizeDescription
+                    font.family: root.styleFontFamily
+                    color: root.isDisabled ? root.styleFormLabelDisabledColor
                          : root.isItemSelected ? root.selectedTextColor
-                         : Style.textDescriptionColor
+                         : root.styleTextDescriptionColor
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     visible: root.itemDescription !== ""
@@ -192,11 +216,11 @@ Item {
                 // Primary metadata line
                 Text {
                     text: root.itemMetadata
-                    font.pixelSize: Style.fontSizeCaption
-                    font.family: Style.fontFamily
-                    color: root.isDisabled ? Style.formLabelDisabledColor
+                    font.pixelSize: root.styleFontSizeCaption
+                    font.family: root.styleFontFamily
+                    color: root.isDisabled ? root.styleFormLabelDisabledColor
                          : root.isItemSelected ? root.selectedTextColor
-                         : Style.textMetadataColor
+                         : root.styleTextMetadataColor
                     Layout.fillWidth: true
                     visible: root.itemMetadata !== ""
                     Accessible.ignored: true
@@ -205,11 +229,11 @@ Item {
                 // Secondary metadata line
                 Text {
                     text: root.itemMetadata2
-                    font.pixelSize: Style.fontSizeSmall
-                    font.family: Style.fontFamily
-                    color: root.isDisabled ? Style.formLabelDisabledColor
+                    font.pixelSize: root.styleFontSizeSmall
+                    font.family: root.styleFontFamily
+                    color: root.isDisabled ? root.styleFormLabelDisabledColor
                          : root.isItemSelected ? root.selectedTextColor
-                         : Style.textMetadataColor
+                         : root.styleTextMetadataColor
                     Layout.fillWidth: true
                     visible: root.itemMetadata2 !== ""
                     Accessible.ignored: true
@@ -219,9 +243,9 @@ Item {
             // Disabled reason indicator (e.g., "Read-only")
             Text {
                 text: root.disabledReason
-                font.pixelSize: Style.fontSizeDescription
-                font.family: Style.fontFamily
-                color: Style.formLabelErrorColor
+                font.pixelSize: root.styleFontSizeDescription
+                font.family: root.styleFontFamily
+                color: root.styleFormLabelErrorColor
                 visible: root.isDisabled && root.disabledReason !== ""
                 Layout.alignment: Qt.AlignVCenter
                 Accessible.ignored: true
@@ -230,9 +254,9 @@ Item {
             // Arrow indicator for sublists
             Text {
                 text: "›"
-                font.pixelSize: Style.fontSizeHeading
-                font.family: Style.fontFamily
-                color: root.isItemSelected ? root.selectedTextColor : Style.textDescriptionColor
+                font.pixelSize: root.styleFontSizeHeading
+                font.family: root.styleFontFamily
+                color: root.isItemSelected ? root.selectedTextColor : root.styleTextDescriptionColor
                 visible: root.showArrow
                 Layout.alignment: Qt.AlignVCenter
             }

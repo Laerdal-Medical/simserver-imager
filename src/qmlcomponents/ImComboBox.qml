@@ -214,9 +214,9 @@ ComboBox {
     // Smooth scroll animation for keyboard navigation
     NumberAnimation {
         id: scrollAnimation
-        target: popup.contentItem
+        target: root.popup.contentItem
         property: "contentY"
-        duration: scrollAnimationDuration
+        duration: root.scrollAnimationDuration
         easing.type: Easing.OutCubic
     }
     

@@ -62,25 +62,25 @@ Item {
     ImTextField {
         id: textField
         anchors.fill: parent
-        
+
         // Toggle between password and normal mode
         echoMode: passwordVisible ? TextInput.Normal : TextInput.Password
-        
+
         // Make room for the eye icon button
         rightPadding: eyeToggleVisible ? eyeButton.width + 8 : 12
-        
+
         // Accessibility: update the description when toggle state changes
         Accessible.description: {
             var base = root.accessibleDescription
             if (eyeToggleVisible) {
-                var toggleHint = passwordVisible 
+                var toggleHint = passwordVisible
                     ? qsTr("Password is visible. Press F2 to hide.")
                     : qsTr("Password is hidden. Press F2 to show.")
                 return base ? base + " " + toggleHint : toggleHint
             }
             return base
         }
-        
+
         // Handle keyboard shortcut to toggle visibility
         Keys.onPressed: function(event) {
             if (event.key === Qt.Key_F2 && eyeToggleVisible) {
@@ -89,8 +89,8 @@ Item {
             }
             // Forward Tab/Shift+Tab navigation to parent Item's KeyNavigation
             else if (event.key === Qt.Key_Tab) {
-                var nextItem = event.modifiers & Qt.ShiftModifier 
-                    ? root.KeyNavigation.backtab 
+                var nextItem = event.modifiers & Qt.ShiftModifier
+                    ? root.KeyNavigation.backtab
                     : root.KeyNavigation.tab
                 if (nextItem) {
                     nextItem.forceActiveFocus()
@@ -106,41 +106,41 @@ Item {
     // Eye icon toggle button - using Button for proper accessibility
     Button {
         id: eyeButton
-        
+
         anchors.right: textField.right
         anchors.rightMargin: 4
         anchors.verticalCenter: textField.verticalCenter
-        
+
         // Match the text field height for a balanced look
         height: textField.height - 8
         width: height
         padding: 0
-        
+
         visible: eyeToggleVisible
         opacity: eyeToggleVisible ? 1.0 : 0.0
-        
+
         // Don't include in normal tab order - use F2 shortcut instead
         // This keeps focus flow simple: tab moves between fields, F2 toggles visibility
         focusPolicy: Qt.NoFocus
-        
+
         Behavior on opacity {
             NumberAnimation { duration: 150 }
         }
-        
+
         // Accessibility
         Accessible.role: Accessible.Button
         Accessible.name: passwordVisible ? qsTr("Hide password") : qsTr("Show password")
-        Accessible.description: passwordVisible 
+        Accessible.description: passwordVisible
             ? qsTr("Password is currently visible. Activate to hide it.")
             : qsTr("Password is currently hidden. Activate to show it.")
-        
+
         background: Rectangle {
             radius: 4
             color: eyeButton.hovered ? Style.buttonHoveredBackgroundColor : "transparent"
             border.width: eyeButton.visualFocus ? Style.focusOutlineWidth : 0
             border.color: Style.focusOutlineColor
         }
-        
+
         contentItem: Image {
             id: eyeIcon
             // Fill most of the button, leaving a small margin
@@ -152,7 +152,7 @@ Item {
             antialiasing: true
             anchors.centerIn: parent
         }
-        
+
         onClicked: {
             passwordVisible = !passwordVisible
             // Return focus to the text field

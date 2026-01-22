@@ -108,7 +108,7 @@ WizardStepBase {
             model: root.imageWriter.getDriveList()
             delegate: dstdelegate
             keyboardAutoAdvance: true
-            nextFunction: root.conditionalNext
+            onNextRequested: root.conditionalNext()
             isItemSelectableFunction: root.isStorageItemSelectable
             accessibleName: {
                 // Count only visible and selectable devices

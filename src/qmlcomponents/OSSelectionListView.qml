@@ -52,7 +52,7 @@ SelectionListView {
         if (fromDoubleClick === undefined) {
             fromDoubleClick = false
         }
-        
+
         if (osSelectionHandler && typeof osSelectionHandler === "function") {
             // Get the delegate item and access its model property (same as mouse click)
             var delegateItem = itemAtIndex(index)
@@ -121,7 +121,7 @@ SelectionListView {
             }
         }
     }
-    
+
     // Override selection to use OS-specific handler if provided
     onItemSelected: function(index, item) {
         handleOSItemSelection(index, item, currentSelectionIsFromMouse, false)

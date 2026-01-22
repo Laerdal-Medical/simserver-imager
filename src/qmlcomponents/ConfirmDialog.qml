@@ -74,7 +74,7 @@ MessageDialog {
     Component.onCompleted: {
         registerFocusGroup("content", function(){
             if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
-                return [titleTextItem, messageTextItem]
+                return [root.titleTextItem, root.messageTextItem]
             }
             return []
         }, 0)

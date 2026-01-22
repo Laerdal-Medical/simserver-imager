@@ -81,6 +81,9 @@ Dialog {
     property int headerIconSize: 24
     property string headerIconAccessibleName: qsTr("Icon")
 
+    // Expose title text element for focus group registration in child dialogs
+    property alias titleTextItem: titleLabel
+
     // Custom header with optional icon and styled title
     header: Item {
         width: parent ? parent.width : 0

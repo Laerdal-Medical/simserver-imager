@@ -65,7 +65,7 @@ CheckBox {
             border.color: control.checked ? Style.formControlActiveColor : "#bdbebf"
             border.width: 2
             color: control.checked ? Style.formControlActiveColor : Style.mainBackgroundColor
-            
+
             // Checkmark
             Text {
                 anchors.centerIn: parent

@@ -16,10 +16,14 @@ ListView {
     // Properties that can be customized
     property bool autoSelectFirst: false
     property bool keyboardAutoAdvance: false
-    property var nextFunction: null
-    property var isItemSelectableFunction: null  // Function(index) that returns true if item can be selected
     property string accessibleName: "Selection list"
     property string accessibleDescription: "Use arrow keys to navigate, Enter or Space to select"
+
+    // Callback signal for keyboard auto-advance navigation
+    signal nextRequested()
+
+    // Callback function for checking if an item is selectable (returns bool)
+    property var isItemSelectableFunction: null
     
     // Signals for selection actions
     signal itemSelected(int index, var item)
@@ -29,14 +33,14 @@ ListView {
     signal returnPressed(int index, var item)
     
     // Helper function for keyboard auto-advance
-    function handleKeyboardSelection(index, item) {
+    function handleKeyboardSelection(index: int, item: QtObject): void {
         // Always call the itemSelected signal first
         root.itemSelected(index, item)
-        
-        // If auto-advance is enabled and we have a next function, call it
-        if (root.keyboardAutoAdvance && root.nextFunction && typeof root.nextFunction === "function") {
+
+        // If auto-advance is enabled, emit the nextRequested signal
+        if (root.keyboardAutoAdvance) {
             Qt.callLater(function() {
-                root.nextFunction()
+                root.nextRequested()
             })
         }
     }
@@ -68,14 +72,15 @@ ListView {
     // Disable ListView's built-in highlight since SelectionListDelegate handles its own
     // background coloring based on selection/hover state
     highlight: null
-    highlightFollowsCurrentItem: true
-    highlightRangeMode: ListView.ApplyRange
-    preferredHighlightBegin: 0
-    preferredHighlightEnd: height
+    highlightFollowsCurrentItem: false
     
+    // Cached style value for use in nested components
+    readonly property int scrollBarWidthValue: Style.scrollBarWidth
+
     // Standard ScrollBar
     ScrollBar.vertical: ScrollBar {
-        width: Style.scrollBarWidth
+        id: verticalScrollBar
+        width: root.scrollBarWidthValue
         policy: root.contentHeight > root.height ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded
     }
     
@@ -104,9 +109,9 @@ ListView {
     }
     
     // Helper function to check if an item is selectable
-    function isItemSelectable(index) {
-        if (isItemSelectableFunction && typeof isItemSelectableFunction === "function") {
-            return isItemSelectableFunction(index)
+    function isItemSelectable(index: int): bool {
+        if (root.isItemSelectableFunction && typeof root.isItemSelectableFunction === "function") {
+            return root.isItemSelectableFunction(index)
         }
         return true  // By default, all items are selectable
     }

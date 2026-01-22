@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import RpiImager
 
 RadioButton {
     id: control
@@ -67,7 +68,7 @@ RadioButton {
             border.color: control.checked ? Style.formControlActiveColor : "#bdbebf"
             border.width: 2
             color: Style.mainBackgroundColor
-            
+
             Rectangle {
                 width: 10
                 height: 10

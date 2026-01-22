@@ -76,7 +76,8 @@ BaseDialog {
     default property alias customContent: customContentContainer.data
     readonly property bool hasCustomContent: customContentContainer.children.length > 0
 
-    // Expose text element for focus group registration in child dialogs
+    // Expose text elements for focus group registration in child dialogs
+    // Note: titleTextItem is inherited from BaseDialog
     property alias messageTextItem: messageText
 
     // Expose action button for focus group registration (returns the visible one)

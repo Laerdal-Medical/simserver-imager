@@ -198,7 +198,7 @@ Item {
                     radius: 0  // Square track
                     color: sw.checked ? Style.formControlActiveColor : "#bdbebf"
                     border.color: sw.checked ? Style.formControlActiveColor : "#bdbebf"
-                    
+
                     Rectangle {
                         x: sw.checked ? parent.width - width - 2 : 2
                         y: 2
@@ -207,7 +207,7 @@ Item {
                         radius: 0  // Square thumb
                         color: Style.mainBackgroundColor
                         border.color: sw.checked ? Style.formControlActiveColor : "#bdbebf"
-                        
+
                         Behavior on x {
                             NumberAnimation { duration: 100 }
                         }

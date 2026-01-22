@@ -57,7 +57,7 @@ BaseDialog {
             font.italic: true
             elide: Text.ElideMiddle
             Layout.fillWidth: true
-            visible: artifactName.length > 0
+            visible: root.artifactName.length > 0
         }
 
         // Progress bar container with text overlay

@@ -160,7 +160,7 @@ WizardStepBase {
             model: root.hwModel
             delegate: hwdelegate
             keyboardAutoAdvance: true
-            nextFunction: root.next
+            onNextRequested: root.next()
             accessibleName: {
                 var count = hwlist.count
                 var name = qsTr("Device selection list")

@@ -1,9 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
+import RpiImager
 
 // Reusable badge component for labels/tags
 Rectangle {
     id: root
+
+    readonly property int styleFontSizeSmall: RpiImager.Style.fontSizeSmall
+    readonly property string styleFontFamily: RpiImager.Style.fontFamily
 
     // Badge type - sets both text and variant automatically
     // Supported types: "ci", "release", "spu", "wic", "vsi"
@@ -63,8 +67,8 @@ Rectangle {
         id: badgeText
         anchors.centerIn: parent
         text: root.text
-        font.pixelSize: Style.fontSizeSmall - 1
-        font.family: Style.fontFamily
+        font.pixelSize: root.styleFontSizeSmall - 1
+        font.family: root.styleFontFamily
         color: "white"
         Accessible.ignored: true
     }
