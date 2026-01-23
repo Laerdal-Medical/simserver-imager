@@ -6,8 +6,8 @@ import RpiImager
 Rectangle {
     id: root
 
-    readonly property int styleFontSizeSmall: RpiImager.Style.fontSizeSmall
-    readonly property string styleFontFamily: RpiImager.Style.fontFamily
+    readonly property int styleFontSizeSmall: Style.fontSizeSmall
+    readonly property string styleFontFamily: Style.fontFamily
 
     // Badge type - sets both text and variant automatically
     // Supported types: "ci", "release", "spu", "wic", "vsi"
