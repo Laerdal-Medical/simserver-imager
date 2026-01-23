@@ -55,12 +55,20 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
   * Write Progress Display: Real-time speed (MB/s) and estimated time remaining
     shown during write operations. Completion screen now displays write
     statistics including total bytes written, duration, and average speed.
-  * Download Speed Display: Real-time download speed (MB/s) and estimated time
-    remaining shown during artifact downloads from GitHub CI
+  * Download Speed Display: Real-time download speed (Mbps) and estimated time
+    remaining shown during download and verify operations with proper
+    network/disk I/O units
   * Multi-Partition Detection: Added API to detect drives with multiple
     partitions for improved SPU copy warnings
   * QML Lint Compliance: Fixed unqualified property access across wizard
     components using pragma ComponentBehavior: Bound
+  * Private Repo Downloads Fix: Fix 404 errors when downloading release
+    assets from private GitHub repositories by using the API asset endpoint
+    with proper authentication headers
+  * SPU Release Discovery: Include SPU files in GitHub release search filters
+    so firmware updates are discovered alongside WIC and VSI images
+  * ImBadge Style Fix: Fix runtime ReferenceError by using Style singleton
+    directly instead of qualified RpiImager.Style access
 
  -- Laerdal Medical <support@laerdal.com>  Wed, 22 Jan 2025 12:00:00 +0000
 

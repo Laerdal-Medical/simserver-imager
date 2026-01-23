@@ -180,6 +180,10 @@ ImBadge {
 - QML classes exposed via `QML_ELEMENT` macro
 - Primary namespace: `rpi_imager` (inherited from Raspberry Pi Imager)
 
+## Pre-Commit Checklist
+
+Before committing, update `RELEASE_NOTES.md` and `debian/changelog` with entries describing the changes being committed.
+
 ## Post-Change Workflow
 
 After completing code changes, always build the project to verify there are no compilation errors:

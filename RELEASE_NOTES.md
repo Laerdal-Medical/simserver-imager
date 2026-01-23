@@ -16,7 +16,7 @@
 ### Improvements
 
 - **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
-- **Download Speed Display**: Real-time download speed (MB/s) and estimated time remaining shown during artifact downloads from GitHub CI
+- **Download Speed Display**: Real-time download speed (Mbps) and estimated time remaining shown during download and verify operations with proper network/disk I/O units
 - **Device Readiness Polling**: Replaced fixed sleep delays with intelligent device readiness polling across all platforms (Linux, Windows, macOS). Operations complete faster when devices are ready and wait longer when devices need more time
 - **Drive List Refresh**: Improved drive list refresh and UI updates
 - **Touch Scrolling**: Improved touch screen scrolling behavior across all list views and scrollable areas with smoother deceleration and better tap vs scroll gesture detection
@@ -30,6 +30,9 @@
 
 ### Bug Fixes
 
+- **Private Repo Downloads**: Fix 404 errors when downloading release assets from private GitHub repositories by using the API asset endpoint with proper authentication headers
+- **SPU Release Discovery**: Include SPU files in GitHub release search filters so firmware updates are discovered alongside WIC and VSI images
+- **ImBadge Style Fix**: Fix runtime ReferenceError warnings by using Style singleton directly instead of qualified RpiImager.Style access
 - **Windows Upgrade Fix**: Preserve user cache and settings during Windows installer upgrades
 - **macOS Build Fix**: Resolve deprecation warnings and use thin LTO for faster builds. Fixed QRegularExpression usage in mount helper
 - **Windows FAT32 Fix**: Support formatting drives larger than 32GB as FAT32 using DiskFormatter with format.com to bypass Windows' artificial limit
