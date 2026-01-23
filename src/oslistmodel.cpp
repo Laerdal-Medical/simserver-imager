@@ -463,6 +463,7 @@ bool OSListModel::reload()
         os.sourceOwner = obj["source_owner"].toString();
         os.sourceRepo = obj["source_repo_name"].toString();
         os.artifactId = obj["artifact_id"].toVariant().toLongLong();
+        os.releaseAssetId = obj["asset_id"].toVariant().toLongLong();
 
         _osList.append(os);
     }
@@ -515,7 +516,8 @@ QHash<int, QByteArray> OSListModel::roleNames() const
         { BranchRole, "branch" },
         { ArtifactIdRole, "artifact_id" },
         { SourceOwnerRole, "source_owner" },
-        { SourceRepoRole, "source_repo" }
+        { SourceRepoRole, "source_repo" },
+        { ReleaseAssetIdRole, "release_asset_id" }
     };
 }
 
@@ -573,6 +575,8 @@ QVariant OSListModel::data(const QModelIndex &index, int role) const {
             return os.sourceOwner;
         case SourceRepoRole:
             return os.sourceRepo;
+        case ReleaseAssetIdRole:
+            return os.releaseAssetId;
     }
 
     return {};

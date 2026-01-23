@@ -53,6 +53,7 @@ public:
         ArtifactIdRole,
         SourceOwnerRole,
         SourceRepoRole,
+        ReleaseAssetIdRole,
     };
 
     struct OS {
@@ -76,6 +77,7 @@ public:
         QString sourceOwner;  // GitHub owner for artifacts
         QString sourceRepo;   // GitHub repo for artifacts
         qint64 artifactId = 0; // GitHub artifact ID for CI builds
+        qint64 releaseAssetId = 0; // GitHub release asset ID for authenticated downloads
 
         quint64 imageDownloadSize = 0;
         quint64 extractSize = 0;

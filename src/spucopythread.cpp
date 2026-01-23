@@ -66,6 +66,16 @@ SPUCopyThread::~SPUCopyThread()
     wait();
 }
 
+void SPUCopyThread::setAuthToken(const QString &token)
+{
+    _authToken = token;
+}
+
+void SPUCopyThread::setDownloadFilename(const QString &filename)
+{
+    _downloadFilename = filename;
+}
+
 void SPUCopyThread::cancelCopy()
 {
     _cancelled = true;
@@ -344,7 +354,9 @@ bool SPUCopyThread::copyDirectFile(const QString &mountPoint)
     }
 
     qint64 totalSize = srcFile.size();
-    QString destPath = mountPoint + "/" + QFileInfo(_spuFilePath).fileName();
+    // Use the download filename if set (to avoid temp file prefix in destination name)
+    QString destFilename = _downloadFilename.isEmpty() ? QFileInfo(_spuFilePath).fileName() : _downloadFilename;
+    QString destPath = mountPoint + "/" + destFilename;
 
     qDebug() << "SPUCopyThread: Destination:" << destPath;
     qDebug() << "SPUCopyThread: Size:" << totalSize;
@@ -412,7 +424,7 @@ QString SPUCopyThread::downloadFromUrl()
 
     // Create temp directory for download
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    QString filename = _spuUrl.fileName();
+    QString filename = _downloadFilename.isEmpty() ? _spuUrl.fileName() : _downloadFilename;
     if (filename.isEmpty())
     {
         filename = "downloaded.spu";
@@ -426,6 +438,11 @@ QString SPUCopyThread::downloadFromUrl()
     QNetworkRequest request(_spuUrl);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    if (!_authToken.isEmpty()) {
+        request.setRawHeader("Authorization", QString("token %1").arg(_authToken).toUtf8());
+        request.setRawHeader("Accept", "application/octet-stream");
+    }
 
     QNetworkReply *reply = manager.get(request);
 
@@ -445,7 +462,7 @@ QString SPUCopyThread::downloadFromUrl()
     QEventLoop loop;
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
 
-    connect(reply, &QNetworkReply::downloadProgress, this,
+    connect(reply, &QNetworkReply::downloadProgress, reply,
             [this, &receivedBytes, &totalBytes](qint64 received, qint64 total) {
                 receivedBytes = received;
                 if (total > 0)
@@ -455,13 +472,19 @@ QString SPUCopyThread::downloadFromUrl()
                 }
             });
 
-    connect(reply, &QNetworkReply::readyRead, this,
+    connect(reply, &QNetworkReply::readyRead, reply,
             [&file, reply]() {
                 file.write(reply->readAll());
             });
 
     // Start the event loop
     loop.exec();
+
+    // Write any remaining buffered data
+    QByteArray remaining = reply->readAll();
+    if (!remaining.isEmpty()) {
+        file.write(remaining);
+    }
 
     file.close();
 
@@ -473,9 +496,15 @@ QString SPUCopyThread::downloadFromUrl()
         return QString();
     }
 
+    int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();
+    QUrl finalUrl = reply->url();
+    qDebug() << "SPUCopyThread: HTTP status:" << httpStatus << "Content-Type:" << contentType;
+    qDebug() << "SPUCopyThread: Final URL:" << finalUrl;
+
     reply->deleteLater();
 
-    qDebug() << "SPUCopyThread: Download complete, size:" << file.size();
+    qDebug() << "SPUCopyThread: Download complete, size:" << QFileInfo(tempPath).size();
     return tempPath;
 }
 

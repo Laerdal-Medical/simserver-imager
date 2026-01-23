@@ -77,6 +77,9 @@ public:
     /* Set URL to download from, and if known download length and uncompressed length */
     Q_INVOKABLE void setSrc(const QUrl &url, quint64 downloadLen = 0, quint64 extrLen = 0, QByteArray expectedHash = "", bool multifilesinzip = false, QString parentcategory = "", QString osname = "", QByteArray initFormat = "", QString releaseDate = "");
 
+    /* Set GitHub release asset metadata for authenticated downloads */
+    Q_INVOKABLE void setGitHubReleaseAsset(qint64 assetId, const QString &owner, const QString &repo);
+
     /* Set GitHub artifact as source (requires authenticated download and ZIP extraction) */
     Q_INVOKABLE void setSrcArtifact(qint64 artifactId, const QString &owner, const QString &repo,
                                      const QString &branch, quint64 downloadLen, QString osname);
@@ -565,6 +568,11 @@ protected:
     SuspendInhibitor *_suspendInhibitor;
     DownloadThread *_thread;
     bool _verifyEnabled, _multipleFilesInZip, _online;
+    // GitHub release asset tracking (for authenticated downloads)
+    qint64 _releaseAssetId = 0;
+    QString _releaseAssetOwner;
+    QString _releaseAssetRepo;
+
     // GitHub artifact source tracking
     bool _isArtifactSource = false;
     qint64 _artifactId = 0;

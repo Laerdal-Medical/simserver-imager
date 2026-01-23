@@ -624,6 +624,9 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &wicFiles)
         osEntry["source"] = "github";
         osEntry["source_type"] = "release";
         osEntry["prerelease"] = wic["prerelease"].toBool();
+        osEntry["asset_id"] = wic["asset_id"].toVariant().toLongLong();
+        osEntry["source_owner"] = wic["owner"].toString();
+        osEntry["source_repo_name"] = wic["repo"].toString();
 
         // Set devices array and icon based on file name
         // SimPad: imx6 = SimPad Plus, imx8 = SimPad Plus 2

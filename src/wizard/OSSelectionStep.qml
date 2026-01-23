@@ -852,9 +852,12 @@ WizardStepBase {
                     var isSpu = urlLower.endsWith(".spu")
 
                     if (isSpu) {
-                        // SPU file from CDN - set up SPU copy mode
-                        console.log("SPU file selected from CDN:", model.url)
+                        // SPU file - set up SPU copy mode
+                        console.log("SPU file selected:", model.url)
                         imageWriter.setSrcSpuUrl(model.url, model.image_download_size, model.name)
+                        if (typeof(model.release_asset_id) !== "undefined" && model.release_asset_id > 0) {
+                            imageWriter.setGitHubReleaseAsset(model.release_asset_id, model.source_owner, model.source_repo)
+                        }
 
                         root.wizardContainer.selectedOsName = model.name
                         root.wizardContainer.isSpuCopyMode = true
@@ -883,6 +886,9 @@ WizardStepBase {
                         typeof(model.init_format) != "undefined" ? model.init_format : "",
                         typeof(model.release_date) != "undefined" ? model.release_date : ""
                     )
+                    if (typeof(model.release_asset_id) !== "undefined" && model.release_asset_id > 0) {
+                        imageWriter.setGitHubReleaseAsset(model.release_asset_id, model.source_owner, model.source_repo)
+                    }
                 }
                 imageWriter.setSWCapabilitiesList(model.capabilities)
 

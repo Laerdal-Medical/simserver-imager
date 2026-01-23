@@ -188,6 +188,16 @@ void DownloadThread::setUserAgent(const QByteArray &ua)
     _useragent = ua;
 }
 
+void DownloadThread::setUrl(const QByteArray &url)
+{
+    _url = url;
+}
+
+void DownloadThread::setHttpHeaders(const QList<QByteArray> &headers)
+{
+    _httpHeaders = headers;
+}
+
 /* Curl write callback function, let it call the object oriented version */
 size_t DownloadThread::_curl_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
@@ -650,6 +660,14 @@ void DownloadThread::run()
     if (!_useragent.isEmpty())
         curl_easy_setopt(_c, CURLOPT_USERAGENT, _useragent.constData());
 
+    struct curl_slist *httpHeaders = nullptr;
+    if (!_httpHeaders.isEmpty()) {
+        for (const QByteArray &header : _httpHeaders) {
+            httpHeaders = curl_slist_append(httpHeaders, header.constData());
+        }
+        curl_easy_setopt(_c, CURLOPT_HTTPHEADER, httpHeaders);
+    }
+
     if (_proxy.isEmpty())
     {
 #ifndef QT_NO_NETWORKPROXY
@@ -761,6 +779,7 @@ void DownloadThread::run()
     }
 
     curl_easy_cleanup(_c);
+    curl_slist_free_all(httpHeaders);
 
     switch (ret)
     {

@@ -509,6 +509,10 @@ void ImageWriter::setSrc(const QUrl &url, quint64 downloadLen, quint64 extrLen, 
     _artifactOwner.clear();
     _artifactRepo.clear();
     _artifactBranch.clear();
+    // Clear release asset info (set separately via setGitHubReleaseAsset)
+    _releaseAssetId = 0;
+    _releaseAssetOwner.clear();
+    _releaseAssetRepo.clear();
     qDebug() << "setSrc: initFormat parameter:" << initFormat << "-> _initFormat set to:" << _initFormat;
 
     if (!_downloadLen && url.isLocalFile())
@@ -516,6 +520,14 @@ void ImageWriter::setSrc(const QUrl &url, quint64 downloadLen, quint64 extrLen, 
         QFileInfo fi(url.toLocalFile());
         _downloadLen = fi.size();
     }
+}
+
+void ImageWriter::setGitHubReleaseAsset(qint64 assetId, const QString &owner, const QString &repo)
+{
+    _releaseAssetId = assetId;
+    _releaseAssetOwner = owner;
+    _releaseAssetRepo = repo;
+    qDebug() << "setGitHubReleaseAsset: assetId:" << assetId << "owner:" << owner << "repo:" << repo;
 }
 
 void ImageWriter::setSrcArtifact(qint64 artifactId, const QString &owner, const QString &repo,
@@ -1367,6 +1379,21 @@ void ImageWriter::startWrite()
 
     _thread->setVerifyEnabled(_verifyEnabled);
     _thread->setUserAgent(QString("Mozilla/5.0 rpi-imager/%1").arg(staticVersion()).toUtf8());
+
+    // Add GitHub auth headers for private repo release asset downloads
+    if (_githubClient && _githubClient->isAuthenticated() && _releaseAssetId > 0) {
+        QList<QByteArray> headers;
+        headers.append(QString("Authorization: token %1").arg(_githubClient->authToken()).toUtf8());
+        headers.append("Accept: application/octet-stream");
+        _thread->setHttpHeaders(headers);
+
+        // Use the API asset URL instead of browser_download_url
+        QString apiUrl = QString("https://api.github.com/repos/%1/%2/releases/assets/%3")
+                             .arg(_releaseAssetOwner, _releaseAssetRepo, QString::number(_releaseAssetId));
+        _thread->setUrl(apiUrl.toUtf8());
+        qDebug() << "startWrite: Using GitHub API asset URL:" << apiUrl;
+    }
+
     qDebug() << "startWrite: Passing to thread - initFormat:" << _initFormat << "cloudinit empty:" << _cloudinit.isEmpty() << "cloudinitNetwork empty:" << _cloudinitNetwork.isEmpty();
     _thread->setImageCustomisation(_config, _cmdline, _firstrun, _cloudinit, _cloudinitNetwork, _initFormat, _advancedOptions);
     
@@ -4243,6 +4270,21 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
 
     _thread->setVerifyEnabled(_verifyEnabled);
     _thread->setUserAgent(QString("Mozilla/5.0 rpi-imager/%1").arg(staticVersion()).toUtf8());
+
+    // Add GitHub auth headers for private repo release asset downloads
+    if (_githubClient && _githubClient->isAuthenticated() && _releaseAssetId > 0) {
+        QList<QByteArray> headers;
+        headers.append(QString("Authorization: token %1").arg(_githubClient->authToken()).toUtf8());
+        headers.append("Accept: application/octet-stream");
+        _thread->setHttpHeaders(headers);
+
+        // Use the API asset URL instead of browser_download_url
+        QString apiUrl = QString("https://api.github.com/repos/%1/%2/releases/assets/%3")
+                             .arg(_releaseAssetOwner, _releaseAssetRepo, QString::number(_releaseAssetId));
+        _thread->setUrl(apiUrl.toUtf8());
+        qDebug() << "_continueStartWrite: Using GitHub API asset URL:" << apiUrl;
+    }
+
     qDebug() << "_continueStartWrite: Passing to thread - initFormat:" << _initFormat << "cloudinit empty:" << _cloudinit.isEmpty() << "cloudinitNetwork empty:" << _cloudinitNetwork.isEmpty();
     _thread->setImageCustomisation(_config, _cmdline, _firstrun, _cloudinit, _cloudinitNetwork, _initFormat, _advancedOptions);
 
@@ -5030,7 +5072,19 @@ void ImageWriter::startSpuCopy(bool skipFormat)
         // For now, we need to download to a temp location
         // The SPUCopyThread can handle URL downloads directly
         qDebug() << "  Using URL download mode";
-        _spuCopyThread = new SPUCopyThread(_spuUrl, _dst.toLatin1(), skipFormat, this);
+        // For GitHub release assets, use the API URL for authenticated downloads
+        QUrl downloadUrl = _spuUrl;
+        if (_githubClient && _githubClient->isAuthenticated() && _releaseAssetId > 0) {
+            QString apiUrl = QString("https://api.github.com/repos/%1/%2/releases/assets/%3")
+                                 .arg(_releaseAssetOwner, _releaseAssetRepo, QString::number(_releaseAssetId));
+            downloadUrl = QUrl(apiUrl);
+            qDebug() << "  Using GitHub API asset URL for SPU:" << apiUrl;
+        }
+        _spuCopyThread = new SPUCopyThread(downloadUrl, _dst.toLatin1(), skipFormat, this);
+        if (_githubClient && _githubClient->isAuthenticated() && _releaseAssetId > 0) {
+            _spuCopyThread->setAuthToken(_githubClient->authToken());
+            _spuCopyThread->setDownloadFilename(_spuUrl.fileName());
+        }
     } else {
         qDebug() << "  ERROR: No SPU source configured!";
         emit spuCopyError(tr("No SPU source configured"));

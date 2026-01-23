@@ -81,6 +81,17 @@ public:
     void setUserAgent(const QByteArray &ua);
 
     /*
+     * Override the download URL (e.g. to use API URL instead of browser URL)
+     */
+    void setUrl(const QByteArray &url);
+
+    /*
+     * Set additional HTTP headers (e.g. Authorization)
+     * Each entry should be in "Header-Name: value" format
+     */
+    void setHttpHeaders(const QList<QByteArray> &headers);
+
+    /*
      * Returns true if download has been successful
      */
     bool successfull();
@@ -245,6 +256,7 @@ protected:
     std::uint64_t _lastFailureOffset;
     qint64 _sectorsStart;
     QByteArray _url, _useragent, _buf, _filename, _lastError, _expectedHash, _config, _cmdline, _firstrun, _cloudinit, _cloudinitNetwork, _initFormat;
+    QList<QByteArray> _httpHeaders;
     ImageOptions::AdvancedOptions _advancedOptions;
     char *_firstBlock;
     size_t _firstBlockSize;

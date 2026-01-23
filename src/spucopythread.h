@@ -63,6 +63,18 @@ public:
     virtual ~SPUCopyThread();
 
     /**
+     * @brief Set HTTP auth token for URL downloads (e.g. GitHub private repo)
+     * @param token OAuth or PAT token
+     */
+    void setAuthToken(const QString &token);
+
+    /**
+     * @brief Set the filename to use for downloaded file (overrides URL-derived name)
+     * @param filename The desired filename (e.g. "image.spu")
+     */
+    void setDownloadFilename(const QString &filename);
+
+    /**
      * @brief Cancel the copy operation
      */
     void cancelCopy();
@@ -155,6 +167,8 @@ private:
     bool _isDirectFile;         ///< True if copying direct SPU file (not from ZIP)
     bool _isUrlDownload;        ///< True if downloading from URL
     volatile bool _cancelled;   ///< Cancellation flag
+    QString _authToken;         ///< OAuth token for authenticated downloads
+    QString _downloadFilename;  ///< Override filename for downloaded file
 };
 
 #endif // SPUCOPYTHREAD_H
