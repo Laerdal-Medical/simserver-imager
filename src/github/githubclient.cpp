@@ -662,15 +662,15 @@ QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
         return wicFiles;
     }
 
-    // WIC file extensions to look for
-    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi"};
+    // Image file extensions to look for (WIC, VSI, SPU)
+    QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
 
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
         qint64 entrySize = archive_entry_size(entry);
 
         // Check if this is a WIC file
-        for (const QString &ext : wicExtensions) {
+        for (const QString &ext : fileExtensions) {
             if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
                 QJsonObject wicFile;
                 wicFile["filename"] = entryName;
@@ -756,8 +756,8 @@ QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
         return imageFiles;
     }
 
-    // WIC file extensions to look for
-    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi"};
+    // Image file extensions to look for (WIC, VSI, SPU)
+    QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
 
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
@@ -766,7 +766,7 @@ QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
 
         // Check if this is a WIC file
         bool isWic = false;
-        for (const QString &ext : wicExtensions) {
+        for (const QString &ext : fileExtensions) {
             if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
                 isWic = true;
                 break;
@@ -1176,8 +1176,8 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
 {
     QJsonArray wicFiles;
 
-    // WIC file extensions to look for
-    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi"};
+    // Image file extensions to look for (WIC, VSI, SPU)
+    QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
 
     for (const auto &releaseValue : releases) {
         QJsonObject release = releaseValue.toObject();
@@ -1194,7 +1194,7 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
 
             // Check if it's a WIC file
             bool isWic = false;
-            for (const QString &ext : wicExtensions) {
+            for (const QString &ext : fileExtensions) {
                 if (name.endsWith(ext, Qt::CaseInsensitive)) {
                     isWic = true;
                     break;
@@ -1230,9 +1230,9 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
 {
     QJsonArray wicFiles;
 
-    // WIC file extensions to look for in artifact names
-    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi"};
-    // Also check for artifact names that suggest WIC content (ZIP files containing WIC images)
+    // Image file extensions to look for in artifact names (WIC, VSI, SPU)
+    QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
+    // Also check for artifact names that suggest image content (ZIP files containing WIC/VSI/SPU files)
     // Note: "build-artifacts-spu" = SimPad images, "build-artifacts-sdk" = Yocto SDK (excluded)
     QStringList wicPatterns = {"wic", "image", "firmware", "build-artifacts-spu"};
 
@@ -1256,7 +1256,7 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
         QString nameLower = name.toLower();
 
         // Check for WIC extensions in name
-        for (const QString &ext : wicExtensions) {
+        for (const QString &ext : fileExtensions) {
             if (nameLower.contains(ext)) {
                 isWicArtifact = true;
                 break;
