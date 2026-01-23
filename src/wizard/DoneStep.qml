@@ -46,36 +46,6 @@ WizardStepBase {
         wizardContainer.completionSnapshot.writeDurationSecs > 0
     )
 
-    // Helper functions for formatting statistics
-    function formatDuration(seconds) {
-        if (seconds < 60) {
-            return qsTr("%1 sec").arg(Math.round(seconds))
-        } else {
-            var mins = Math.floor(seconds / 60)
-            var secs = Math.round(seconds % 60)
-            if (secs === 0) {
-                return qsTr("%1 min").arg(mins)
-            }
-            return qsTr("%1 min %2 sec").arg(mins).arg(secs)
-        }
-    }
-
-    function formatBytes(bytes) {
-        if (bytes < 1024 * 1024) {
-            return qsTr("%1 KB").arg((bytes / 1024).toFixed(1))
-        } else if (bytes < 1024 * 1024 * 1024) {
-            return qsTr("%1 MB").arg((bytes / (1024 * 1024)).toFixed(1))
-        } else {
-            return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(2))
-        }
-    }
-
-    function calculateAverageSpeed(bytes, seconds) {
-        if (seconds <= 0) return ""
-        var mbps = bytes / (1024 * 1024) / seconds
-        return qsTr("%1 MB/s").arg(mbps.toFixed(1))
-    }
-
     // Content
     content: [
     ColumnLayout {
@@ -392,9 +362,9 @@ WizardStepBase {
                 }
                 Text {
                     text: qsTr("%1 in %2 (%3)")
-                        .arg(root.formatBytes(wizardContainer.completionSnapshot.writeBytesTotal))
-                        .arg(root.formatDuration(wizardContainer.completionSnapshot.writeDurationSecs))
-                        .arg(root.calculateAverageSpeed(wizardContainer.completionSnapshot.writeBytesTotal, wizardContainer.completionSnapshot.writeDurationSecs))
+                        .arg(Utils.formatBytes(wizardContainer.completionSnapshot.writeBytesTotal))
+                        .arg(Utils.formatDuration(wizardContainer.completionSnapshot.writeDurationSecs))
+                        .arg(Utils.calculateAverageSpeed(wizardContainer.completionSnapshot.writeBytesTotal, wizardContainer.completionSnapshot.writeDurationSecs))
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamilyBold
                     font.bold: true
@@ -413,8 +383,8 @@ WizardStepBase {
                 }
                 Text {
                     text: qsTr("%1 (%2)")
-                        .arg(root.formatDuration(wizardContainer.completionSnapshot.verifyDurationSecs))
-                        .arg(root.calculateAverageSpeed(wizardContainer.completionSnapshot.writeBytesTotal, wizardContainer.completionSnapshot.verifyDurationSecs))
+                        .arg(Utils.formatDuration(wizardContainer.completionSnapshot.verifyDurationSecs))
+                        .arg(Utils.calculateAverageSpeed(wizardContainer.completionSnapshot.writeBytesTotal, wizardContainer.completionSnapshot.verifyDurationSecs))
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamilyBold
                     font.bold: true

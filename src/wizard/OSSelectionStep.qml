@@ -352,6 +352,8 @@ WizardStepBase {
             if (bytesTotal > 0) {
                 artifactDownloadProgressDialog.indeterminate = false
                 artifactDownloadProgressDialog.progress = bytesReceived / bytesTotal
+                artifactDownloadProgressDialog.bytesReceived = bytesReceived
+                artifactDownloadProgressDialog.bytesTotal = bytesTotal
 
                 // Update download speed calculation
                 artifactDownloadProgressDialog.updateDownloadSpeed(bytesReceived)

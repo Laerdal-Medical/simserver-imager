@@ -322,18 +322,18 @@ void GitHubClient::downloadArtifact(const QString &owner, const QString &repo,
 {
     QString urlStr = getArtifactDownloadUrl(owner, repo, artifactId);
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    // No timeout for downloads - they can take a long time for large files
-    request.setTransferTimeout(0);
 
     // Don't auto-follow redirects - we need to manually handle them to add auth headers
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::ManualRedirectPolicy);
 
     QNetworkReply *reply = _networkManager.get(request);
+    _activeInspectionReply = reply;
 
     qDebug() << "GitHubClient: Starting artifact download from" << urlStr << "to" << destinationPath;
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, destinationPath]() {
+        _activeInspectionReply = nullptr;
         reply->deleteLater();
 
         // Check for redirect (302)
@@ -456,19 +456,19 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
         }
     }
 
-    // Download the artifact
+    // Download the artifact - initial request gets a 302 redirect from GitHub API
     QString urlStr = getArtifactDownloadUrl(owner, repo, artifactId);
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    // No timeout for downloads - they can take a long time for large files
-    request.setTransferTimeout(0);
 
     // Don't auto-follow redirects - we need to manually handle them to add auth headers
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::ManualRedirectPolicy);
 
     QNetworkReply *reply = _networkManager.get(request);
+    _activeInspectionReply = reply;
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
+        _activeInspectionReply = nullptr;
         reply->deleteLater();
 
         // Check for redirect (302)
@@ -662,15 +662,15 @@ QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
         return wicFiles;
     }
 
-    // Image file extensions to look for (WIC, VSI, SPU)
-    QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
+    // WIC file extensions only
+    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
 
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
         qint64 entrySize = archive_entry_size(entry);
 
         // Check if this is a WIC file
-        for (const QString &ext : fileExtensions) {
+        for (const QString &ext : wicExtensions) {
             if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
                 QJsonObject wicFile;
                 wicFile["filename"] = entryName;
@@ -756,41 +756,37 @@ QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
         return imageFiles;
     }
 
-    // Image file extensions to look for (WIC, VSI, SPU)
-    QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
+    // Image file extensions to look for
+    QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
 
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
         qint64 entrySize = archive_entry_size(entry);
         QString displayName = QFileInfo(entryName).fileName();
 
-        // Check if this is a WIC file
-        bool isWic = false;
-        for (const QString &ext : fileExtensions) {
-            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
-                isWic = true;
-                break;
+        // Determine the image type from extension
+        QString type;
+        if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
+            type = "spu";
+        } else if (entryName.endsWith(".vsi", Qt::CaseInsensitive)) {
+            type = "vsi";
+        } else {
+            for (const QString &ext : wicExtensions) {
+                if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+                    type = "wic";
+                    break;
+                }
             }
         }
 
-        if (isWic) {
+        if (!type.isEmpty()) {
             QJsonObject imageFile;
             imageFile["filename"] = entryName;
             imageFile["size"] = entrySize;
             imageFile["display_name"] = displayName;
-            imageFile["type"] = "wic";
+            imageFile["type"] = type;
             imageFiles.append(imageFile);
-            qDebug() << "GitHubClient: Found WIC file:" << entryName;
-        }
-        // Check if this is an SPU file
-        else if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
-            QJsonObject imageFile;
-            imageFile["filename"] = entryName;
-            imageFile["size"] = entrySize;
-            imageFile["display_name"] = displayName;
-            imageFile["type"] = "spu";
-            imageFiles.append(imageFile);
-            qDebug() << "GitHubClient: Found SPU file:" << entryName;
+            qDebug() << "GitHubClient: Found" << type.toUpper() << "file:" << entryName;
         }
 
         archive_read_data_skip(a);

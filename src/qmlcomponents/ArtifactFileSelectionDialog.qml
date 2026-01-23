@@ -151,13 +151,7 @@ ConfirmDialog {
                         spacing: Style.spacingSmall
 
                         Text {
-                            property string sizeStr: {
-                                var bytes = fileDelegate.modelData.size || 0
-                                if (bytes < 1024) return bytes + " B"
-                                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
-                                if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB"
-                                return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB"
-                            }
+                            property string sizeStr: Utils.formatBytes(fileDelegate.modelData.size || 0)
                             text: qsTr("Size: %1").arg(sizeStr)
                             color: fileDelegate.highlighted ? Qt.rgba(1,1,1,0.7) : Style.textMetadataColor
                             font.pixelSize: Style.fontSizeXs

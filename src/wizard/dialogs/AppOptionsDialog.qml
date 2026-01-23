@@ -359,7 +359,7 @@ ConfirmDialog {
                 // Cache size indicator
                 Text {
                     id: cacheSizeText
-                    text: qsTr("Cache size: %1").arg(popup.formatBytes(imageWriter.getArtifactCacheSize()))
+                    text: qsTr("Cache size: %1").arg(Utils.formatBytes(imageWriter.getArtifactCacheSize()))
                     font.pixelSize: Style.fontSizeCaption
                     font.family: Style.fontFamily
                     color: Style.textDescriptionColor
@@ -487,15 +487,8 @@ ConfirmDialog {
             popup.wizardContainer.disableWarnings = chkDisableWarnings.checked;
     }
 
-    function formatBytes(bytes) {
-        if (bytes < 1024) return bytes + " B"
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB"
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB"
-    }
-
     function updateCacheSize() {
-        cacheSizeText.text = qsTr("Cache size: %1").arg(formatBytes(imageWriter.getArtifactCacheSize()))
+        cacheSizeText.text = qsTr("Cache size: %1").arg(Utils.formatBytes(imageWriter.getArtifactCacheSize()))
     }
 
     onOpened: {

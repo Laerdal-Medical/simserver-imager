@@ -28,6 +28,8 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
     end-of-write drain time from ~175 seconds to ~2 seconds.
   * Write Progress Logging: Added periodic progress logging showing MB
     written, speed in MB/s, and pending writes for better diagnostics
+  * CI Artifact Download Progress: Show download size (received/total) alongside
+    percentage and speed in the artifact download progress dialog
   * SelectionListDelegate: New reusable QML delegate component providing
     consistent styling for list items with icon, title, description, badges,
     and metadata across all wizard selection screens
@@ -46,6 +48,10 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
     get exclusive access, avoiding timeout when device is already in use
   * Large Artifact ID Fix: Support GitHub artifact IDs larger than 2^31 by
     using JavaScript's safe integer range (2^53)
+  * Artifact File Type Detection: Fix SPU and VSI files in CI artifacts being
+    incorrectly identified as WIC, causing wrong write mode to be used
+  * Artifact Download Freeze: Fix CI artifact downloads hanging indefinitely
+    by using proper API timeout and enabling cancellation during redirect phase
   * Install Authorization Button: Added button to permission warning dialog
     for easier authorization flow
   * GitHub Artifact Handling: Improved artifact handling and branch filtering

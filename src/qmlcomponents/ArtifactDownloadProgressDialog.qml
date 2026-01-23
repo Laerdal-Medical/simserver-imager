@@ -23,6 +23,10 @@ BaseDialog {
     property string artifactName: ""
     property bool indeterminate: false
 
+    // Download size tracking
+    property real bytesReceived: 0
+    property real bytesTotal: 0
+
     // Download speed tracking
     property real downloadSpeedMbps: 0  // Megabits per second
     property real lastBytesReceived: 0
@@ -146,6 +150,9 @@ BaseDialog {
                         return qsTr("Connecting...")
                     }
                     var parts = [qsTr("%1%").arg(root.progressPercent)]
+                    if (root.bytesTotal > 0) {
+                        parts.push(Utils.formatBytes(root.bytesReceived) + " / " + Utils.formatBytes(root.bytesTotal))
+                    }
                     if (root.downloadSpeedMbps > 0) {
                         parts.push(Math.round(root.downloadSpeedMbps) + " Mbps")
                     }
@@ -182,11 +189,14 @@ BaseDialog {
     onOpened: {
         root.progress = 0
         root.indeterminate = true
+        root.bytesReceived = 0
+        root.bytesTotal = 0
         root.downloadSpeedMbps = 0
         root.lastBytesReceived = 0
         root.lastUpdateTime = 0
         cancelButton.forceActiveFocus()
     }
+
 
     // Update download speed calculation
     function updateDownloadSpeed(bytesReceived) {

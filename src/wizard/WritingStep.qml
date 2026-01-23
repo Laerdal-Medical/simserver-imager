@@ -365,7 +365,7 @@ WizardStepBase {
                     if (root.imageWriter.writeState === ImageWriter.Preparing && root.downloadThroughputMbps > 0) {
                         parts.push(Math.round(root.downloadThroughputMbps) + " Mbps")
                         var downloadTimeRemaining = root.calculateDownloadTimeRemaining()
-                        var downloadTimeStr = root.formatTimeRemaining(downloadTimeRemaining)
+                        var downloadTimeStr = Utils.formatTimeRemaining(downloadTimeRemaining)
                         if (downloadTimeStr !== "") {
                             parts.push(downloadTimeStr)
                         }
@@ -380,7 +380,7 @@ WizardStepBase {
                         // Only show time remaining during write phase (not verification)
                         if (!root.isVerifying) {
                             var timeRemaining = root.calculateTimeRemaining()
-                            var timeStr = root.formatTimeRemaining(timeRemaining)
+                            var timeStr = Utils.formatTimeRemaining(timeRemaining)
                             if (timeStr !== "") {
                                 parts.push(timeStr)
                             }
@@ -417,104 +417,24 @@ WizardStepBase {
     }
     ]
 
-    // Format seconds into a human-readable time string
-    function formatTimeRemaining(seconds: int): string {
-        if (seconds < 0 || !isFinite(seconds)) {
-            return ""
-        }
-        if (seconds < 60) {
-            return qsTr("%n second(s) remaining", "", seconds)
-        }
-        var minutes = Math.floor(seconds / 60)
-        var remainingSeconds = seconds % 60
-        if (minutes < 60) {
-            if (remainingSeconds > 0) {
-                return qsTr("%1 min %2 sec remaining").arg(minutes).arg(remainingSeconds)
-            }
-            return qsTr("%n minute(s) remaining", "", minutes)
-        }
-        var hours = Math.floor(minutes / 60)
-        var remainingMinutes = minutes % 60
-        if (remainingMinutes > 0) {
-            return qsTr("%1 hr %2 min remaining").arg(hours).arg(remainingMinutes)
-        }
-        return qsTr("%n hour(s) remaining", "", hours)
-    }
 
     // Calculate estimated time remaining based on current speed
     function calculateTimeRemaining(): int {
-        if (root.writeThroughputKBps <= 0 || root.progressBytesTotal <= 0) {
-            return -1
-        }
-        var remainingBytes = root.progressBytesTotal - root.progressBytesNow
-        if (remainingBytes <= 0) {
-            return 0
-        }
-        // throughput is in KB/s, convert to bytes/s
-        var bytesPerSecond = root.writeThroughputKBps * 1024
-        return Math.ceil(remainingBytes / bytesPerSecond)
+        return Utils.calculateTimeRemainingKBps(
+            root.progressBytesNow,
+            root.progressBytesTotal,
+            root.writeThroughputKBps
+        )
     }
 
     function calculateDownloadTimeRemaining(): int {
-        if (root.downloadThroughputMbps <= 0 || root.downloadBytesTotal <= 0) {
-            return -1
-        }
-        var remainingBytes = root.downloadBytesTotal - root.downloadBytesNow
-        if (remainingBytes <= 0) {
-            return 0
-        }
-        // throughput is in Mbps (megabits/s), convert to bytes/s: Mbps * 1,000,000 / 8
-        var bytesPerSecond = (root.downloadThroughputMbps * 1000000) / 8
-        return Math.ceil(remainingBytes / bytesPerSecond)
+        return Utils.calculateTimeRemainingMbps(
+            root.downloadBytesNow,
+            root.downloadBytesTotal,
+            root.downloadThroughputMbps
+        )
     }
 
-    // Format duration in seconds to a human-readable string
-    function formatDuration(seconds: real): string {
-        if (seconds < 0 || !isFinite(seconds)) {
-            return ""
-        }
-        var secs = Math.round(seconds)
-        if (secs < 60) {
-            return qsTr("%n second(s)", "", secs)
-        }
-        var minutes = Math.floor(secs / 60)
-        var remainingSecs = secs % 60
-        if (minutes < 60) {
-            if (remainingSecs > 0) {
-                return qsTr("%1 min %2 sec").arg(minutes).arg(remainingSecs)
-            }
-            return qsTr("%n minute(s)", "", minutes)
-        }
-        var hours = Math.floor(minutes / 60)
-        var remainingMins = minutes % 60
-        if (remainingMins > 0) {
-            return qsTr("%1 hr %2 min").arg(hours).arg(remainingMins)
-        }
-        return qsTr("%n hour(s)", "", hours)
-    }
-
-    // Format bytes to human-readable size
-    function formatBytes(bytes: real): string {
-        if (bytes < 1024) {
-            return qsTr("%1 B").arg(Math.round(bytes))
-        }
-        if (bytes < 1024 * 1024) {
-            return qsTr("%1 KB").arg(Math.round(bytes / 1024))
-        }
-        if (bytes < 1024 * 1024 * 1024) {
-            return qsTr("%1 MB").arg((bytes / (1024 * 1024)).toFixed(1))
-        }
-        return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(2))
-    }
-
-    // Calculate average speed in MB/s
-    function calculateAverageSpeed(bytes: real, seconds: real): string {
-        if (seconds <= 0 || bytes <= 0) {
-            return ""
-        }
-        var mbps = bytes / (1024 * 1024) / seconds
-        return qsTr("%1 MB/s").arg(mbps.toFixed(1))
-    }
 
     // Handle next button clicks based on current state
     onNextClicked: {
@@ -783,25 +703,6 @@ WizardStepBase {
                 // No verification phase, write lasted until now
                 root.writeDurationSecs = (now - root.writePhaseStartTime) / 1000
             }
-
-            // Build completion summary
-            var summary = qsTr("Write completed successfully!")
-            var details = []
-            if (root.writeBytesTotal > 0 && root.writeDurationSecs > 0) {
-                details.push(qsTr("Write: %1 in %2 (%3)")
-                    .arg(root.formatBytes(root.writeBytesTotal))
-                    .arg(root.formatDuration(root.writeDurationSecs))
-                    .arg(root.calculateAverageSpeed(root.writeBytesTotal, root.writeDurationSecs)))
-            }
-            if (root.verifyDurationSecs > 0) {
-                details.push(qsTr("Verify: %1 (%2)")
-                    .arg(root.formatDuration(root.verifyDurationSecs))
-                    .arg(root.calculateAverageSpeed(root.writeBytesTotal, root.verifyDurationSecs)))
-            }
-            if (details.length > 0) {
-                summary += "\n" + details.join("\n")
-            }
-            progressText.text = summary
 
             // Save write statistics to completion snapshot for display on Done screen
             root.wizardContainer.completionSnapshot = {

@@ -17,6 +17,7 @@
 
 - **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
 - **Download Speed Display**: Real-time download speed (Mbps) and estimated time remaining shown during download and verify operations with proper network/disk I/O units
+- **CI Artifact Download Progress**: Show download size (received / total in MB/GB) alongside percentage and speed in the artifact download progress dialog
 - **Device Readiness Polling**: Replaced fixed sleep delays with intelligent device readiness polling across all platforms (Linux, Windows, macOS). Operations complete faster when devices are ready and wait longer when devices need more time
 - **Drive List Refresh**: Improved drive list refresh and UI updates
 - **Touch Scrolling**: Improved touch screen scrolling behavior across all list views and scrollable areas with smoother deceleration and better tap vs scroll gesture detection
@@ -40,3 +41,5 @@
 - **SPU Device Removal**: Set write state during SPU copy to prevent spurious device removal dialog
 - **Mount Helper Fix**: Check if device is already mounted before trying to get exclusive access, avoiding timeout when device is already in use
 - **Large Artifact ID Fix**: Support GitHub artifact IDs larger than 2^31 by using JavaScript's safe integer range (2^53)
+- **Artifact File Type Detection**: Fix SPU and VSI files in CI artifacts being incorrectly identified as WIC, causing them to be written as disk images instead of using their correct write modes
+- **Artifact Download Freeze**: Fix CI artifact downloads hanging indefinitely by using proper API timeout on the initial redirect request and enabling cancellation during the redirect phase
