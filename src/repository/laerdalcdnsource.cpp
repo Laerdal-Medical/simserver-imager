@@ -80,6 +80,8 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
         QString md5 = update["md5"].toString();
         QString info = update["info"].toString();
         QString releaseNotes = update["releasenotes"].toString();
+        double imageDownloadSize = update["image_download_size"].toDouble();
+        double extractSize = update["extract_size"].toDouble();
 
         // Create OS list entry
         QJsonObject osEntry;
@@ -97,6 +99,10 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
         // Note: We use MD5 from Laerdal, but the imager typically expects SHA256
         // For compatibility, store as extract_md5 and handle in download thread
         osEntry["extract_md5"] = md5;
+
+        // Download and extract sizes for progress tracking
+        osEntry["image_download_size"] = imageDownloadSize;
+        osEntry["extract_size"] = extractSize;
 
         // Mark as no customization support (WIC files don't support cloud-init)
         osEntry["init_format"] = "none";

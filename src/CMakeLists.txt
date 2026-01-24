@@ -298,6 +298,7 @@ set(SOURCES_BASE
     "drivelistmodelpollthread.cpp"
     "downloadthread.cpp"
     "downloadextractthread.cpp"
+    "downloadarchiveextractthread.cpp"
     "devicewrapper.cpp"
     "devicewrapperblockcacheentry.cpp"
     "devicewrapperpartition.cpp"

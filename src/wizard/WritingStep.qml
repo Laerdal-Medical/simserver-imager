@@ -617,9 +617,16 @@ WizardStepBase {
             root.progressBytesNow = now
             root.progressBytesTotal = total
             root.writeBytesTotal = total
-            var progress = total > 0 ? (now / total) * 100 : 0
-            progressBar.value = progress
-            progressBar.text = qsTr("Writing... %1%").arg(Math.round(progress))
+            if (total > 0) {
+                var progress = (now / total) * 100
+                progressBar.indeterminate = false
+                progressBar.value = progress
+                progressBar.text = qsTr("Writing... %1%").arg(Math.round(progress))
+            } else {
+                // Unknown total (e.g. compressed file with no decompressed size metadata)
+                progressBar.indeterminate = true
+                progressBar.indeterminateText = qsTr("Writing... %1").arg(Utils.formatBytes(now))
+            }
         }
     }
 
@@ -628,6 +635,7 @@ WizardStepBase {
             // When verification starts, record write phase duration
             if (!root.isVerifying) {
                 root.isVerifying = true
+                progressBar.indeterminate = false
                 if (root.writePhaseStartTime > 0) {
                     root.writeDurationSecs = (Date.now() - root.writePhaseStartTime) / 1000
                 }

@@ -4,6 +4,7 @@
  */
 
 #include "downloadextractthread.h"
+#include "downloadarchiveextractthread.h"
 #include "imagewriter.h"
 #include "embedded_config.h"
 #include "config.h"
@@ -34,6 +35,7 @@
 #include <qjsondocument.h>
 #include <QJsonArray>
 #include <random>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QTextStream>
@@ -654,6 +656,34 @@ void ImageWriter::setSrcArtifactWithTargetAndCache(qint64 artifactId, const QStr
     }
 }
 
+void ImageWriter::setSrcArtifactStreaming(qint64 artifactId, const QString &owner, const QString &repo,
+                                           const QString &branch, quint64 downloadLen, QString osname,
+                                           const QString &targetEntry)
+{
+    qDebug() << "ImageWriter: Setting artifact streaming source";
+    qDebug() << "  Artifact ID:" << artifactId;
+    qDebug() << "  Owner:" << owner << "Repo:" << repo << "Branch:" << branch;
+    qDebug() << "  Target entry:" << targetEntry;
+
+    _isArtifactStreamingSource = true;
+    _isArtifactSource = false;
+    _artifactId = artifactId;
+    _artifactOwner = owner;
+    _artifactRepo = repo;
+    _artifactBranch = branch;
+    _downloadLen = downloadLen;
+    _osName = osname;
+    _artifactStreamingEntry = targetEntry;
+
+    // Build the artifact download URL
+    QString urlStr = _githubClient->getArtifactDownloadUrl(owner, repo, artifactId);
+    _src = QUrl(urlStr);
+
+    _extrLen = 0;
+    _expectedHash.clear();
+    _multipleFilesInZip = false;
+}
+
 /* Set device to write to */
 void ImageWriter::setDst(const QString &device, quint64 deviceSize)
 {
@@ -756,6 +786,95 @@ void ImageWriter::startWrite()
 #endif
 
     setWriteState(WriteState::Preparing);
+
+    // Handle direct artifact streaming (bypasses CI inspection step)
+    if (_isArtifactStreamingSource)
+    {
+        qDebug() << "Using DownloadArchiveExtractThread for direct artifact streaming";
+        qDebug() << "  URL:" << _src;
+        qDebug() << "  Target entry:" << _artifactStreamingEntry;
+
+        _isArtifactStreamingSource = false;
+
+        // Will be handled by the normal thread creation below using DownloadArchiveExtractThread
+        // Set up the URL as a remote source - the extract thread handles ZIP parsing
+        // Defer to let QML render the indeterminate progress animation
+        QTimer::singleShot(100, this, [this]() {
+            // Re-enter startWrite but now as a normal remote URL with artifact streaming
+            if (_writeState == WriteState::Cancelled || _writeState == WriteState::Failed) return;
+
+            QByteArray urlstr = _src.toString(_src.FullyEncoded).toLatin1();
+            QString writeDevicePath = _dst;
+
+            emit preparationStatusUpdate(tr("Starting artifact stream..."));
+
+            auto *thread = new DownloadArchiveExtractThread(urlstr, writeDevicePath.toLatin1(), _expectedHash, this);
+            thread->setTargetEntry(_artifactStreamingEntry);
+
+            // Set auth headers for GitHub artifact download
+            if (_githubClient && _githubClient->isAuthenticated()) {
+                QList<QByteArray> headers;
+                headers.append(QString("Authorization: Bearer %1").arg(_githubClient->authToken()).toUtf8());
+                headers.append(QByteArray("Accept: application/vnd.github+json"));
+                thread->setHttpHeaders(headers);
+            }
+
+            thread->setExtractTotal(_extrLen > 0 ? _extrLen : _downloadLen);
+
+            // Set up cache for artifact ZIP (use artifact ID as cache key)
+            if (_cacheManager && _artifactId > 0) {
+                QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/artifacts";
+                QDir().mkpath(cacheDir);
+                QString cacheFilePath = cacheDir + QString("/artifact_%1.zip").arg(_artifactId);
+                thread->setCacheFile(cacheFilePath);
+            }
+
+            // Apply debug options
+            thread->setDebugDirectIO(_debugDirectIO);
+            thread->setDebugPeriodicSync(_debugPeriodicSync);
+            thread->setDebugVerboseLogging(_debugVerboseLogging);
+            thread->setDebugAsyncIO(_debugAsyncIO);
+            thread->setDebugAsyncQueueDepth(_debugAsyncQueueDepth);
+            thread->setDebugIPv4Only(_debugIPv4Only);
+            thread->setDebugSkipEndOfDevice(_debugSkipEndOfDevice);
+            thread->setVerifyEnabled(_verifyEnabled);
+
+            _thread = thread;
+
+            connect(_thread, SIGNAL(success()), SLOT(onSuccess()));
+            connect(_thread, SIGNAL(error(QString)), SLOT(onError(QString)));
+            connect(_thread, SIGNAL(finalizing()), SLOT(onFinalizing()));
+            connect(_thread, SIGNAL(preparationStatusUpdate(QString)), SLOT(onPreparationStatusUpdate(QString)));
+            connect(_thread, &QThread::finished, this, [this]() {
+                if (_thread) {
+                    _thread->deleteLater();
+                    _thread = nullptr;
+                }
+            });
+
+            // Connect progress signals
+            DownloadExtractThread *downloadThread = qobject_cast<DownloadExtractThread*>(_thread);
+            if (downloadThread) {
+                connect(downloadThread, &DownloadExtractThread::downloadProgressChanged,
+                        this, &ImageWriter::downloadProgress);
+                connect(downloadThread, &DownloadExtractThread::writeProgressChanged,
+                        this, &ImageWriter::writeProgress);
+                connect(downloadThread, &DownloadExtractThread::verifyProgressChanged,
+                        this, &ImageWriter::verifyProgress);
+                connect(downloadThread, &DownloadThread::asyncWriteProgress,
+                        this, &ImageWriter::writeProgress, Qt::QueuedConnection);
+                connect(downloadThread, &DownloadExtractThread::verifyProgressChanged,
+                        this, [this](quint64, quint64){
+                            if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded)
+                                setWriteState(WriteState::Verifying);
+                        });
+            }
+
+            setWriteState(WriteState::Writing);
+            _thread->start();
+        });
+        return;
+    }
 
     // Handle GitHub artifact source - stream directly from cached ZIP
     if (_isArtifactSource)
@@ -959,7 +1078,14 @@ void ImageWriter::startWrite()
         return;
     }
 
-    if (_extrLen && !_multipleFilesInZip && _extrLen % 512 != 0)
+    // Skip 512-byte alignment check for compressed files where extract_size
+    // may actually be the compressed file size (e.g., GitHub releases only provide
+    // the download size, not the decompressed size)
+    QString srcLower = _src.toString().toLower();
+    bool isCompressedSource = srcLower.endsWith(".xz") || srcLower.endsWith(".gz")
+                              || srcLower.endsWith(".zst") || srcLower.endsWith(".bz2")
+                              || srcLower.endsWith(".lz4");
+    if (_extrLen && !_multipleFilesInZip && !isCompressedSource && _extrLen % 512 != 0)
     {
         emit error(tr("Input file is not a valid disk image.<br>File size %1 bytes is not a multiple of 512 bytes.").arg(_extrLen));
         return;
@@ -4982,6 +5108,35 @@ void ImageWriter::setSrcSpuArtifact(qint64 artifactId, const QString &owner,
     _artifactBranch = branch;
 }
 
+void ImageWriter::setSrcSpuArtifactStreaming(qint64 artifactId, const QString &owner,
+                                              const QString &repo, const QString &branch,
+                                              const QString &spuFilename)
+{
+    qDebug() << "ImageWriter: Setting SPU artifact streaming source";
+    qDebug() << "  Artifact ID:" << artifactId;
+    qDebug() << "  Owner:" << owner << "Repo:" << repo << "Branch:" << branch;
+    qDebug() << "  SPU filename:" << spuFilename;
+
+    _isSpuCopyMode = true;
+    _isSpuArtifactStreamingSource = true;
+    _spuArtifactEntry = spuFilename;
+
+    // Build the artifact download URL
+    QString urlStr = _githubClient->getArtifactDownloadUrl(owner, repo, artifactId);
+    _spuArtifactUrl = QUrl(urlStr);
+
+    // Clear other SPU source types
+    _spuFilePath.clear();
+    _spuArchivePath.clear();
+    _spuEntryName.clear();
+    _spuUrl.clear();
+
+    _artifactId = artifactId;
+    _artifactOwner = owner;
+    _artifactRepo = repo;
+    _artifactBranch = branch;
+}
+
 void ImageWriter::setSrcSpuFile(const QString &filePath)
 {
     qDebug() << "ImageWriter: Setting SPU source from file:" << filePath;
@@ -5066,8 +5221,26 @@ void ImageWriter::startSpuCopy(bool skipFormat)
     qDebug() << "    _spuArchivePath:" << _spuArchivePath;
     qDebug() << "    _spuEntryName:" << _spuEntryName;
     qDebug() << "    _spuUrl:" << _spuUrl;
+    qDebug() << "    _isSpuArtifactStreamingSource:" << _isSpuArtifactStreamingSource;
 
-    if (!_spuFilePath.isEmpty()) {
+    if (_isSpuArtifactStreamingSource) {
+        // Artifact streaming: download ZIP and extract SPU entry directly to FAT32
+        qDebug() << "  Using artifact streaming mode";
+        _spuCopyThread = new SPUCopyThread(_spuArtifactUrl, _spuArtifactEntry,
+                                           _dst.toLatin1(), skipFormat, this);
+        if (_githubClient && _githubClient->isAuthenticated()) {
+            _spuCopyThread->setAuthToken(_githubClient->authToken());
+            QStringList headers;
+            headers.append(QString("Authorization: Bearer %1").arg(_githubClient->authToken()));
+            headers.append("Accept: application/vnd.github+json");
+            _spuCopyThread->setHttpHeaders(headers);
+        }
+        _spuCopyThread->setDownloadFilename(_spuArtifactEntry);
+        // Set cache directory for caching the artifact ZIP
+        QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/artifacts";
+        _spuCopyThread->setCacheDir(cacheDir);
+        _isSpuArtifactStreamingSource = false;
+    } else if (!_spuFilePath.isEmpty()) {
         // Direct file copy
         qDebug() << "  Using direct file copy mode";
         _spuCopyThread = new SPUCopyThread(_spuFilePath, _dst.toLatin1(), skipFormat, this);
@@ -5093,6 +5266,9 @@ void ImageWriter::startSpuCopy(bool skipFormat)
             _spuCopyThread->setAuthToken(_githubClient->authToken());
             _spuCopyThread->setDownloadFilename(_spuUrl.fileName());
         }
+        // Set cache directory for streaming downloads
+        QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/spu";
+        _spuCopyThread->setCacheDir(cacheDir);
     } else {
         qDebug() << "  ERROR: No SPU source configured!";
         emit spuCopyError(tr("No SPU source configured"));

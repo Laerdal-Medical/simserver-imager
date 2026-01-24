@@ -89,16 +89,57 @@ WizardStepBase {
                     " -> needsInspection=" + needsInspection)
 
         if (needsInspection) {
-            // Artifact needs inspection - store for CIArtifactSelectionStep
-            root.wizardContainer.pendingArtifactInspection = model
-            // Cache selection IDs for back navigation (model object gets invalidated on re-sort)
-            root.wizardContainer.cachedOsArtifactId = model.artifact_id || -1
-            root.wizardContainer.cachedOsName = model.name || ""
-            root.wizardContainer.cachedOsUrl = model.url || ""
-            console.log("OSSelectionStep: Caching OS selection for back navigation - artifact_id:", model.artifact_id, "name:", model.name)
-            console.log("Routing to CIArtifactSelectionStep for artifact inspection")
-            // Advance to download step
-            root.nextClicked()
+            // Check if this is a single-file artifact that can bypass inspection
+            var artifactNameLower = (model.name || "").toLowerCase()
+            var isSingleWic = artifactNameLower.match(/\.wic(\.xz|\.gz|\.zst|\.bz2|\.lz4)?$/) !== null
+            var isSingleSpu = artifactNameLower.endsWith(".spu")
+
+            if (isGitHubArtifact && (isSingleWic || isSingleSpu)) {
+                // Single-file artifact - bypass inspection, use direct streaming
+                console.log("Single-file artifact detected, bypassing inspection:", model.name)
+                var displayName = model.name
+
+                if (isSingleSpu) {
+                    imageWriter.setSrcSpuArtifactStreaming(
+                        model.artifact_id, model.owner, model.repo,
+                        model.branch, model.name)
+                    root.wizardContainer.selectedSpuName = displayName
+                    root.wizardContainer.isSpuCopyMode = true
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = false
+                    root.wizardContainer.ccRpiAvailable = false
+                    root.wizardContainer.ifAndFeaturesAvailable = false
+                } else {
+                    imageWriter.setSrcArtifactStreaming(
+                        model.artifact_id, model.owner, model.repo,
+                        model.branch, model.image_download_size || 0,
+                        displayName, model.name)
+                    root.wizardContainer.selectedOsName = displayName
+                    root.wizardContainer.isSpuCopyMode = false
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = false
+                    root.wizardContainer.ccRpiAvailable = false
+                    root.wizardContainer.ifAndFeaturesAvailable = false
+                }
+
+                root.selectedArtifactModel = null
+                root.nextButtonEnabled = true
+                root.customSelected = false
+                root.nextClicked()
+            } else {
+                // Artifact needs inspection - store for CIArtifactSelectionStep
+                root.wizardContainer.pendingArtifactInspection = model
+                // Cache selection IDs for back navigation (model object gets invalidated on re-sort)
+                root.wizardContainer.cachedOsArtifactId = model.artifact_id || -1
+                root.wizardContainer.cachedOsName = model.name || ""
+                root.wizardContainer.cachedOsUrl = model.url || ""
+                console.log("OSSelectionStep: Caching OS selection for back navigation - artifact_id:", model.artifact_id, "name:", model.name)
+                console.log("Routing to CIArtifactSelectionStep for artifact inspection")
+                // Advance to download step
+                root.nextClicked()
+            }
         } else {
             // Direct file (.wic, .spu, .vsi) - configure source immediately
             // Determine file type from URL

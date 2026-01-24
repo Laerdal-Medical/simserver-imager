@@ -335,7 +335,39 @@ void DownloadExtractThread::extractImageRun()
         
         // Log the compression filter(s) being used for diagnostics
         _logCompressionFilters(a);
-        
+
+        // Fix extract total when JSON metadata has incorrect values.
+        // For uncompressed files: extract size equals download size, use Content-Length.
+        // For compressed files: if extract_size <= download size, it's clearly the
+        // compressed size (GitHub releases only provide download size). Try to get
+        // the real uncompressed size from the archive entry header (works for LZMA
+        // which stores it in the header; XZ stores it in the stream footer so it's
+        // unavailable during streaming). Fall back to unknown (indeterminate progress).
+        int filterCount = archive_filter_count(a);
+        uint64_t dlTotal = _lastDlTotal.load();
+        if (filterCount <= 1) {
+            if (dlTotal > 0) {
+                qDebug() << "Uncompressed file: overriding extract total from"
+                         << (_extractTotal.load() / (1024*1024)) << "MB to"
+                         << (dlTotal / (1024*1024)) << "MB (from Content-Length)";
+                _extractTotal.store(dlTotal);
+            }
+        } else if (dlTotal > 0 && _extractTotal.load() <= dlTotal) {
+            // extract_size from metadata is wrong (it's the compressed size).
+            // Try to get the real uncompressed size from the entry header.
+            qint64 entrySize = archive_entry_size(entry);
+            if (archive_entry_size_is_set(entry) && entrySize > 0) {
+                qDebug() << "Compressed file: using entry header uncompressed size:"
+                         << (entrySize / (1024*1024)) << "MB";
+                _extractTotal.store(static_cast<uint64_t>(entrySize));
+            } else {
+                qDebug() << "Compressed file: extract total" << (_extractTotal.load() / (1024*1024))
+                         << "MB <= download size" << (dlTotal / (1024*1024))
+                         << "MB - decompressed size unknown, using indeterminate progress";
+                _extractTotal.store(0);
+            }
+        }
+
         // Emit image extraction setup event (archive opened and header read)
         emit eventImageExtraction(static_cast<quint32>(extractionTimer.elapsed()), true);
 

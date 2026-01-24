@@ -4,6 +4,8 @@
 
 ### Features
 
+- **Direct Artifact Streaming**: Single-file CI artifacts (.wic, .wic.xz, .spu) are detected by filename and stream directly to USB, bypassing the CI artifact selection step. WIC images use a new two-stage ZIP extraction pipeline (DownloadArchiveExtractThread) that decompresses on-the-fly. SPU artifacts download the ZIP to cache and extract the entry to FAT32
+- **SPU URL Streaming**: SPU downloads from CDN or GitHub releases now stream directly to the FAT32 mount point while simultaneously caching to disk, eliminating the intermediate temp file
 - **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
 - **Download Speed Display**: Real-time download speed (Mbps) and estimated time remaining shown during download and verify operations with proper network/disk I/O units
 - **CI Artifact Selection Step**: Unified wizard step for downloading CI artifacts and selecting files from ZIP archives, replacing modal dialogs with integrated wizard flow. All GitHub CI artifacts are routed through the artifact selection step for inspection. Direct CDN artifact files (.wic, .spu, .vsi) skip this step and advance directly to storage selection
@@ -24,6 +26,8 @@
 
 ### Bug Fixes
 
+- **Uncompressed WIC Progress**: Fix write progress showing incorrect total for uncompressed .wic files from CDN where JSON metadata has wrong extract_size. Now uses actual Content-Length from curl when no compression filter is detected
+- **Compressed Image Validation**: Fix "not a valid disk image" error and >100% write progress for .wic.xz files from GitHub releases where extract_size reflects the compressed size. The 512-byte alignment check is now skipped for compressed source files, and write progress shows indeterminate state when the decompressed size is unknown
 - **Private Repo Downloads**: Fix 404 errors when downloading release assets from private GitHub repositories by using the API asset endpoint with proper authentication headers
 - **SPU Release Discovery**: Include SPU files in GitHub release search filters so firmware updates are discovered alongside WIC and VSI images
 - **ImBadge Style Fix**: Fix runtime ReferenceError warnings by using Style singleton directly instead of qualified RpiImager.Style access

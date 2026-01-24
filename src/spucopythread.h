@@ -8,6 +8,7 @@
 
 #include <QThread>
 #include <QString>
+#include <QStringList>
 #include <QByteArray>
 #include <QUrl>
 
@@ -51,7 +52,8 @@ public:
                   bool skipFormat, QObject *parent = nullptr);
 
     /**
-     * @brief Construct SPU copy thread for URL download (from CDN)
+     * @brief Construct SPU copy thread for URL download (from CDN or GitHub release)
+     * Streams directly to FAT32 mount while caching.
      * @param url URL to download the SPU file from
      * @param device Device path (e.g., "/dev/sdb" on Linux)
      * @param skipFormat If true, skip formatting (drive already FAT32)
@@ -59,6 +61,19 @@ public:
      */
     SPUCopyThread(const QUrl &url, const QByteArray &device,
                   bool skipFormat, QObject *parent = nullptr);
+
+    /**
+     * @brief Construct SPU copy thread for artifact ZIP streaming (CI artifacts)
+     * Downloads the ZIP, caches it, and extracts the target SPU entry to FAT32.
+     * @param artifactUrl URL to download the artifact ZIP from
+     * @param targetEntry Name of the SPU file entry within the ZIP
+     * @param device Device path (e.g., "/dev/sdb" on Linux)
+     * @param skipFormat If true, skip formatting (drive already FAT32)
+     * @param parent Parent object
+     */
+    SPUCopyThread(const QUrl &artifactUrl, const QString &targetEntry,
+                  const QByteArray &device, bool skipFormat,
+                  QObject *parent = nullptr);
 
     virtual ~SPUCopyThread();
 
@@ -73,6 +88,18 @@ public:
      * @param filename The desired filename (e.g. "image.spu")
      */
     void setDownloadFilename(const QString &filename);
+
+    /**
+     * @brief Set cache directory for caching downloads
+     * @param cacheDir Directory to store cached files
+     */
+    void setCacheDir(const QString &cacheDir);
+
+    /**
+     * @brief Set HTTP headers for authenticated downloads (e.g. GitHub artifacts)
+     * @param headers List of "Header-Name: value" strings
+     */
+    void setHttpHeaders(const QStringList &headers);
 
     /**
      * @brief Cancel the copy operation
@@ -140,10 +167,18 @@ private:
     bool copyDirectFile(const QString &mountPoint);
 
     /**
-     * @brief Download SPU file from URL to temp location
-     * @return Path to downloaded file, empty on failure
+     * @brief Stream SPU download directly to FAT32 mount and cache
+     * @param mountPoint Path where drive is mounted
+     * @return true on success
      */
-    QString downloadFromUrl();
+    bool streamUrlToFile(const QString &mountPoint);
+
+    /**
+     * @brief Download artifact ZIP to cache and extract SPU entry to mount
+     * @param mountPoint Path where drive is mounted
+     * @return true on success
+     */
+    bool downloadArtifactAndCopy(const QString &mountPoint);
 
     /**
      * @brief Unmount the drive
@@ -161,14 +196,18 @@ private:
     QString _archivePath;       ///< Path to ZIP archive
     QString _spuEntry;          ///< SPU filename within ZIP
     QString _spuFilePath;       ///< Direct SPU file path (if not from ZIP)
-    QUrl _spuUrl;               ///< URL to download SPU from (CDN)
+    QUrl _spuUrl;               ///< URL to download SPU from (CDN or artifact)
     QByteArray _device;         ///< Device path
     bool _skipFormat;           ///< Skip formatting if drive is already FAT32
     bool _isDirectFile;         ///< True if copying direct SPU file (not from ZIP)
-    bool _isUrlDownload;        ///< True if downloading from URL
+    bool _isUrlDownload;        ///< True if downloading from URL (standalone SPU)
+    bool _isArtifactStreaming;  ///< True if streaming from CI artifact ZIP
+    QString _artifactEntry;     ///< Target SPU entry name within artifact ZIP
     volatile bool _cancelled;   ///< Cancellation flag
     QString _authToken;         ///< OAuth token for authenticated downloads
     QString _downloadFilename;  ///< Override filename for downloaded file
+    QString _cacheDir;          ///< Cache directory for storing downloads
+    QStringList _httpHeaders;   ///< HTTP headers for authenticated requests
 };
 
 #endif // SPUCOPYTHREAD_H

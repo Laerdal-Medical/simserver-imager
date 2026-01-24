@@ -103,6 +103,11 @@ public:
                                                        const QString &branch, quint64 downloadLen, QString osname,
                                                        const QString &targetFilename, const QString &cachedZipPath);
 
+    /* Set GitHub artifact for direct WIC streaming (bypasses CI inspection step) */
+    Q_INVOKABLE void setSrcArtifactStreaming(qint64 artifactId, const QString &owner, const QString &repo,
+                                             const QString &branch, quint64 downloadLen, QString osname,
+                                             const QString &targetEntry = QString());
+
     /* Set device to write to */
     Q_INVOKABLE void setDst(const QString &device, quint64 deviceSize = 0);
 
@@ -435,6 +440,11 @@ public:
                                         const QString &repo, const QString &branch,
                                         const QString &spuFilename, const QString &zipPath);
 
+    /* Set SPU source for direct artifact streaming (bypasses CI inspection step) */
+    Q_INVOKABLE void setSrcSpuArtifactStreaming(qint64 artifactId, const QString &owner,
+                                                const QString &repo, const QString &branch,
+                                                const QString &spuFilename);
+
     /* Set SPU source from direct file path */
     Q_INVOKABLE void setSrcSpuFile(const QString &filePath);
 
@@ -575,6 +585,7 @@ protected:
 
     // GitHub artifact source tracking
     bool _isArtifactSource = false;
+    bool _isArtifactStreamingSource = false;  // Direct streaming (bypasses inspection)
     qint64 _artifactId = 0;
     QString _artifactOwner;
     QString _artifactRepo;
@@ -583,6 +594,7 @@ protected:
     QString _cachedArtifactZipPath;  // Path to cached artifact ZIP (from inspection)
     QString _artifactZipForStreaming;  // ZIP path for direct streaming (uncompressed WIC)
     QString _artifactEntryForStreaming;  // Entry name for direct streaming
+    QString _artifactStreamingEntry;  // Target entry for direct artifact streaming
     QSettings _settings;
     QMap<QString,QString> _translations;
     QTranslator *_trans;
@@ -615,10 +627,13 @@ protected:
 
     // SPU copy mode state
     bool _isSpuCopyMode = false;
+    bool _isSpuArtifactStreamingSource = false;  // Direct streaming from artifact ZIP
     QString _spuFilePath;           // Direct SPU file path
     QString _spuArchivePath;        // ZIP archive containing SPU
     QString _spuEntryName;          // SPU filename within ZIP
     QUrl _spuUrl;                   // CDN URL for SPU file
+    QUrl _spuArtifactUrl;           // Artifact download URL for streaming
+    QString _spuArtifactEntry;      // Target SPU entry in artifact ZIP
     quint64 _spuDownloadSize = 0;   // Expected download size
     QString _spuDisplayName;        // Display name for SPU
     class SPUCopyThread *_spuCopyThread = nullptr;

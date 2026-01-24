@@ -87,6 +87,19 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     during a CI artifact download by disconnecting network reply signals
     before abort. Show quit confirmation dialog during downloads matching
     the existing write operation behavior
+  * Direct Artifact Streaming: Single-file CI artifacts (.wic, .wic.xz, .spu)
+    stream directly to USB bypassing the artifact selection step. WIC images
+    use a two-stage ZIP extraction pipeline (DownloadArchiveExtractThread).
+    SPU artifacts download ZIP to cache and extract entry to FAT32
+  * SPU URL Streaming: SPU downloads from CDN or GitHub releases now stream
+    directly to FAT32 mount while caching to disk, eliminating temp file
+  * Uncompressed WIC Progress Fix: Use actual Content-Length from curl for
+    write progress total when no compression filter is detected, fixing wrong
+    progress for CDN .wic files with incorrect JSON metadata
+  * Compressed Image Validation Fix: Skip 512-byte alignment check and fix
+    >100% write progress for compressed .wic.xz files from GitHub releases
+    where extract_size reflects the compressed download size. Write progress
+    shows indeterminate state when decompressed size is unknown
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 24 Jan 2025 12:00:00 +0000
 

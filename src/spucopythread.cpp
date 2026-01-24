@@ -32,6 +32,7 @@ SPUCopyThread::SPUCopyThread(const QString &archivePath, const QString &spuEntry
     , _skipFormat(skipFormat)
     , _isDirectFile(false)
     , _isUrlDownload(false)
+    , _isArtifactStreaming(false)
     , _cancelled(false)
 {
 }
@@ -44,6 +45,7 @@ SPUCopyThread::SPUCopyThread(const QString &spuFilePath, const QByteArray &devic
     , _skipFormat(skipFormat)
     , _isDirectFile(true)
     , _isUrlDownload(false)
+    , _isArtifactStreaming(false)
     , _cancelled(false)
 {
 }
@@ -56,6 +58,22 @@ SPUCopyThread::SPUCopyThread(const QUrl &url, const QByteArray &device,
     , _skipFormat(skipFormat)
     , _isDirectFile(false)
     , _isUrlDownload(true)
+    , _isArtifactStreaming(false)
+    , _cancelled(false)
+{
+}
+
+SPUCopyThread::SPUCopyThread(const QUrl &artifactUrl, const QString &targetEntry,
+                             const QByteArray &device, bool skipFormat,
+                             QObject *parent)
+    : QThread(parent)
+    , _spuUrl(artifactUrl)
+    , _artifactEntry(targetEntry)
+    , _device(device)
+    , _skipFormat(skipFormat)
+    , _isDirectFile(false)
+    , _isUrlDownload(false)
+    , _isArtifactStreaming(true)
     , _cancelled(false)
 {
 }
@@ -76,6 +94,16 @@ void SPUCopyThread::setDownloadFilename(const QString &filename)
     _downloadFilename = filename;
 }
 
+void SPUCopyThread::setCacheDir(const QString &cacheDir)
+{
+    _cacheDir = cacheDir;
+}
+
+void SPUCopyThread::setHttpHeaders(const QStringList &headers)
+{
+    _httpHeaders = headers;
+}
+
 void SPUCopyThread::cancelCopy()
 {
     _cancelled = true;
@@ -87,7 +115,12 @@ void SPUCopyThread::run()
     qDebug() << "  Device:" << _device;
     qDebug() << "  Skip format:" << _skipFormat;
 
-    if (_isUrlDownload)
+    if (_isArtifactStreaming)
+    {
+        qDebug() << "  Artifact URL:" << _spuUrl;
+        qDebug() << "  Target entry:" << _artifactEntry;
+    }
+    else if (_isUrlDownload)
     {
         qDebug() << "  SPU URL:" << _spuUrl;
     }
@@ -99,21 +132,6 @@ void SPUCopyThread::run()
     {
         qDebug() << "  Archive:" << _archivePath;
         qDebug() << "  SPU entry:" << _spuEntry;
-    }
-
-    // Step 0: Download from URL if needed
-    if (_isUrlDownload)
-    {
-        emit preparationStatusUpdate(tr("Downloading SPU file..."));
-        QString downloadedPath = downloadFromUrl();
-        if (downloadedPath.isEmpty())
-        {
-            return; // Error already emitted
-        }
-        // Switch to direct file mode with the downloaded file
-        _spuFilePath = downloadedPath;
-        _isDirectFile = true;
-        _isUrlDownload = false;
     }
 
     // Step 1: Format drive if needed
@@ -167,16 +185,27 @@ void SPUCopyThread::run()
         return;
     }
 
-    // Step 3: Copy SPU file
-    emit preparationStatusUpdate(tr("Copying SPU file..."));
+    // Step 3: Copy SPU file (method depends on source type)
     bool copySuccess = false;
 
-    if (_isDirectFile)
+    if (_isArtifactStreaming)
     {
+        emit preparationStatusUpdate(tr("Downloading artifact..."));
+        copySuccess = downloadArtifactAndCopy(mountPoint);
+    }
+    else if (_isUrlDownload)
+    {
+        emit preparationStatusUpdate(tr("Streaming SPU file..."));
+        copySuccess = streamUrlToFile(mountPoint);
+    }
+    else if (_isDirectFile)
+    {
+        emit preparationStatusUpdate(tr("Copying SPU file..."));
         copySuccess = copyDirectFile(mountPoint);
     }
     else
     {
+        emit preparationStatusUpdate(tr("Extracting SPU file..."));
         copySuccess = extractAndCopy(mountPoint);
     }
 
@@ -418,57 +447,225 @@ bool SPUCopyThread::copyDirectFile(const QString &mountPoint)
     return success;
 }
 
-QString SPUCopyThread::downloadFromUrl()
+bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
 {
-    qDebug() << "SPUCopyThread: Downloading SPU from URL:" << _spuUrl;
+    qDebug() << "SPUCopyThread: Streaming SPU from URL:" << _spuUrl;
 
-    // Create temp directory for download
-    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     QString filename = _downloadFilename.isEmpty() ? _spuUrl.fileName() : _downloadFilename;
     if (filename.isEmpty())
     {
         filename = "downloaded.spu";
     }
-    QString tempPath = tempDir + "/laerdal-spu-" + filename;
 
-    qDebug() << "SPUCopyThread: Downloading to:" << tempPath;
+    QString destPath = mountPoint + "/" + filename;
+    qDebug() << "SPUCopyThread: Streaming to:" << destPath;
 
-    // Use synchronous download with event loop
+    // Open destination file on FAT32 mount
+    QFile destFile(destPath);
+    if (!destFile.open(QIODevice::WriteOnly))
+    {
+        emit error(tr("Failed to create file on USB drive: %1").arg(destFile.errorString()));
+        return false;
+    }
+
+    // Optionally open cache file for simultaneous caching
+    QFile cacheFile;
+    bool caching = false;
+    if (!_cacheDir.isEmpty())
+    {
+        QDir().mkpath(_cacheDir);
+        QString cachePath = _cacheDir + "/" + filename;
+        cacheFile.setFileName(cachePath);
+        if (cacheFile.open(QIODevice::WriteOnly))
+        {
+            caching = true;
+            qDebug() << "SPUCopyThread: Also caching to:" << cachePath;
+        }
+        else
+        {
+            qWarning() << "SPUCopyThread: Could not open cache file:" << cachePath;
+        }
+    }
+
+    // Set up network request
     QNetworkAccessManager manager;
     QNetworkRequest request(_spuUrl);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
 
-    if (!_authToken.isEmpty()) {
+    if (!_authToken.isEmpty())
+    {
         request.setRawHeader("Authorization", QString("token %1").arg(_authToken).toUtf8());
         request.setRawHeader("Accept", "application/octet-stream");
     }
 
-    QNetworkReply *reply = manager.get(request);
-
-    // Open file for writing
-    QFile file(tempPath);
-    if (!file.open(QIODevice::WriteOnly))
+    for (const QString &header : _httpHeaders)
     {
-        emit error(tr("Failed to create temporary file: %1").arg(file.errorString()));
-        reply->deleteLater();
-        return QString();
+        int colonPos = header.indexOf(':');
+        if (colonPos > 0)
+        {
+            QByteArray name = header.left(colonPos).trimmed().toUtf8();
+            QByteArray value = header.mid(colonPos + 1).trimmed().toUtf8();
+            request.setRawHeader(name, value);
+        }
     }
 
-    // Track download progress
-    qint64 totalBytes = 0;
-    qint64 receivedBytes = 0;
+    QNetworkReply *reply = manager.get(request);
+
+    bool success = true;
+    qint64 totalWritten = 0;
 
     QEventLoop loop;
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
 
     connect(reply, &QNetworkReply::downloadProgress, reply,
-            [this, &receivedBytes, &totalBytes](qint64 received, qint64 total) {
-                receivedBytes = received;
+            [this](qint64 received, qint64 total) {
                 if (total > 0)
                 {
-                    totalBytes = total;
                     emit copyProgress(received, total);
+                }
+            });
+
+    // Stream each chunk directly to FAT32 and cache
+    connect(reply, &QNetworkReply::readyRead, reply,
+            [this, &destFile, &cacheFile, &caching, &success, &totalWritten, reply]() {
+                if (_cancelled || !success) return;
+
+                QByteArray data = reply->readAll();
+                qint64 written = destFile.write(data);
+                if (written != data.size())
+                {
+                    success = false;
+                    return;
+                }
+                totalWritten += written;
+
+                if (caching)
+                {
+                    cacheFile.write(data);
+                }
+            });
+
+    loop.exec();
+
+    // Write any remaining data
+    if (success && !_cancelled)
+    {
+        QByteArray remaining = reply->readAll();
+        if (!remaining.isEmpty())
+        {
+            qint64 written = destFile.write(remaining);
+            if (written != remaining.size()) success = false;
+            totalWritten += written;
+            if (caching) cacheFile.write(remaining);
+        }
+    }
+
+    destFile.flush();
+    destFile.close();
+    if (caching)
+    {
+        cacheFile.flush();
+        cacheFile.close();
+    }
+
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        emit error(tr("Download failed: %1").arg(reply->errorString()));
+        destFile.remove();
+        if (caching) cacheFile.remove();
+        reply->deleteLater();
+        return false;
+    }
+
+    if (!success)
+    {
+        emit error(tr("Error writing to USB drive: %1").arg(destFile.errorString()));
+        destFile.remove();
+        if (caching) cacheFile.remove();
+        reply->deleteLater();
+        return false;
+    }
+
+    reply->deleteLater();
+    qDebug() << "SPUCopyThread: Streaming complete," << totalWritten << "bytes written";
+    return true;
+}
+
+bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
+{
+    qDebug() << "SPUCopyThread: Downloading artifact ZIP from:" << _spuUrl;
+    qDebug() << "SPUCopyThread: Target SPU entry:" << _artifactEntry;
+
+    // Determine cache path for the ZIP
+    QString cachePath;
+    if (!_cacheDir.isEmpty())
+    {
+        QDir().mkpath(_cacheDir);
+        // Use URL hash as cache key
+        QString urlHash = QString::number(qHash(_spuUrl.toString()), 16);
+        cachePath = _cacheDir + "/artifact_" + urlHash + ".zip";
+
+        // Check if already cached
+        if (QFile::exists(cachePath))
+        {
+            qDebug() << "SPUCopyThread: Using cached artifact ZIP:" << cachePath;
+            _archivePath = cachePath;
+            _spuEntry = _artifactEntry;
+            return extractAndCopy(mountPoint);
+        }
+    }
+    else
+    {
+        // No cache dir - use temp location
+        QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+        cachePath = tempDir + "/laerdal-artifact-" + _spuUrl.fileName();
+    }
+
+    qDebug() << "SPUCopyThread: Downloading artifact to:" << cachePath;
+
+    // Download the full artifact ZIP
+    QNetworkAccessManager manager;
+    QNetworkRequest request(_spuUrl);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    if (!_authToken.isEmpty())
+    {
+        request.setRawHeader("Authorization", QString("Bearer %1").arg(_authToken).toUtf8());
+        request.setRawHeader("Accept", "application/octet-stream");
+    }
+
+    for (const QString &header : _httpHeaders)
+    {
+        int colonPos = header.indexOf(':');
+        if (colonPos > 0)
+        {
+            QByteArray name = header.left(colonPos).trimmed().toUtf8();
+            QByteArray value = header.mid(colonPos + 1).trimmed().toUtf8();
+            request.setRawHeader(name, value);
+        }
+    }
+
+    QNetworkReply *reply = manager.get(request);
+
+    QFile file(cachePath);
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        emit error(tr("Failed to create cache file: %1").arg(file.errorString()));
+        reply->deleteLater();
+        return false;
+    }
+
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+
+    connect(reply, &QNetworkReply::downloadProgress, reply,
+            [this](qint64 received, qint64 total) {
+                if (total > 0)
+                {
+                    // Show download progress as first half of the operation
+                    emit copyProgress(received, total * 2);
                 }
             });
 
@@ -477,35 +674,30 @@ QString SPUCopyThread::downloadFromUrl()
                 file.write(reply->readAll());
             });
 
-    // Start the event loop
     loop.exec();
 
-    // Write any remaining buffered data
     QByteArray remaining = reply->readAll();
-    if (!remaining.isEmpty()) {
+    if (!remaining.isEmpty())
+    {
         file.write(remaining);
     }
-
     file.close();
 
     if (reply->error() != QNetworkReply::NoError)
     {
-        emit error(tr("Download failed: %1").arg(reply->errorString()));
+        emit error(tr("Artifact download failed: %1").arg(reply->errorString()));
         file.remove();
         reply->deleteLater();
-        return QString();
+        return false;
     }
 
-    int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();
-    QUrl finalUrl = reply->url();
-    qDebug() << "SPUCopyThread: HTTP status:" << httpStatus << "Content-Type:" << contentType;
-    qDebug() << "SPUCopyThread: Final URL:" << finalUrl;
-
     reply->deleteLater();
+    qDebug() << "SPUCopyThread: Artifact download complete, size:" << QFileInfo(cachePath).size();
 
-    qDebug() << "SPUCopyThread: Download complete, size:" << QFileInfo(tempPath).size();
-    return tempPath;
+    // Now extract the SPU entry from the downloaded ZIP
+    _archivePath = cachePath;
+    _spuEntry = _artifactEntry;
+    return extractAndCopy(mountPoint);
 }
 
 void SPUCopyThread::deleteExistingSpuFiles(const QString &mountPoint)
