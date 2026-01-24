@@ -605,7 +605,6 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/WarningDialog.qml
       qmlcomponents/ErrorDialog.qml
       qmlcomponents/ActionMessageDialog.qml
-      qmlcomponents/ResumeDownloadDialog.qml
       qmlcomponents/ImButton.qml
       qmlcomponents/ImButtonRed.qml
       qmlcomponents/ImCheckBox.qml
