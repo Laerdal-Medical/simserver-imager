@@ -19,6 +19,7 @@
 - **QML Lint Compliance**: Fixed unqualified property access across wizard components using `pragma ComponentBehavior: Bound`
 - **Write Progress Status Consolidation**: Bottleneck status is now shown inline with speed and ETA instead of as a separate line below. Time remaining and throughput are displayed during both write and verify phases, and speed is only shown when a valid ETA is available. Bottleneck detection now distinguishes between storage, network, and decompression bottlenecks, only warning when throughput drops below 15 MB/s
 - **OS Selection Navigation**: OS list model is no longer unnecessarily reloaded and re-sorted when navigating back to the OS selection step. The C++ model persists across QML component recreation, so data is only loaded once per session, improving performance and eliminating redundant sorting
+- **CI Build Deduplication**: Prevent duplicate CI builds when a tag and branch push arrive for the same commit by using a SHA-based concurrency group. Tag builds take priority over branch builds
 - **Button and Component Theming**: Replace hardcoded `Qt.rgba()` disabled colors with dedicated Style properties (`buttonDisabledBackgroundColor`, `button2DisabledBackgroundColor`, `popupDisabledBorderColor`, etc.) for consistent Laerdal branding. Remove legacy `raspberryRed` alias and update all component focus/hover colors to use `laerdalBlue`
 
 ### Bug Fixes

@@ -38,6 +38,8 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     displayed during both write and verify phases. Bottleneck detection now
     distinguishes storage, network, and decompression, warning only when
     throughput drops below 15 MB/s
+  * CI Build Deduplication: Prevent duplicate builds when tag and branch
+    push arrive for same commit using SHA-based concurrency group
   * OS Selection Navigation: OS list model is no longer unnecessarily
     reloaded and re-sorted when navigating back to the OS selection step.
     The C++ model persists across QML component recreation, so data is only
