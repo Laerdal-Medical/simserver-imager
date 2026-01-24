@@ -183,6 +183,8 @@ ApplicationWindow {
         id: quitDialog
         imageWriter: window.imageWriter
         parent: overlayRoot
+        headerIconVisible: true
+        headerIconBackgroundColor: Style.accentColor
 
         title: qsTr("Are you sure you want to quit?")
         message: wizardContainer.isWriting

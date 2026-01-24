@@ -21,7 +21,7 @@ Item {
     readonly property color successColor: "#37a851"          // Green for success states
     readonly property color errorColor: "#d32f2f"            // Red for error states
     readonly property color warningBackgroundColor: "#fff3cd" // Light yellow background for warnings
-    readonly property color warningTextColor: "#856404"      // Dark yellow/brown text for warnings
+    readonly property color warningTextColor: '#b18133'      // Dark yellow/brown text for warnings
     readonly property color accentColor: laerdalBlue         // Accent color for highlights
     readonly property color cardBackground: "#f8f9fa"        // Light gray for card backgrounds
 
