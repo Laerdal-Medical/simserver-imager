@@ -29,9 +29,11 @@ Button {
     }
 
     background: Rectangle {
-        color: control.enabled ? (control.activeFocus ? Style.buttonFocusedBackgroundColor : (control.hovered ? Style.buttonHoveredBackgroundColor : Style.buttonBackgroundColor)) : Qt.rgba(0, 0, 0, 0.1)
+        color: control.enabled ? (control.activeFocus ? Style.buttonFocusedBackgroundColor :
+              (control.hovered ? Style.buttonHoveredBackgroundColor : Style.buttonBackgroundColor)) : 
+               Style.buttonDisabledBackgroundColor
         radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? Style.buttonBorderRadiusEmbedded : 4
-        border.color: control.enabled ? Style.popupBorderColor : Qt.rgba(0, 0, 0, 0.2)
+        border.color: control.enabled ? Style.popupBorderColor : Style.popupDisabledBorderColor
         border.width: 1
         antialiasing: true  // Smooth edges at non-integer scale factors
         clip: true  // Prevent content overflow at non-integer scale factors
@@ -47,7 +49,7 @@ Button {
         font.pixelSize: control.font.pixelSize
         minimumPixelSize: Math.round(control.font.pixelSize * 0.7)  // Don't shrink below 70%
         fontSizeMode: Text.HorizontalFit
-        color: control.enabled ? Style.buttonForegroundColor : Qt.rgba(0, 0, 0, 0.3)
+        color: control.enabled ? Style.buttonForegroundColor : Style.buttonDisabledForegroundColor
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight  // Fallback if still too long at minimum size

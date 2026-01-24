@@ -33,7 +33,7 @@ Button {
                ? (control.activeFocus
                    ? Style.button2HoveredBackgroundColor
                    : (control.hovered ? Style.button2HoveredBackgroundColor : Style.button2BackgroundColor))
-               : Qt.rgba(0, 0, 0, 0.1)
+               : Style.button2DisabledBackgroundColor
         radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? Style.buttonBorderRadiusEmbedded : 4
         antialiasing: true  // Smooth edges at non-integer scale factors
         clip: true  // Prevent content overflow at non-integer scale factors
@@ -43,8 +43,8 @@ Button {
         text: control.text
         font: control.font
         color: control.enabled
-               ? (control.activeFocus || control.hovered ? Style.raspberryRed : Style.button2ForegroundColor)
-               : Qt.rgba(0, 0, 0, 0.3)
+               ? (control.activeFocus || control.hovered ? Style.button2FocusedBackgroundColor : Style.button2ForegroundColor)
+               : Style.button2DisabledForegroundColor
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
     }

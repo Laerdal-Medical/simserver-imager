@@ -25,32 +25,35 @@ Item {
     readonly property color accentColor: laerdalBlue         // Accent color for highlights
     readonly property color cardBackground: "#f8f9fa"        // Light gray for card backgrounds
 
-    // Legacy alias for compatibility
-    readonly property color raspberryRed: laerdalBlue
-
     readonly property color buttonBackgroundColor: mainBackgroundColor
     readonly property color buttonForegroundColor: laerdalBlue
-    readonly property color buttonFocusedBackgroundColor: "#d1e8f0"
-    readonly property color buttonHoveredBackgroundColor: "#f2f2f2"
+    readonly property color buttonDisabledBackgroundColor: "#805fa8c4"
+    readonly property color buttonDisabledForegroundColor: "#5fa8c4"
+    
+    readonly property color buttonFocusedBackgroundColor: "#a05fa8c4"
+    readonly property color buttonHoveredBackgroundColor: '#7fc5e0'
 
     readonly property color button2BackgroundColor: laerdalBlue
     readonly property color button2ForegroundColor: mainBackgroundColor
+    readonly property color button2FocusedForegroundColor: laerdalBlueLight
+    readonly property color button2DisabledBackgroundColor: "#702e7fa1"
+    readonly property color button2DisabledForegroundColor: "#5fa8c4"
     // Focused: noticeably darker for strong state indication (keyboard focus)
     readonly property color button2FocusedBackgroundColor: laerdalDarkBlue
     // Hovered: noticeably lighter to differentiate from base (≥4.5:1 contrast vs base)
-    readonly property color button2HoveredBackgroundColor: "#c7e0ea"
+    readonly property color button2HoveredBackgroundColor: '#5fb8db'
     // Hovered foreground should be Laerdal Blue for ≥4.5:1 contrast on the light hover bg
     readonly property color button2HoveredForegroundColor: laerdalBlue
-    readonly property color raspberryRedHighlight: laerdalLightBlue
 
-    readonly property color titleBackgroundColor: "#f5f5f5"
-    readonly property color titleSeparatorColor: "#afafaf"
-    readonly property color popupBorderColor: "#dcdcdc"
+    readonly property color titleBackgroundColor: '#f1f5f7'
+    readonly property color titleSeparatorColor: "#301a5a73"
+    readonly property color popupBorderColor: '#bed5e8f6'
+    readonly property color popupDisabledBorderColor: '#405fa7c4'
 
     readonly property color listViewRowBackgroundColor: "#ffffff"
-    readonly property color listViewHoverRowBackgroundColor: titleBackgroundColor
+    readonly property color listViewHoverRowBackgroundColor: "#40BACCE7"
     // Selection highlight color for OS/device lists
-    readonly property color listViewHighlightColor: "#BACCE7"
+    readonly property color listViewHighlightColor: "#80BACCE7"
 
     // Utility translucent colors
     readonly property color translucentWhite10: Qt.rgba(255, 255, 255, 0.1)
@@ -62,9 +65,9 @@ Item {
     readonly property color sidebarActiveBackgroundColor: laerdalBlue
     readonly property color sidebarTextOnActiveColor: "#FFFFFF"
     readonly property color sidebarTextOnInactiveColor: laerdalBlue
-    readonly property color sidebarTextDisabledColor: "#E0E0E0"
+    readonly property color sidebarTextDisabledColor: "#202e7fa1"
     // Sidebar controls
-    readonly property color sidebarControlBorderColor: "#767676"
+    readonly property color sidebarControlBorderColor: "#502e7fa1"
     readonly property color sidebarBackgroundColour: mainBackgroundColor
     readonly property color sidebarBorderColour: laerdalBlue
 
@@ -74,19 +77,19 @@ Item {
     // for the "device / OS / storage" titles
     readonly property color subtitleColor: "#ffffff"
 
-    readonly property color progressBarTextColor: "white"
+    readonly property color progressBarTextColor: '#70c6e8'
     readonly property color progressBarVerifyForegroundColor: "#37a851"  // Laerdal success green
     readonly property color progressBarBackgroundColor: laerdalBlue
     // New: distinct colors for writing vs verification phases
     readonly property color progressBarWritingForegroundColor: laerdalBlue
-    readonly property color progressBarTrackColor: titleBackgroundColor
+    readonly property color progressBarTrackColor: '#eefafe'
 
     readonly property color lanbarBackgroundColor: "#ffffe3"
 
     /// the check-boxes/radio-buttons have labels that might be disabled
     readonly property color formLabelColor: "black"
     readonly property color formLabelErrorColor: "red"
-    readonly property color formLabelDisabledColor: "grey"
+    readonly property color formLabelDisabledColor: "#202e7fa1"
     // Active color for radio buttons, checkboxes, and switches
     readonly property color formControlActiveColor: "#1955AE"
 
@@ -117,6 +120,7 @@ Item {
     readonly property int fontSizeFormLabel: fontSizeSm
     readonly property int fontSizeSubtitle: fontSizeSm
     readonly property int fontSizeDescription: fontSizeXs
+    readonly property int fontSizeProgressBar: fontSizeMd
     readonly property int fontSizeInput: fontSizeXs
     readonly property int fontSizeCaption: fontSizeXs
     readonly property int fontSizeSmall: fontSizeXs
