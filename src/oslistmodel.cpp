@@ -521,6 +521,41 @@ QHash<int, QByteArray> OSListModel::roleNames() const
     };
 }
 
+QVariantMap OSListModel::getOsEntry(int index) const
+{
+    QVariantMap result;
+    if (index < 0 || index >= _osList.size())
+        return result;
+
+    const OS &os = _osList[index];
+    result["name"] = os.name;
+    result["description"] = os.description;
+    result["devices"] = os.devices;
+    result["capabilities"] = os.capabilities;
+    result["extract_sha256"] = os.extractSha256;
+    result["extract_size"] = os.extractSize;
+    result["icon"] = os.icon;
+    result["image_download_size"] = os.imageDownloadSize;
+    result["init_format"] = os.initFormat;
+    result["release_date"] = os.releaseDate;
+    result["url"] = os.url;
+    result["random"] = os.random;
+    result["subitems_json"] = os.subitemsJson;
+    result["tooltip"] = os.tooltip;
+    result["website"] = os.website;
+    result["architecture"] = os.architecture;
+    result["enable_rpi_connect"] = os.enableRPiConnect;
+    result["source"] = os.source;
+    result["source_type"] = os.sourceType;
+    result["branch"] = os.branch;
+    result["artifact_id"] = static_cast<qint64>(os.artifactId);
+    result["source_owner"] = os.sourceOwner;
+    result["source_repo"] = os.sourceRepo;
+    result["release_asset_id"] = static_cast<qint64>(os.releaseAssetId);
+
+    return result;
+}
+
 QVariant OSListModel::data(const QModelIndex &index, int role) const {
     const int row = index.row();
     if (row < 0 || row >= _osList.size())

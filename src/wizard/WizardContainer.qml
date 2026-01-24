@@ -27,11 +27,11 @@ Item {
     // This updates reactively when OS list becomes available after a retry
     readonly property bool hasNetworkConnectivity: !imageWriter.isOsListUnavailable
     
-    // Laerdal simplified wizard: Device -> Source -> OS -> Storage -> Writing -> Done
+    // Laerdal simplified wizard: Device -> Source -> OS -> (CI Artifact) -> Storage -> Writing -> Done
     // NOT a binding, so it won't auto-change when hasNetworkConnectivity changes.
     // The onOsListUnavailableChanged handler manages the offline→online transition.
     property int currentStep: 0
-    readonly property int totalSteps: 6
+    readonly property int totalSteps: 7
     
     // Track which steps have been made permissible/unlocked for navigation
     // Each bit represents a step: bit 0 = Device, bit 1 = OS, etc.
@@ -45,7 +45,26 @@ Item {
 
     // Track if a startup image was provided via command line
     property bool hasStartupImage: false
-    
+
+    // Track pending artifact inspection for CIArtifactSelectionStep
+    property var pendingArtifactInspection: null
+
+    // Cached OS selection for back navigation from CIArtifactSelectionStep
+    // Store artifact_id instead of model object (which gets invalidated on re-sort)
+    property int cachedOsArtifactId: -1
+    property string cachedOsName: ""
+    property string cachedOsUrl: ""
+
+    // Cached artifact inspection results for back navigation
+    property var cachedArtifactFiles: []
+    property int cachedSelectedFileIndex: -1
+    property var cachedArtifactId: 0
+    property string cachedArtifactName: ""
+    property string cachedArtifactOwner: ""
+    property string cachedArtifactRepo: ""
+    property string cachedArtifactBranch: ""
+    property string cachedArtifactZipPath: ""
+
     // Track selections for display in summary
     property string selectedDeviceName: ""
     property string selectedOsName: ""
@@ -58,6 +77,9 @@ Item {
     property bool supportsSerialConsoleOnly: false
     property bool supportsUsbGadget: false
     
+    // Track the source type used for the last OS list load (to detect CDN/GitHub switches)
+    property string lastOsListSourceType: ""
+
     // Track customizations that were actually configured
     property bool hostnameConfigured: false
     property bool localeConfigured: false
@@ -121,9 +143,10 @@ Item {
     readonly property int stepDeviceSelection: 0
     readonly property int stepSourceSelection: 1
     readonly property int stepOSSelection: 2
-    readonly property int stepStorageSelection: 3
-    readonly property int stepWriting: 4
-    readonly property int stepDone: 5
+    readonly property int stepCIArtifactSelection: 3
+    readonly property int stepStorageSelection: 4
+    readonly property int stepWriting: 5
+    readonly property int stepDone: 6
 
     // SPU flow step (alternative flow when SPU source is selected)
     readonly property int stepSpuCopy: 10
@@ -243,6 +266,7 @@ Item {
         qsTr("Device"),
         qsTr("Source"),
         qsTr("System Image"),
+        qsTr("Select File"),
         qsTr("Storage"),
         qsTr("Writing"),
         qsTr("Done")
@@ -472,11 +496,11 @@ Item {
                                     text: stepItem.modelData
                                     font.pixelSize: Style.fontSizeSidebarItem
                                     font.family: Style.fontFamily
-                                    color: (stepItem.index > root.getSidebarIndex(root.currentStep) || (stepItem.index === 3 && !root.customizationSupported))
-                                               ? Style.formLabelDisabledColor
-                                               : (stepItem.index === root.getSidebarIndex(root.currentStep)
-                                                   ? Style.sidebarTextOnActiveColor
-                                                   : Style.sidebarTextOnInactiveColor)
+                                    color: stepItem.index === root.getSidebarIndex(root.currentStep)
+                                               ? Style.sidebarTextOnActiveColor
+                                               : (stepItem.index > root.getSidebarIndex(root.currentStep) || (stepItem.index === 3 && !root.customizationSupported))
+                                                   ? Style.formLabelDisabledColor
+                                                   : Style.sidebarTextOnInactiveColor
                                 }
                             }
                         }
@@ -604,10 +628,7 @@ Item {
                 
                 // [moved] Advanced options lives outside the scroll area
                 }
-                ScrollBar.vertical: ScrollBar { 
-                    width: Style.scrollBarWidth
-                    policy: ScrollBar.AsNeeded 
-                }
+                // ScrollBar.vertical: ImScrollBar { }
             }
             // Fixed bottom container for Advanced Options
             Item {
@@ -723,20 +744,35 @@ Item {
     
     // Navigation functions - Laerdal simplified (no customization steps)
     function nextStep() {
+        console.log("WizardContainer.nextStep(): currentStep =", root.currentStep, "isSpuCopyMode =", root.isSpuCopyMode)
+
         if (root.currentStep < root.totalSteps - 1) {
             var nextIndex = root.currentStep + 1
 
+            // CI artifact routing: after OS selection, conditionally route to CI artifact selection
+            if (root.currentStep === stepOSSelection) {
+                if (pendingArtifactInspection !== null) {
+                    console.log("WizardContainer.nextStep(): Routing to CI artifact selection")
+                    nextIndex = stepCIArtifactSelection
+                } else {
+                    // Skip CI artifact selection - go directly to storage
+                    console.log("WizardContainer.nextStep(): Skipping CI artifact selection, going to storage")
+                    nextIndex = stepStorageSelection
+                }
+            }
             // Special handling for "write another" mode: skip directly to writing step after storage selection
-            if (writeAnotherMode && root.currentStep === stepStorageSelection) {
+            else if (writeAnotherMode && root.currentStep === stepStorageSelection) {
+                console.log("WizardContainer.nextStep(): Write another mode - going to writing")
                 nextIndex = stepWriting
                 writeAnotherMode = false  // Reset the flag
             }
-
             // SPU mode routing: after storage selection, go to SPU copy step instead of writing
-            if (root.isSpuCopyMode && root.currentStep === stepStorageSelection) {
+            else if (root.isSpuCopyMode && root.currentStep === stepStorageSelection) {
+                console.log("WizardContainer.nextStep(): SPU mode - going to SPU copy step")
                 nextIndex = stepSpuCopy
             }
 
+            console.log("WizardContainer.nextStep(): Moving from step", root.currentStep, "to step", nextIndex)
             root.currentStep = nextIndex
             var nextComponent = getStepComponent(root.currentStep)
             if (nextComponent) {
@@ -751,6 +787,7 @@ Item {
     function previousStep() {
         if (root.currentStep > 0) {
             var prevIndex = root.currentStep - 1
+
             root.currentStep = prevIndex
             var prevComponent = getStepComponent(root.currentStep)
             if (prevComponent) {
@@ -873,6 +910,7 @@ Item {
             case stepDeviceSelection: return deviceSelectionStep
             case stepSourceSelection: return sourceSelectionStep
             case stepOSSelection: return osSelectionStep
+            case stepCIArtifactSelection: return ciArtifactSelectionStep
             case stepStorageSelection: return storageSelectionStep
             case stepWriting: return writingStep
             case stepDone: return doneStep
@@ -935,7 +973,16 @@ Item {
             onBackClicked: root.previousStep()
         }
     }
-    
+
+    Component {
+        id: ciArtifactSelectionStep
+        CIArtifactSelectionStep {
+            imageWriter: root.imageWriter
+            wizardContainer: root
+            // CIArtifactSelectionStep handles navigation internally - don't connect nextClicked or backClicked
+        }
+    }
+
     Component {
         id: storageSelectionStep
         StorageSelectionStep {
@@ -1120,6 +1167,20 @@ Item {
                 root.jumpToStep(root.stepStorageSelection)
             }
         }
+    }
+
+    // Centralized error dialog for wizard steps
+    ErrorDialog {
+        id: wizardErrorDialog
+        imageWriter: root.imageWriter
+        parent: root
+        anchors.centerIn: parent
+    }
+
+    function showError(title, message) {
+        wizardErrorDialog.title = title
+        wizardErrorDialog.message = message
+        wizardErrorDialog.open()
     }
 
     // Token conflict dialog — security confirmation for token replacement

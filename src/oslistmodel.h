@@ -92,6 +92,8 @@ public:
     // Emit dataChanged for all rows without resetting the model
     Q_INVOKABLE void softRefresh();
 
+    Q_INVOKABLE QVariantMap getOsEntry(int index) const;
+
     // Adds "(Recommended)" to the description of the first OS
     Q_INVOKABLE void markFirstAsRecommended();
 

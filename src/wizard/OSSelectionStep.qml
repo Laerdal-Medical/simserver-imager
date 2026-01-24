@@ -20,8 +20,10 @@ WizardStepBase {
     readonly property HWListModel hwmodel: imageWriter.getHWList()
     readonly property OSListModel osmodel: imageWriter.getOSList()
     
-    title: qsTr("Choose system image")
-    subtitle: qsTr("Select a system image to install on your device")
+    title: repoManager && repoManager.selectedSourceType == 'github' ? 
+        qsTr("Choose CI Artifact") : qsTr("Choose system image")
+    subtitle: repoManager && repoManager.selectedSourceType == 'github' ? 
+        qsTr("Choose CI Artifact to install on your device") : qsTr("Select a system image to install on your device")
     showNextButton: true
     // Disable Next until a concrete OS has been selected
     nextButtonEnabled: oslist.currentIndex !== -1 && wizardContainer.selectedOsName.length > 0
@@ -71,24 +73,75 @@ WizardStepBase {
         if (!model) return
 
         console.log("Inspecting artifact:", model.artifact_id, model.name)
-        root.pendingArtifactModel = model
-        root.selectedArtifactModel = null  // Clear so we don't re-inspect
 
-        // Show download progress dialog
-        artifactDownloadProgressDialog.artifactName = model.name
-        artifactDownloadProgressDialog.progress = 0
-        artifactDownloadProgressDialog.indeterminate = true
-        artifactDownloadProgressDialog.open()
+        // Check if artifact needs inspection:
+        // 1. GitHub CI artifacts (have artifact_id) ALWAYS need inspection
+        // 2. ZIP files (URL ends with .zip) need inspection
+        // 3. Artifacts marked with contains_multiple_files flag need inspection
+        var isGitHubArtifact = typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0
+        var isZipUrl = model.url && model.url.toLowerCase().endsWith(".zip")
+        var hasMultipleFiles = typeof(model.contains_multiple_files) !== "undefined" && model.contains_multiple_files
+        var needsInspection = isGitHubArtifact || isZipUrl || hasMultipleFiles
 
-        // Request artifact inspection - this will download and scan the ZIP
-        var repoManager = imageWriter.getRepositoryManager()
-        repoManager.inspectArtifact(
-            model.artifact_id,
-            model.name,
-            model.source_owner,
-            model.source_repo,
-            typeof(model.branch) !== "undefined" ? model.branch : ""
-        )
+        console.log("Artifact inspection check: isGitHubArtifact=" + isGitHubArtifact +
+                    " isZipUrl=" + isZipUrl +
+                    " hasMultipleFiles=" + hasMultipleFiles +
+                    " -> needsInspection=" + needsInspection)
+
+        if (needsInspection) {
+            // Artifact needs inspection - store for CIArtifactSelectionStep
+            root.wizardContainer.pendingArtifactInspection = model
+            // Cache selection IDs for back navigation (model object gets invalidated on re-sort)
+            root.wizardContainer.cachedOsArtifactId = model.artifact_id || -1
+            root.wizardContainer.cachedOsName = model.name || ""
+            root.wizardContainer.cachedOsUrl = model.url || ""
+            console.log("OSSelectionStep: Caching OS selection for back navigation - artifact_id:", model.artifact_id, "name:", model.name)
+            console.log("Routing to CIArtifactSelectionStep for artifact inspection")
+            // Advance to download step
+            root.nextClicked()
+        } else {
+            // Direct file (.wic, .spu, .vsi) - configure source immediately
+            // Determine file type from URL
+            var urlLower = model.url.toLowerCase()
+            var isSpu = urlLower.endsWith(".spu")
+            var displayName = model.name
+
+            if (isSpu) {
+                imageWriter.setSrcSpuUrl(model.url, model.image_download_size, displayName)
+                root.wizardContainer.selectedSpuName = displayName
+                root.wizardContainer.isSpuCopyMode = true
+                root.wizardContainer.customizationSupported = false
+                root.wizardContainer.piConnectAvailable = false
+                root.wizardContainer.secureBootAvailable = false
+                root.wizardContainer.ccRpiAvailable = false
+                root.wizardContainer.ifAndFeaturesAvailable = false
+            } else {
+                imageWriter.setSrc(
+                    model.url,
+                    model.image_download_size,
+                    model.extract_size,
+                    model.extract_sha256 || "",
+                    false,  // Not multiple files
+                    "",     // No category
+                    displayName,
+                    model.init_format || "",
+                    model.release_date || ""
+                )
+                root.wizardContainer.selectedOsName = displayName
+                root.wizardContainer.isSpuCopyMode = false
+                root.wizardContainer.customizationSupported = false
+                root.wizardContainer.piConnectAvailable = false
+                root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
+                root.wizardContainer.ccRpiAvailable = false
+                root.wizardContainer.ifAndFeaturesAvailable = false
+            }
+
+            root.selectedArtifactModel = null
+            root.nextButtonEnabled = true
+            root.customSelected = false
+            // Advance directly to storage (skip download step)
+            root.nextClicked()
+        }
     }
     
     // Common handler functions for OS selection
@@ -142,8 +195,19 @@ WizardStepBase {
     }
 
     Component.onCompleted: {
-        // Try initial load in case data is already available
-        onOsListPreparedHandler()
+        var modelHasData = root.osmodel && root.osmodel.rowCount() > 2
+        var currentSourceType = root.repoManager ? root.repoManager.selectedSourceType : "cdn"
+        var sourceTypeChanged = currentSourceType !== root.wizardContainer.lastOsListSourceType
+
+        if (!modelHasData || sourceTypeChanged) {
+            console.log("OSSelectionStep: Loading data (source:", currentSourceType,
+                        "previous:", root.wizardContainer.lastOsListSourceType, ")")
+            onOsListPreparedHandler()
+            root.wizardContainer.lastOsListSourceType = currentSourceType
+        } else {
+            console.log("OSSelectionStep: Model already has data (", root.osmodel.rowCount(), "items) - skipping reload")
+            root.modelLoaded = true
+        }
 
         // Register the OS list for keyboard navigation
         root.registerFocusGroup("os_list", function(){
@@ -154,6 +218,8 @@ WizardStepBase {
 
         // Initial focus will automatically go to title, then subtitle, then first control (handled by WizardStepBase)
         _focusFirstItemInCurrentView()
+
+        // Cache restoration is now handled in oslist's Component.onCompleted
     }
 
     Connections {
@@ -165,11 +231,11 @@ WizardStepBase {
                 // Still unavailable - no point refreshing
                 return
             }
-            
+
             // If model was loaded with just Erase/Use custom (2 items) but now we have more,
             // we need a full reload, not just softRefresh
             var needsFullReload = !root.modelLoaded || (root.osmodel && root.osmodel.rowCount() <= 2)
-            
+
             if (needsFullReload) {
                 root.modelLoaded = false  // Reset so handler does full reload
                 onOsListPreparedHandler()
@@ -251,176 +317,12 @@ WizardStepBase {
     function _focusFirstItemInCurrentView() {}
 
     // Dialog for selecting a specific file from a multi-file CI artifact
-    ArtifactFileSelectionDialog {
-        id: artifactFileSelectionDialog
-        imageWriter: root.imageWriter
-        parent: root.wizardContainer && root.wizardContainer.overlayRootRef ? root.wizardContainer.overlayRootRef : (root.Window.window ? root.Window.window.overlayRootItem : null)
-        anchors.centerIn: parent
-
-        onFileSelected: function(filename, displayName, size, fileType) {
-            // User selected a specific file from the artifact
-            console.log("User selected file from artifact:", filename, "display:", displayName, "type:", fileType, "cached ZIP:", artifactFileSelectionDialog.zipPath)
-
-            if (fileType === "spu") {
-                // SPU file selected - set up SPU copy mode and navigate to SPU copy step
-                imageWriter.setSrcSpuArtifact(
-                    artifactFileSelectionDialog.artifactId,
-                    artifactFileSelectionDialog.owner,
-                    artifactFileSelectionDialog.repo,
-                    artifactFileSelectionDialog.branch,
-                    filename,
-                    artifactFileSelectionDialog.zipPath
-                )
-
-                // Update UI state for SPU mode
-                root.wizardContainer.selectedSpuName = displayName
-                root.wizardContainer.isSpuCopyMode = true
-                root.wizardContainer.customizationSupported = false
-                root.wizardContainer.piConnectAvailable = false
-                root.wizardContainer.secureBootAvailable = false
-                root.wizardContainer.ccRpiAvailable = false
-                root.wizardContainer.ifAndFeaturesAvailable = false
-                root.customSelected = false
-                root.nextButtonEnabled = true
-            } else {
-                // WIC file selected - normal disk image flow
-                imageWriter.setSrcArtifactWithTargetAndCache(
-                    artifactFileSelectionDialog.artifactId,
-                    artifactFileSelectionDialog.owner,
-                    artifactFileSelectionDialog.repo,
-                    artifactFileSelectionDialog.branch,
-                    size,
-                    displayName,
-                    filename,
-                    artifactFileSelectionDialog.zipPath  // Pass the cached ZIP path
-                )
-
-                // Update UI state
-                root.wizardContainer.selectedOsName = displayName
-                root.wizardContainer.isSpuCopyMode = false
-                root.wizardContainer.customizationSupported = false
-                root.wizardContainer.piConnectAvailable = false
-                root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
-                root.wizardContainer.ccRpiAvailable = false
-                root.wizardContainer.ifAndFeaturesAvailable = false
-                root.customSelected = false
-                root.nextButtonEnabled = true
-            }
-
-            // Auto-advance to next step after file selection
-            Qt.callLater(function() {
-                if (root.nextButtonEnabled) {
-                    root.nextClicked()
-                }
-            })
-        }
-
-        onCancelled: {
-            // User cancelled file selection
-            root.nextButtonEnabled = false
-        }
-    }
-
     // Pending artifact selection data (stored while waiting for inspection)
     property var pendingArtifactModel: null
 
     // Selected artifact that hasn't been inspected yet (for deferred download on double-click/Next)
     property var selectedArtifactModel: null
 
-    // Download progress dialog for artifact inspection
-    ArtifactDownloadProgressDialog {
-        id: artifactDownloadProgressDialog
-        imageWriter: root.imageWriter
-        parent: root.wizardContainer && root.wizardContainer.overlayRootRef ? root.wizardContainer.overlayRootRef : (root.Window.window ? root.Window.window.contentItem : null)
-
-        onCancelled: {
-            // Cancel the download in progress
-            var repoManager = imageWriter.getRepositoryManager()
-            if (repoManager) {
-                repoManager.cancelArtifactInspection()
-            }
-            root.pendingArtifactModel = null
-            root.nextButtonEnabled = false
-        }
-    }
-
-    // Connection to handle artifact contents ready signal
-    Connections {
-        target: imageWriter.getRepositoryManager()
-
-        function onArtifactDownloadProgress(bytesReceived, bytesTotal) {
-            if (bytesTotal > 0) {
-                artifactDownloadProgressDialog.indeterminate = false
-                artifactDownloadProgressDialog.progress = bytesReceived / bytesTotal
-                artifactDownloadProgressDialog.bytesReceived = bytesReceived
-                artifactDownloadProgressDialog.bytesTotal = bytesTotal
-
-                // Update download speed calculation
-                artifactDownloadProgressDialog.updateDownloadSpeed(bytesReceived)
-            } else {
-                artifactDownloadProgressDialog.indeterminate = true
-            }
-        }
-
-        function onArtifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath) {
-            console.log("Artifact contents ready:", artifactId, "files:", imageFiles.length)
-
-            // Close the progress dialog
-            artifactDownloadProgressDialog.close()
-
-            if (imageFiles.length === 0) {
-                // No image files found in artifact
-                root.wizardContainer.showError(qsTr("No installable images found in the CI build artifact."))
-                root.nextButtonEnabled = false
-            } else if (imageFiles.length === 1) {
-                // Only one file - select it directly using the cached ZIP
-                var file = imageFiles[0]
-                var displayName = file.display_name || file.filename
-                var fileType = file.type || "wic"
-
-                if (fileType === "spu") {
-                    // SPU file - set up SPU copy mode
-                    imageWriter.setSrcSpuArtifact(artifactId, owner, repo, branch, file.filename, zipPath)
-                    root.wizardContainer.selectedSpuName = displayName
-                    root.wizardContainer.isSpuCopyMode = true
-                    root.wizardContainer.customizationSupported = false
-                    root.wizardContainer.piConnectAvailable = false
-                    root.wizardContainer.secureBootAvailable = false
-                    root.wizardContainer.ccRpiAvailable = false
-                    root.wizardContainer.ifAndFeaturesAvailable = false
-                } else {
-                    // WIC file - normal disk image flow
-                    imageWriter.setSrcArtifactWithTargetAndCache(
-                        artifactId, owner, repo, branch,
-                        file.size || 0, displayName, file.filename, zipPath
-                    )
-                    root.wizardContainer.selectedOsName = displayName
-                    root.wizardContainer.isSpuCopyMode = false
-                    root.wizardContainer.customizationSupported = false
-                    root.wizardContainer.piConnectAvailable = false
-                    root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
-                    root.wizardContainer.ccRpiAvailable = false
-                    root.wizardContainer.ifAndFeaturesAvailable = false
-                }
-
-                root.customSelected = false
-                root.nextButtonEnabled = true
-            } else {
-                // Multiple files - show selection dialog
-                artifactFileSelectionDialog.artifactId = artifactId
-                artifactFileSelectionDialog.artifactName = artifactName
-                artifactFileSelectionDialog.owner = owner
-                artifactFileSelectionDialog.repo = repo
-                artifactFileSelectionDialog.branch = branch
-                artifactFileSelectionDialog.zipPath = zipPath
-                artifactFileSelectionDialog.imageFiles = imageFiles
-                artifactFileSelectionDialog.open()
-            }
-
-            root.pendingArtifactModel = null
-        }
-    }
-    
     // Ensure the clicked selection is visually highlighted in the current list view
     function _highlightMatchingEntryInCurrentView(selectedModel) {
         var currentView = osswipeview.currentItem
@@ -434,6 +336,39 @@ WizardStepBase {
                 break
             }
         }
+    }
+
+    function _restoreCachedOsSelection() {
+        if (!root.wizardContainer) return
+
+        var cachedId = root.wizardContainer.cachedOsArtifactId
+        var cachedName = root.wizardContainer.cachedOsName
+        var cachedUrl = root.wizardContainer.cachedOsUrl
+
+        console.log("OSSelectionStep: Searching for cached selection - artifact_id:", cachedId, "name:", cachedName)
+
+        for (var i = 0; i < oslist.count; i++) {
+            var entry = oslist.model.getOsEntry(i)
+            if (!entry) {
+                console.log("Null entry at index", i);
+                continue
+            }
+
+            // Match by artifact_id (for GitHub artifacts) or by name+url (for other artifacts)
+            var matchesArtifact = (typeof entry.artifact_id !== "undefined" && entry.artifact_id === cachedId && cachedId >= 0)
+            var matchesNameUrl = (entry.name === cachedName && entry.url === cachedUrl)
+
+            if (matchesArtifact || matchesNameUrl) {
+                console.log("OSSelectionStep: Found cached selection at index", i, "- restoring")
+                root.selectedArtifactModel = entry
+                oslist.currentIndex = i
+                oslist.positionViewAtIndex(i, ListView.Center)
+                oslist.handleOSItemSelection(i, entry, true, false)
+                return
+            }
+        }
+
+        console.log("OSSelectionStep: WARNING - Cached selection not found in model (artifact may have been deleted)")
     }
     
     // Track whether OS list is unavailable (no data loaded)
@@ -548,9 +483,19 @@ WizardStepBase {
                         Component.onCompleted: {
                             root.initializeListViewFocus(oslist)
                         }
-                        
+
                         onCountChanged: {
                             root.initializeListViewFocus(oslist)
+
+                            // Restore cached OS selection when model is populated
+                            // Only restore once (check if cache exists and hasn't been cleared yet)
+                            var hasCachedSelection = root.wizardContainer && root.wizardContainer.cachedOsArtifactId >= 0
+                            if (hasCachedSelection && oslist.count > 0) {
+                                console.log("OSSelectionStep: oslist model populated with", oslist.count, "items - restoring cached selection")
+                                root._restoreCachedOsSelection()
+                                // Clear cache after restoration to prevent re-triggering on subsequent count changes
+                                root.wizardContainer.cachedOsArtifactId = -1
+                            }
                         }
                     }
             }
@@ -786,6 +731,8 @@ WizardStepBase {
                 // Use custom: open native file selector if available, otherwise fall back to QML FileDialog
                 // Don't clear selectedOsName or customSelected here - only update them when user actually selects a file
                 // Changing these properties causes delegate height changes and scroll position resets
+                // Clear pending artifact inspection (not a CI artifact)
+                root.wizardContainer.pendingArtifactInspection = null
                 root.nextButtonEnabled = false
                 if (imageWriter.nativeFileDialogAvailable()) {
                     // Defer opening the native dialog until after the current event completes
@@ -829,6 +776,8 @@ WizardStepBase {
                 root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
                 root.wizardContainer.ccRpiAvailable = false
                 root.wizardContainer.ifAndFeaturesAvailable = false
+                // Clear pending artifact inspection (not a CI artifact)
+                root.wizardContainer.pendingArtifactInspection = null
                 root.nextButtonEnabled = true
                 if (fromMouse) {
                     Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
@@ -868,6 +817,8 @@ WizardStepBase {
                         root.wizardContainer.secureBootAvailable = false
                         root.wizardContainer.ccRpiAvailable = false
                         root.wizardContainer.ifAndFeaturesAvailable = false
+                        // Clear pending artifact inspection (not a CI artifact)
+                        root.wizardContainer.pendingArtifactInspection = null
                         root.customSelected = false
                         root.nextButtonEnabled = true
                         if (fromMouse) {
@@ -900,6 +851,8 @@ WizardStepBase {
                 root.wizardContainer.piConnectAvailable = imageWriter.checkSWCapability("rpi_connect")
                 root.wizardContainer.secureBootAvailable = imageWriter.checkSWCapability("secure_boot") || imageWriter.isSecureBootForcedByCliFlag()
                 root.wizardContainer.ccRpiAvailable = imageWriter.imageSupportsCcRpi()
+                // Clear pending artifact inspection (not a CI artifact)
+                root.wizardContainer.pendingArtifactInspection = null
 
                 // Check if any interface/feature capabilities are available (requires both HW and SW support)
                 if (root.wizardContainer.ccRpiAvailable) {
