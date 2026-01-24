@@ -366,18 +366,19 @@ WizardStepBase {
                     }
                     // Show write/verify speed during write phase
                     else if (root.isWriting && !root.isFinalising) {
+                        if (root.bottleneckStatus !== "") {
+                            parts.push(root.bottleneckStatus)
+                        }
                         // Show verification speed during verify, write speed otherwise
                         var throughput = root.isVerifying ? root.verifyThroughputKBps : root.writeThroughputKBps
-                        if (throughput > 0) {
-                            parts.push(Math.round(throughput / 1024) + " MB/s")
-                        }
                         // Only show time remaining during write phase (not verification)
-                        if (!root.isVerifying) {
-                            var timeRemaining = root.calculateTimeRemaining()
-                            var timeStr = Utils.formatTimeRemaining(timeRemaining)
-                            if (timeStr !== "") {
-                                parts.push(timeStr)
+                        var timeRemaining = root.calculateTimeRemaining(throughput)
+                        var timeStr = Utils.formatTimeRemaining(timeRemaining)
+                        if (timeStr !== "") {
+                            if (throughput >= 0) {
+                                parts.push(Math.round(throughput / 1024) + " MB/s")
                             }
+                            parts.push(timeStr)
                         }
                     }
 
@@ -391,18 +392,6 @@ WizardStepBase {
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
             }
-
-            // Bottleneck status indicator - shows what's limiting progress
-            Text {
-                id: bottleneckText
-                text: root.bottleneckStatus
-                font.pixelSize: Style.fontSizeSmall
-                font.family: Style.fontFamily
-                color: Style.formLabelDisabledColor
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                visible: root.isWriting && root.bottleneckStatus !== "" && !root.isFinalising
-            }
         }
 
         // Bottom spacer to vertically center progress section when writing/complete
@@ -412,11 +401,11 @@ WizardStepBase {
 
 
     // Calculate estimated time remaining based on current speed
-    function calculateTimeRemaining(): int {
+    function calculateTimeRemaining(throughput): int {
         return Utils.calculateTimeRemainingKBps(
             root.progressBytesNow,
             root.progressBytesTotal,
-            root.writeThroughputKBps
+            throughput
         )
     }
 

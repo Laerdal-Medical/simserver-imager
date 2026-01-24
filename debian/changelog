@@ -33,6 +33,9 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     eliminating code duplication across wizard steps
   * QML Lint Compliance: Fixed unqualified property access across wizard
     components using pragma ComponentBehavior: Bound
+  * Write Progress Status Consolidation: Bottleneck status shown inline with
+    speed and ETA instead of as a separate line. Time remaining and throughput
+    displayed during both write and verify phases
   * OS Selection Navigation: OS list model is no longer unnecessarily
     reloaded and re-sorted when navigating back to the OS selection step.
     The C++ model persists across QML component recreation, so data is only
