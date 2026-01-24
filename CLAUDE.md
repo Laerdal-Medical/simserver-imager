@@ -218,7 +218,6 @@ Features: rounded pill shape, Laerdal blue color, smooth hover/press state trans
 - `ImComboBox` - Dropdown selector
 - `ImPopup`, `BaseDialog` - Modal dialogs
 - `SelectionListView`, `OSSelectionListView` - List views
-- `ArtifactFileSelectionDialog` - CI artifact file picker (used within CIArtifactSelectionStep)
 
 ## Coding Conventions
 
