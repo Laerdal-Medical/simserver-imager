@@ -371,13 +371,12 @@ WizardStepBase {
                         }
                         // Show verification speed during verify, write speed otherwise
                         var throughput = root.isVerifying ? root.verifyThroughputKBps : root.writeThroughputKBps
-                        // Only show time remaining during write phase (not verification)
+                        if (throughput > 0) {
+                            parts.push(Math.round(throughput / 1024) + " MB/s")
+                        }
                         var timeRemaining = root.calculateTimeRemaining(throughput)
                         var timeStr = Utils.formatTimeRemaining(timeRemaining)
                         if (timeStr !== "") {
-                            if (throughput >= 0) {
-                                parts.push(Math.round(throughput / 1024) + " MB/s")
-                            }
                             parts.push(timeStr)
                         }
                     }

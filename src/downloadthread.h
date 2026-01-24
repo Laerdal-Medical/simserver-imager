@@ -35,8 +35,7 @@ public:
         None,           // Pipeline flowing smoothly
         Network,        // Waiting for network download
         Decompression,  // CPU-bound decompression
-        Storage,        // Waiting for storage device
-        Verifying       // Reading back for verification
+        Storage         // Waiting for storage device
     };
     Q_ENUM(BottleneckState)
 
@@ -304,6 +303,7 @@ protected:
     
     // Bottleneck detection state
     BottleneckState _currentBottleneck;
+    BottleneckState _upstreamBottleneckType;  // What to report when upstream can't keep up
     QElapsedTimer _bottleneckTimer;
     static constexpr int BOTTLENECK_HYSTERESIS_MS = 500;  // Minimum time before changing state
     

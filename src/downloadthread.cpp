@@ -133,6 +133,7 @@ DownloadThread::DownloadThread(const QByteArray &url, const QByteArray &localfil
     
     // Initialize bottleneck detection
     _currentBottleneck = BottleneckState::None;
+    _upstreamBottleneckType = BottleneckState::Network;
     _bottleneckTimer.start();
 }
 
@@ -1758,26 +1759,13 @@ void DownloadThread::_updateBottleneckState()
         _file->PollAsyncCompletions();
     }
     
-    // Detect current bottleneck based on pipeline state
-    BottleneckState newState = BottleneckState::None;
-    quint32 throughputKBps = 0;
-    
-    if (_file && _file->IsAsyncIOSupported() && _file->GetAsyncQueueDepth() > 1) {
-        int pendingWrites = _file->GetPendingWriteCount();
-        int queueDepth = _file->GetAsyncQueueDepth();
-        
-        // If async queue is more than 75% full, storage is the bottleneck
-        if (pendingWrites > (queueDepth * 3 / 4)) {
-            newState = BottleneckState::Storage;
-        }
-    }
-    
-    // Calculate current write throughput for display
+    // Calculate current write throughput (persists last measurement between updates)
+    static quint32 throughputKBps = 0;
     qint64 currentBytes = _bytesWritten.load();
     static qint64 lastThroughputBytes = 0;
     static QElapsedTimer throughputTimer;
     static bool throughputTimerStarted = false;
-    
+
     if (!throughputTimerStarted) {
         throughputTimer.start();
         throughputTimerStarted = true;
@@ -1786,11 +1774,28 @@ void DownloadThread::_updateBottleneckState()
         qint64 elapsed = throughputTimer.elapsed();
         if (elapsed >= 500) {  // Update throughput every 500ms
             qint64 bytesDelta = currentBytes - lastThroughputBytes;
-            if (bytesDelta > 0 && elapsed > 0) {
-                throughputKBps = static_cast<quint32>((bytesDelta * 1000) / (elapsed * 1024));
-            }
+            throughputKBps = (bytesDelta > 0 && elapsed > 0)
+                ? static_cast<quint32>((bytesDelta * 1000) / (elapsed * 1024))
+                : 0;
             lastThroughputBytes = currentBytes;
             throughputTimer.restart();
+        }
+    }
+
+    // Detect current bottleneck based on pipeline state
+    BottleneckState newState = BottleneckState::None;
+
+    if (_file && _file->IsAsyncIOSupported() && _file->GetAsyncQueueDepth() > 1
+        && throughputKBps > 0 && throughputKBps < 15 * 1024) {
+        int pendingWrites = _file->GetPendingWriteCount();
+        int queueDepth = _file->GetAsyncQueueDepth();
+
+        if (pendingWrites > (queueDepth * 3 / 4)) {
+            // Queue is full and speed is low — storage can't keep up
+            newState = BottleneckState::Storage;
+        } else {
+            // Queue is not full but speed is low — upstream can't feed data
+            newState = _upstreamBottleneckType;
         }
     }
     

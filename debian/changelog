@@ -35,7 +35,9 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     components using pragma ComponentBehavior: Bound
   * Write Progress Status Consolidation: Bottleneck status shown inline with
     speed and ETA instead of as a separate line. Time remaining and throughput
-    displayed during both write and verify phases
+    displayed during both write and verify phases. Bottleneck detection now
+    distinguishes storage, network, and decompression, warning only when
+    throughput drops below 15 MB/s
   * OS Selection Navigation: OS list model is no longer unnecessarily
     reloaded and re-sorted when navigating back to the OS selection step.
     The C++ model persists across QML component recreation, so data is only

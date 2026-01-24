@@ -75,6 +75,7 @@ DownloadExtractThread::DownloadExtractThread(const QByteArray &url, const QByteA
       _totalRingBufferWaitMs(0),
       _bytesReadFromRingBuffer(0)
 {
+    _upstreamBottleneckType = DownloadThread::BottleneckState::Decompression;
     _extractThread = new _extractThreadClass(this);
 }
 

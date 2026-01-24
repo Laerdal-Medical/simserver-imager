@@ -1384,9 +1384,6 @@ void ImageWriter::startWrite()
                     case DownloadThread::BottleneckState::Storage:
                         statusText = tr("Limited by storage device speed");
                         break;
-                    case DownloadThread::BottleneckState::Verifying:
-                        statusText = tr("Verifying written data");
-                        break;
                 }
                 emit bottleneckStatusChanged(statusText, throughputKBps);
             });
@@ -4274,9 +4271,6 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
                         break;
                     case DownloadThread::BottleneckState::Storage:
                         statusText = tr("Limited by storage device speed");
-                        break;
-                    case DownloadThread::BottleneckState::Verifying:
-                        statusText = tr("Verifying written data");
                         break;
                 }
                 emit bottleneckStatusChanged(statusText, throughputKBps);
