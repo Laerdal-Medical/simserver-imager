@@ -101,6 +101,7 @@ WizardStepBase {
     // Content
     content: [
     Flickable {
+        id: sourceFlickable
         anchors.fill: parent
         contentWidth: parent.width
         contentHeight: contentColumn.implicitHeight
@@ -112,14 +113,9 @@ WizardStepBase {
         maximumFlickVelocity: 2500  // Reasonable max velocity
         pressDelay: 50  // Brief delay to distinguish tap from scroll on touch
 
-        ScrollBar.vertical: ScrollBar {
-            width: Style.scrollBarWidth
-            policy: ScrollBar.AsNeeded
-        }
-
         ColumnLayout {
             id: contentColumn
-            width: parent.width - Style.scrollBarWidth
+            width: parent.width
             spacing: Style.spacingLarge
 
             // Source Type Selection
@@ -478,7 +474,7 @@ WizardStepBase {
                     }
 
                     // Refresh button to manually re-fetch branches
-                    Button {
+                    ImButton {
                         id: refreshBranchesButton
                         Layout.preferredWidth: implicitWidth
                         Layout.preferredHeight: Style.buttonHeightStandard

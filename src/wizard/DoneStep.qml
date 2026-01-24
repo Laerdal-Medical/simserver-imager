@@ -145,13 +145,17 @@ WizardStepBase {
                 columns: 2
                 columnSpacing: Style.formColumnSpacing
                 rowSpacing: Style.spacingSmall
-                
+
+                // Set consistent label column width for alignment
+                property real labelColumnWidth: 120
+
                 Text {
                     id: deviceLabel
                     text: CommonStrings.device
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
+                    Layout.minimumWidth: choicesGrid.labelColumnWidth
                     Accessible.role: Accessible.StaticText
                     Accessible.name: text + ": " + (wizardContainer.selectedDeviceName || CommonStrings.noDeviceSelected)
                     Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
@@ -186,6 +190,7 @@ WizardStepBase {
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
+                    Layout.minimumWidth: choicesGrid.labelColumnWidth
                     Accessible.role: Accessible.StaticText
                     Accessible.name: text + " " + (wizardContainer.selectedOsName || CommonStrings.noImageSelected)
                     Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
@@ -220,6 +225,7 @@ WizardStepBase {
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
+                    Layout.minimumWidth: choicesGrid.labelColumnWidth
                     Accessible.role: Accessible.StaticText
                     Accessible.name: text + " " + (wizardContainer.selectedStorageName || CommonStrings.noStorageSelected)
                     Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
@@ -326,22 +332,25 @@ WizardStepBase {
                         Text { text: "✓ " + CommonStrings.serialConfigured; font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor; visible: customizationColumn.snapshot.ifSerial !== "" && customizationColumn.snapshot.ifSerial !== "Disabled" }
                     }
                 }
-                ScrollBar.vertical: ScrollBar { policy: contentItem.implicitHeight > height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff; width: Style.scrollBarWidth }
+                ScrollBar.vertical: ImScrollBar { }
             }
 
             // Write statistics section
             Text {
                 id: statsHeading
                 text: qsTr("Write statistics:")
-                font.pixelSize: Style.fontSizeFormLabel
+                font.pixelSize: Style.fontSizeHeading
                 font.family: Style.fontFamilyBold
                 font.bold: true
                 color: Style.formLabelColor
                 Layout.fillWidth: true
-                Layout.topMargin: Style.spacingSmall
+                Layout.topMargin: Style.spacingLarge
                 visible: root.hasWriteStats
                 Accessible.role: Accessible.Heading
                 Accessible.name: text
+                Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
+                focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
+                activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
             }
 
             GridLayout {
@@ -358,6 +367,7 @@ WizardStepBase {
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
+                    Layout.minimumWidth: choicesGrid.labelColumnWidth
                     visible: wizardContainer.completionSnapshot.writeBytesTotal > 0 && wizardContainer.completionSnapshot.writeDurationSecs > 0
                 }
                 Text {
@@ -379,6 +389,7 @@ WizardStepBase {
                     font.pixelSize: Style.fontSizeDescription
                     font.family: Style.fontFamily
                     color: Style.formLabelColor
+                    Layout.minimumWidth: choicesGrid.labelColumnWidth
                     visible: wizardContainer.completionSnapshot.verifyDurationSecs > 0
                 }
                 Text {
@@ -392,6 +403,11 @@ WizardStepBase {
                     Layout.fillWidth: true
                     visible: wizardContainer.completionSnapshot.verifyDurationSecs > 0
                 }
+            }
+            
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Style.spacingLarge
             }
 
             Text {
