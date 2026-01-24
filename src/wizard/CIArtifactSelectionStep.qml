@@ -33,9 +33,10 @@ WizardStepBase {
     property string artifactName: ""
     property bool downloadIndeterminate: true
 
-    // Debug logging for phase changes
+    // Propagate download state to WizardContainer for close confirmation
     onIsDownloadingChanged: {
         console.log("CIArtifactSelectionStep: isDownloading changed to", isDownloading)
+        root.wizardContainer.isDownloading = isDownloading
         if (isDownloading) {
             console.log("CIArtifactSelectionStep: Showing Phase 1 (download progress)")
         } else {

@@ -76,6 +76,10 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     artifact image a second time via "Write Another". Archive streaming
     variables were cleared after first write, causing fallthrough to
     DownloadExtractThread which deadlocked on the internal archive:// URL
+  * Close During Download Crash: Fix segfault when closing the application
+    during a CI artifact download by disconnecting network reply signals
+    before abort. Show quit confirmation dialog during downloads matching
+    the existing write operation behavior
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 24 Jan 2025 12:00:00 +0000
 

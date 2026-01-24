@@ -77,10 +77,17 @@ ApplicationWindow {
     }
 
     onClosing: function (close) {
-        if (wizardContainer.isWriting && !forceQuit) {
+        if ((wizardContainer.isWriting || wizardContainer.isDownloading) && !forceQuit) {
             close.accepted = false;
             quitDialog.open();
         } else {
+            // Cancel any active download before closing
+            if (wizardContainer.isDownloading) {
+                var repoManager = imageWriter.getRepositoryManager()
+                if (repoManager) {
+                    repoManager.cancelArtifactInspection()
+                }
+            }
             // Save window size before closing
             if (!imageWriter.isEmbeddedMode() && window.width >= minWidth && window.height >= minHeight) {
                 imageWriter.setSetting("window/width", window.width)
@@ -178,13 +185,23 @@ ApplicationWindow {
         parent: overlayRoot
 
         title: qsTr("Are you sure you want to quit?")
-        message: qsTr("Laerdal SimServer Imager is still busy. Are you sure you want to quit?")
+        message: wizardContainer.isWriting
+            ? qsTr("Laerdal SimServer Imager is still writing to the storage device. Are you sure you want to quit?")
+            : qsTr("Laerdal SimServer Imager is still downloading. Are you sure you want to quit?")
         cancelText: CommonStrings.no
         confirmText: CommonStrings.yes
         cancelAccessibleDescription: qsTr("Return to Laerdal SimServer Imager and continue the current operation")
         confirmAccessibleDescription: qsTr("Force quit Laerdal SimServer Imager and cancel the current write operation")
 
         onAccepted: {
+            // Cancel any active artifact download before quitting
+            if (wizardContainer.isDownloading) {
+                var repoManager = imageWriter.getRepositoryManager()
+                if (repoManager) {
+                    repoManager.cancelArtifactInspection()
+                }
+                wizardContainer.isDownloading = false
+            }
             window.forceQuit = true
             Qt.quit()
         }

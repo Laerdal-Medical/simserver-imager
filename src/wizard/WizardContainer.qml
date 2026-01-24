@@ -39,6 +39,9 @@ Item {
     
     // Track writing state
     property bool isWriting: false
+
+    // Track CI artifact download state (set by CIArtifactSelectionStep)
+    property bool isDownloading: false
     
     // Track if we're in "write another" flow (skip to writing step after storage selection)
     property bool writeAnotherMode: false

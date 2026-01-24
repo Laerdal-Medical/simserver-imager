@@ -25,15 +25,18 @@ GitHubClient::GitHubClient(QObject *parent)
 
 GitHubClient::~GitHubClient()
 {
-    // Cancel any pending requests
+    // Cancel any pending requests - disconnect signals first to prevent
+    // handlers from firing on already-destroyed QML objects
     for (auto reply : _pendingRequests.keys()) {
+        reply->disconnect();
         reply->abort();
         reply->deleteLater();
     }
     _pendingRequests.clear();
 
-    // Cancel active inspection reply
+    // Cancel active inspection reply - disconnect before abort to prevent segfault
     if (_activeInspectionReply) {
+        _activeInspectionReply->disconnect();
         _activeInspectionReply->abort();
         _activeInspectionReply->deleteLater();
         _activeInspectionReply = nullptr;
