@@ -6,7 +6,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 import RpiImager
@@ -317,40 +316,23 @@ WizardStepBase {
                     spacing: Style.spacingMedium
                     visible: root.isCopying
 
-                    Text {
-                        text: root.statusMessage
-                        font.pixelSize: Style.fontSizeHeading
-                        font.family: Style.fontFamilyBold
-                        font.bold: true
-                        color: Style.formLabelColor
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    ProgressBar {
+                    ImProgressBar {
                         id: progressBar
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 20
+                        Layout.preferredHeight: Style.spacingLarge
                         from: 0
                         to: 1
                         value: root.copyProgress
-                    }
+                        showText: true
+                        indeterminate: root.bytesTotal === 0
+                        indeterminateText: root.statusMessage
+                        text: root.bytesTotal > 0
+                            ? qsTr("Copying... %1 of %2")
+                                .arg(root.imageWriter.formatSize(root.bytesNow))
+                                .arg(root.imageWriter.formatSize(root.bytesTotal))
+                            : ""
 
-                    Text {
-                        text: {
-                            if (root.bytesTotal > 0) {
-                                return qsTr("%1 of %2")
-                                    .arg(root.imageWriter.formatSize(root.bytesNow))
-                                    .arg(root.imageWriter.formatSize(root.bytesTotal))
-                            }
-                            return ""
-                        }
-                        font.pixelSize: Style.fontSizeDescription
-                        font.family: Style.fontFamily
-                        color: Style.textDescriptionColor
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                        visible: root.bytesTotal > 0
+                        Accessible.name: qsTr("Copy progress")
                     }
                 }
 

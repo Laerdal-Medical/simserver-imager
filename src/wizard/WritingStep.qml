@@ -307,10 +307,7 @@ WizardStepBase {
                         Text { text: "• " + CommonStrings.serialConfigured;        font.pixelSize: Style.fontSizeDescription; font.family: Style.fontFamily; color: Style.formLabelColor;     visible: root.wizardContainer.ifSerial !== "" && root.wizardContainer.ifSerial !== "Disabled"; Accessible.role: Accessible.ListItem; Accessible.name: text }
                     }
                 }
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                    width: Style.scrollBarWidth
-                }
+                ScrollBar.vertical: ImScrollBar {}
             }
         }
 
@@ -323,36 +320,33 @@ WizardStepBase {
             spacing: Style.spacingMedium
             visible: root.isWriting || root.cancelPending || root.isFinalising || root.isComplete
 
-            Text {
-                id: progressText
-                text: qsTr("Starting write process...")
-                font.pixelSize: Style.fontSizeHeading
-                font.family: Style.fontFamilyBold
-                font.bold: true
-                color: Style.formLabelColor
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                Accessible.role: Accessible.StatusBar
-                Accessible.name: text
-                Accessible.focusable: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-                focusPolicy: (root.imageWriter && root.imageWriter.isScreenReaderActive()) ? Qt.TabFocus : Qt.NoFocus
-                activeFocusOnTab: root.imageWriter ? root.imageWriter.isScreenReaderActive() : false
-            }
-
-            ProgressBar {
+            ImProgressBar {
                 id: progressBar
                 Layout.fillWidth: true
                 Layout.preferredHeight: Style.spacingLarge
                 value: 0
                 from: 0
                 to: 100
-
-                Material.accent: Style.progressBarVerifyForegroundColor
-                Material.background: Style.progressBarBackgroundColor
                 visible: (root.isWriting || root.isFinalising)
+                fillColor: {
+                    // Use green for verification, blue for writing
+                    if (root.imageWriter.writeState === ImageWriter.Verifying) {
+                        return Style.progressBarVerifyForegroundColor
+                    }
+                    return Style.progressBarWritingForegroundColor
+                }
+                showText: true
+                indeterminate: ( root.imageWriter.writeState === ImageWriter.Preparing || root.imageWriter.writeState === ImageWriter.Idle )
+                indeterminateText: qsTr("Starting write process...")
+                onIndeterminateChanged: {
+                    // Update accessible description when indeterminate state changes
+                    console.log("Indeterminate changed to", indeterminate, "Write state:", root.imageWriter.writeState)
+                }
+                text: ""
+
                 Accessible.role: Accessible.ProgressBar
                 Accessible.name: qsTr("Write progress")
-                Accessible.description: progressText.text
+                Accessible.description: progressBar.text
             }
             
             // Speed and time remaining display
@@ -394,7 +388,6 @@ WizardStepBase {
                 color: Style.formLabelColor
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                visible: root.isWriting && !root.isFinalising && (root.downloadThroughputMbps > 0 || root.writeThroughputKBps > 0 || root.verifyThroughputKBps > 0)
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
             }
@@ -448,7 +441,7 @@ WizardStepBase {
                 root.isVerifying = false
                 root.isFinalising = true
                 progressBar.value = 100
-                progressText.text = qsTr("Finalising…")
+                progressBar.text = qsTr("Finalizing…")
                 root.imageWriter.cancelWrite()
             }
         } else if (!root.isComplete) {
@@ -467,7 +460,7 @@ WizardStepBase {
 
     function onFinalizing() {
         root.isVerifying = false
-        progressText.text = qsTr("Finalising...")
+        progressBar.text = qsTr("Finalizing...")
         progressBar.value = 100
     }
 
@@ -590,7 +583,7 @@ WizardStepBase {
             root.verifyDurationSecs = 0
             root.writePhaseStartTime = 0
             root.verifyPhaseStartTime = 0
-            progressText.text = qsTr("Starting write process...")
+            progressBar.text = qsTr("Starting write process...")
             progressBar.value = 0
             Qt.callLater(function(){ root.imageWriter.startWrite() })
         }
@@ -601,7 +594,7 @@ WizardStepBase {
         if (root.isWriting && root.imageWriter.writeState === ImageWriter.Preparing) {
             var progress = total > 0 ? (now / total) * 100 : 0
             progressBar.value = progress
-            progressText.text = qsTr("Downloading... %1%").arg(Math.round(progress))
+            progressBar.text = qsTr("Downloading... %1%").arg(Math.round(progress))
 
             // Store current download bytes for time remaining calculation
             root.downloadBytesNow = now
@@ -638,7 +631,7 @@ WizardStepBase {
             root.writeBytesTotal = total
             var progress = total > 0 ? (now / total) * 100 : 0
             progressBar.value = progress
-            progressText.text = qsTr("Writing... %1%").arg(Math.round(progress))
+            progressBar.text = qsTr("Writing... %1%").arg(Math.round(progress))
         }
     }
 
@@ -675,13 +668,13 @@ WizardStepBase {
             root.bottleneckStatus = ""  // Clear write bottleneck during verification
             var progress = total > 0 ? (now / total) * 100 : 0
             progressBar.value = progress
-            progressText.text = qsTr("Verifying... %1%").arg(Math.round(progress))
+            progressBar.text = qsTr("Verifying... %1%").arg(Math.round(progress))
         }
     }
 
     function onPreparationStatusUpdate(msg) {
         if (root.isWriting) {
-            progressText.text = msg
+            progressBar.indeterminateText = msg
         }
     }
 
@@ -733,14 +726,14 @@ WizardStepBase {
             root.wizardContainer.isWriting = false
             root.cancelPending = false
             root.isFinalising = false
-            progressText.text = qsTr("Write failed: %1").arg(msg)
+            progressBar.text = qsTr("Write failed: %1").arg(msg)
         }
 
         function onFinalizing() {
             if (root.isWriting || root.cancelPending) {
                 root.isVerifying = false
                 root.isFinalising = true
-                progressText.text = qsTr("Finalising…")
+                progressBar.text = qsTr("Finalising…")
                 progressBar.value = 100
             }
         }
@@ -789,10 +782,6 @@ WizardStepBase {
         registerFocusGroup("progress", function() {
             var items = []
             if (progressLayout.visible) {
-                // Only include progress text when screen reader is active
-                if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
-                    items.push(progressText)
-                }
                 // Always include progress bar when visible (during writing)
                 if (progressBar.visible) {
                     items.push(progressBar)
