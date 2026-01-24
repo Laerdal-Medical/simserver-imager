@@ -58,6 +58,16 @@ Browse and select the image you want to write. Images are sorted by version (new
 - **Status** - Whether the image is cached locally or needs to be downloaded
 - **Release date** - When the image was published
 
+### Step 3b: Select File (CI Artifacts only)
+
+When selecting a GitHub CI artifact, the application downloads and inspects the ZIP archive to find installable image files. This step shows:
+
+- Download progress with speed and estimated time remaining
+- List of installable files found in the artifact (WIC, VSI, SPU)
+- File sizes and types indicated by colored badges
+
+Select the file you want to install and click **NEXT** to continue. Direct CDN files (.wic, .spu, .vsi) skip this step automatically.
+
 ### Step 4: Select Storage
 
 Choose the target SD card or USB drive. The list shows:
@@ -70,17 +80,22 @@ Choose the target SD card or USB drive. The list shows:
 
 ### Step 5: Write
 
-Click **NEXT** to review your selections, then **WRITE** to begin.
+Click **NEXT** to begin the write process.
 
 For WIC/VSI images:
 - The device will be unmounted
 - All existing data will be erased
-- The image will be written and verified
+- The image will be downloaded (if not cached), written, and verified
+- Progress bar shows real-time speed (MB/s) and estimated time remaining
+- After completion, write statistics (bytes written, duration, average speed) are displayed
 
 For SPU updates:
 - The device will be mounted (or stay mounted)
 - Update files will be copied to the appropriate locations
 - Existing data is preserved
+- Copy progress shown with bytes transferred
+
+After a successful write, you can click **Write Another** to write the same image to a different device.
 
 ## From Laerdal CDN
 
@@ -109,8 +124,10 @@ GitHub builds from private repositories require authentication:
 2. Choose a repository
 3. Select a branch (e.g., `main`, `release`, or a feature branch)
 4. Browse available CI build artifacts
+5. The artifact ZIP will be downloaded and inspected
+6. Select which file to install from the artifact contents
 
-**Note:** CI builds may contain multiple installable files. A dialog will appear to let you choose which file to use.
+**Note:** CI build artifacts typically contain multiple files. The application will download the artifact, scan for installable images (WIC, VSI, SPU), and present them for selection with file type badges and sizes.
 
 ### Build Types
 

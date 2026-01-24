@@ -25,9 +25,25 @@ Laerdal SimServer Imager - A Qt/QML-based disk imaging tool forked from Raspberr
 - `src/imagewriter.h/cpp` - Main orchestrator for download/write operations
 - `src/drivelistmodel.h/cpp` - Drive enumeration model
 - `src/downloadthread.h/cpp` - Async download handling
+- `src/downloadextractthread.h/cpp` - Download + decompress pipeline with ring buffers
 - `src/driveformatthread.h/cpp` - Writing images to devices
+- `src/systemmemorymanager.h/cpp` - Memory-aware buffer sizing for write pipeline
+- `src/oslistmodel.h/cpp` - OS image list model (CDN and GitHub sources)
 - `src/cachemanager.h/cpp` - Disk cache with verification
 - `src/config.h` - Compile-time configuration (repos, OAuth, URLs)
+
+## Wizard Flow
+
+The wizard uses a step-based navigation system defined in `src/wizard/WizardContainer.qml`:
+
+```text
+Device → Source → OS Selection → [CI Artifact Selection] → Storage → Writing → Done
+```
+
+- **CI Artifact Selection** (step 3) is conditionally shown only for GitHub CI artifacts that need ZIP inspection
+- Direct CDN files (.wic, .spu, .vsi) skip from OS Selection directly to Storage
+- SPU files route to a separate SPU Copy step instead of Writing
+- Step indices: Device=0, Source=1, OS=2, CIArtifact=3, Storage=4, Writing=5, Done=6
 
 ## Build Instructions
 
@@ -163,15 +179,46 @@ ImBadge {
 - GitHub-style: `purple`, `green`, `blue`, `red`, `yellow`, `gray`
 - Image types: `indigo` (SPU), `emerald` (WIC), `cyan` (VSI)
 
+### ImProgressBar
+
+Custom progress bar with Laerdal brand styling:
+
+```qml
+ImProgressBar {
+    value: 50
+    from: 0
+    to: 100
+    showText: true
+    text: qsTr("Writing... 50%")
+    fillColor: Style.progressBarWritingForegroundColor  // Blue for write, green for verify
+    indeterminate: false
+    indeterminateText: qsTr("Preparing...")
+}
+```
+
+Features: rounded borders (8px radius), glassy effect, smooth width animation, integrated text display, indeterminate mode with animation.
+
+### ImScrollBar
+
+Custom scrollbar replacing default Qt ScrollBar:
+
+```qml
+ScrollBar.vertical: ImScrollBar {
+    flickable: myListView  // Optional: attach to a specific flickable
+}
+```
+
+Features: rounded pill shape, Laerdal blue color, smooth hover/press state transitions.
+
 ### Other Components
 
-- `ImButton`, `ImButtonRed` - Styled buttons
+- `ImButton`, `ImButtonRed` - Styled buttons with Laerdal disabled states
 - `ImTextField`, `ImPasswordField` - Input fields
 - `ImCheckBox`, `ImRadioButton` - Selection controls
 - `ImComboBox` - Dropdown selector
 - `ImPopup`, `BaseDialog` - Modal dialogs
 - `SelectionListView`, `OSSelectionListView` - List views
-- `ArtifactFileSelectionDialog` - CI artifact file picker
+- `ArtifactFileSelectionDialog` - CI artifact file picker (used within CIArtifactSelectionStep)
 
 ## Coding Conventions
 
