@@ -621,6 +621,8 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/ImOptionButton.qml
       qmlcomponents/ImTextField.qml
       qmlcomponents/ImPasswordField.qml
+      qmlcomponents/ImProgressBar.qml
+      qmlcomponents/ImScrollBar.qml
       qmlcomponents/ImToggleTab.qml
       qmlcomponents/MarqueeText.qml
       qmlcomponents/ImBadge.qml
@@ -634,6 +636,7 @@ if(NOT BUILD_CLI_ONLY)
       wizard/DeviceSelectionStep.qml
       wizard/SourceSelectionStep.qml
       wizard/OSSelectionStep.qml
+      wizard/CIArtifactSelectionStep.qml
       wizard/StorageSelectionStep.qml
       wizard/HostnameCustomizationStep.qml
       wizard/IfAndFeaturesCustomizationStep.qml

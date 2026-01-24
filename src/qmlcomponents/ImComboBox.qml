@@ -482,10 +482,9 @@ ComboBox {
                 anchors.rightMargin: 2 + (dropdownList.contentHeight > dropdownList.height ? Style.scrollBarWidth : 0)
             }
             
-            ScrollBar.vertical: ScrollBar {
-                policy: dropdownList.contentHeight > dropdownList.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                width: Style.scrollBarWidth
-            }
+            ScrollBar.vertical: ImScrollBar {
+                flickable: dropdownList
+           }
             
             // Smooth scroll animation for wheel events
             NumberAnimation {

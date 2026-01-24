@@ -84,10 +84,7 @@ MessageDialog {
             clip: true
             model: root.repos
 
-            ScrollBar.vertical: ScrollBar {
-                width: Style.scrollBarWidth
-                policy: ScrollBar.AsNeeded
-            }
+            ScrollBar.vertical: ImScrollBar { }
 
             delegate: Item {
                 id: repoDelegate

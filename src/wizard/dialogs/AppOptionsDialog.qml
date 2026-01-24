@@ -103,9 +103,7 @@ ConfirmDialog {
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.VerticalFlick
 
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
-            }
+            ScrollBar.vertical: ImScrollBar {}
 
             ColumnLayout {
                 id: optionsLayout

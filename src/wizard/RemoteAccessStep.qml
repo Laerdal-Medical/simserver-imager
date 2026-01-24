@@ -31,7 +31,9 @@ WizardStepBase {
         id: sshScroll
         anchors.fill: parent
         clip: true
-        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+        ScrollBar.vertical: ImScrollBar {
+            flickable: sshScroll
+        }
         
         ColumnLayout {
             anchors.left: parent.left

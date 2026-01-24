@@ -198,7 +198,7 @@ WizardStepBase {
         id: wifiScroll
         anchors.fill: parent
         clip: true
-        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+        ScrollBar.vertical : ImScrollBar {}
 
         // Smoothly bring a child item into view (vertical)
         function scrollToItem(item, margin) {

@@ -78,11 +78,7 @@ ListView {
     readonly property int scrollBarWidthValue: Style.scrollBarWidth
 
     // Standard ScrollBar
-    ScrollBar.vertical: ScrollBar {
-        id: verticalScrollBar
-        width: root.scrollBarWidthValue
-        policy: root.contentHeight > root.height ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded
-    }
+    ScrollBar.vertical: ImScrollBar { flickable: root }
     
     // Focus management
     onActiveFocusChanged: {
@@ -208,7 +204,7 @@ ListView {
             root.itemSelected(currentIndex, item)
         }
     }
-    
+
     // Helper function to get model data safely
     function getModelData(index) {
         if (!model || index < 0 || index >= count) {

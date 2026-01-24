@@ -659,7 +659,7 @@ BaseDialog {
                             }
                         }
                     }
-                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: Style.scrollBarWidth }
+                    ScrollBar.vertical: ImScrollBar {  }
                     Keys.onUpPressed: {
                         if (currentIndex > 0) {
                             currentIndex--
@@ -736,7 +736,7 @@ BaseDialog {
                 id: fileListScrollView
                 anchors.fill: parent
                 activeFocusOnTab: false  // Don't focus the ScrollView itself, only its children
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: Style.scrollBarWidth }
+                ScrollBar.vertical: ImScrollBar { }
                 contentWidth: availableWidth  // Ensure content fills width
 
                 property int currentFileIndex: -1

@@ -58,6 +58,8 @@
         <file>qmlcomponents/ImLoadingBanner.qml</file>
         <file>qmlcomponents/ImTextField.qml</file>
         <file>qmlcomponents/ImPasswordField.qml</file>
+        <file>qmlcomponents/ImProgressBar.qml</file>
+        <file>qmlcomponents/ImScrollBar.qml</file>
         <file>qmlcomponents/MarqueeText.qml</file>
     </qresource>
 </RCC>

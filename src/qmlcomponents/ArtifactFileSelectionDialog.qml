@@ -94,8 +94,8 @@ ConfirmDialog {
             clip: true
             currentIndex: 0
 
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+            ScrollBar.vertical: ImScrollBar {
+                flickable: fileListView
             }
 
             delegate: ItemDelegate {

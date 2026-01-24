@@ -52,7 +52,9 @@ WizardStepBase {
             id: ifAndFeatScroll
             anchors.fill: parent
             clip: true
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.vertical: ImScrollBar {
+                flickable: ifAndFeatScroll
+            }
             rightPadding: 20
             ColumnLayout {
                 id: scrollContent
