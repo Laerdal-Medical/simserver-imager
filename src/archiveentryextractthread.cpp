@@ -52,6 +52,8 @@ void ArchiveEntryExtractThread::_cancelExtract()
 
 void ArchiveEntryExtractThread::run()
 {
+    _allocateBuffers();
+
     if (isImage() && !_openAndPrepareDevice()) {
         return;
     }

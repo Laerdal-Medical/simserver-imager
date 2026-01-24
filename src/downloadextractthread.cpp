@@ -76,36 +76,53 @@ DownloadExtractThread::DownloadExtractThread(const QByteArray &url, const QByteA
       _bytesReadFromRingBuffer(0)
 {
     _extractThread = new _extractThreadClass(this);
+}
+
+void DownloadExtractThread::_allocateBuffers()
+{
+    if (_ringBuffer)
+        return;  // Already allocated
+
     size_t pageSize = SystemMemoryManager::instance().getSystemPageSize();
-    
+
     // Create zero-copy ring buffer for curl -> libarchive data transfer (compressed data)
-    // Both slot size and slot count are determined by SystemMemoryManager based on available RAM
+    // Cap slots to prevent excessive memory allocation that causes system-wide memory pressure.
+    // 128 slots is enough for several seconds of buffering even at 10Gbps.
     size_t inputBufferSize = SystemMemoryManager::instance().getOptimalInputBufferSize();
     size_t numSlots = SystemMemoryManager::instance().getOptimalRingBufferSlots(inputBufferSize);
+    numSlots = qMin(numSlots, static_cast<size_t>(128));
     _ringBuffer = std::make_unique<RingBuffer>(numSlots, inputBufferSize, pageSize);
-    
+
     // Create ring buffer for decompress -> write path (decompressed data)
-    // With zero-copy async I/O, ring buffer slots serve as async I/O buffers.
-    // Size based on optimal queue depth (calculated from available memory) plus headroom.
-    // This avoids over-allocation while still allowing decompression to stay ahead.
-    int optimalDepth = SystemMemoryManager::instance().getOptimalAsyncQueueDepth(_writeBufferSize);
-    
-    // Add headroom: 2x optimal depth or optimal + 64, whichever is larger
-    // This allows decompression to buffer ahead while async writes drain
-    int writeRingBufferDepth = qMax(optimalDepth * 2, optimalDepth + 64);
-    
-    // Cap to a reasonable maximum to prevent excessive memory usage
-    // 512 slots @ 8MB = 4GB, which is reasonable for high-memory systems
-    static const int MAX_RING_BUFFER_DEPTH = 512;
-    writeRingBufferDepth = qMin(writeRingBufferDepth, MAX_RING_BUFFER_DEPTH);
-    
-    size_t writeRingBufferSlots = static_cast<size_t>(writeRingBufferDepth + 4);
+    // Size based on the ACTUAL io_uring queue depth, not the theoretical "optimal" depth.
+    // The ring buffer only needs enough slots to cover:
+    //   - Slots in the io_uring queue (async writes in-flight)
+    //   - 1 slot being decompressed into
+    //   - 1 slot being hashed
+    //   - Some headroom for decompression to stay ahead of the writer
+    //
+    // Previously this used getOptimalAsyncQueueDepth() which returned 128-512 based on RAM,
+    // but the actual io_uring queue is _debugAsyncQueueDepth (typically 16). The mismatch
+    // caused massive over-allocation (e.g., 512 slots * 8MB = 4GB) creating memory pressure
+    // that blocked the UI thread via page faults and TLB misses.
+    int actualQueueDepth = _debugAsyncQueueDepth;
+    int writeRingBufferDepth = actualQueueDepth * 2 + 8;
+
+    size_t writeRingBufferSlots = static_cast<size_t>(writeRingBufferDepth);
     _writeRingBuffer = std::make_unique<RingBuffer>(writeRingBufferSlots, _writeBufferSize, pageSize);
-    
-    qDebug() << "Using buffer size:" << _writeBufferSize << "bytes with page size:" << pageSize << "bytes";
-    qDebug() << "Ring buffer:" << RING_BUFFER_SLOTS << "slots of" << inputBufferSize << "bytes";
-    qDebug() << "Write ring buffer:" << writeRingBufferSlots << "slots of" << _writeBufferSize << "bytes"
-             << "(optimal depth:" << optimalDepth << ", max configurable:" << writeRingBufferDepth << ")";
+
+    size_t inputBufferMB = (numSlots * inputBufferSize) / (1024 * 1024);
+    size_t writeBufferMB = (writeRingBufferSlots * _writeBufferSize) / (1024 * 1024);
+    qDebug() << "Input ring buffer:" << numSlots << "slots x" << (inputBufferSize / 1024) << "KB ="
+             << inputBufferMB << "MB";
+    qDebug() << "Write ring buffer:" << writeRingBufferSlots << "slots x" << (_writeBufferSize / 1024) << "KB ="
+             << writeBufferMB << "MB (queue depth:" << actualQueueDepth << ")";
+}
+
+void DownloadExtractThread::run()
+{
+    _allocateBuffers();
+    DownloadThread::run();
 }
 
 DownloadExtractThread::~DownloadExtractThread()

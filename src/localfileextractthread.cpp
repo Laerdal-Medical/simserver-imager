@@ -58,6 +58,8 @@ void LocalFileExtractThread::_cancelExtract()
 
 void LocalFileExtractThread::run()
 {
+    _allocateBuffers();
+
     if (isImage() && !_openAndPrepareDevice())
         return;
 

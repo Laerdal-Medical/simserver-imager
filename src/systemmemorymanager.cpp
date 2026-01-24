@@ -285,38 +285,37 @@ size_t SystemMemoryManager::getOptimalWriteBufferSize()
 {
     qint64 totalMemMB = getTotalMemoryMB();
     size_t pageSize = getSystemPageSize();
-    
-    // Base buffer size calculation based on available memory
+
+    // Use 1MB write blocks for all memory tiers.
+    //
+    // With io_uring async I/O, large blocks don't improve throughput - the per-submission
+    // overhead is ~1µs regardless of block size. SHA256 throughput is also block-size
+    // independent (same bytes/sec whether hashing 1MB or 8MB at a time).
+    //
+    // Smaller blocks provide critical benefits:
+    // - More frequent io_uring completions = smoother progress updates
+    // - Less memory for ring buffers (queue_depth * block_size)
+    // - Better CPU cache utilization (1MB fits in L3, 8MB doesn't)
+    // - Reduced memory pressure on the system (less page cache churn)
+    //
+    // At 30 MB/s USB speed with 1MB blocks: one completion every ~33ms = smooth progress.
+    // At 30 MB/s with 8MB blocks: one completion every ~267ms = visible stuttering.
     size_t bufferSize;
-    
+
     if (totalMemMB < 1024) {
-        // Very low memory (< 1GB): Conservative 512KB
+        // Very low memory (< 1GB): 512KB
         bufferSize = 512 * 1024;
-    } else if (totalMemMB < 2048) {
-        // Low memory (1-2GB): 1MB default
-        bufferSize = IMAGEWRITER_BLOCKSIZE;
-    } else if (totalMemMB < 4096) {
-        // Medium memory (2-4GB): 2MB for better throughput
-        bufferSize = 2 * 1024 * 1024;
-    } else if (totalMemMB < 8192) {
-        // High memory (4-8GB): 4MB
-        bufferSize = 4 * 1024 * 1024;
     } else {
-        // Very high memory (> 8GB): 8MB for maximum throughput
-        bufferSize = 8 * 1024 * 1024;
+        // All other systems: 1MB
+        bufferSize = 1024 * 1024;
     }
-    
-    // Align to page boundaries for optimal performance
+
+    // Align to page boundaries for direct I/O compatibility
     bufferSize = ((bufferSize + pageSize - 1) / pageSize) * pageSize;
-    
-    // Apply platform-specific constraints
-    const size_t minBufferSize = 256 * 1024;  // 256KB minimum
-    const size_t maxBufferSize = 16 * 1024 * 1024;  // 16MB maximum
-    bufferSize = qMax(minBufferSize, qMin(maxBufferSize, bufferSize));
-    
-    qDebug() << "Optimal write buffer size:" << (bufferSize / 1024) << "KB for" 
+
+    qDebug() << "Optimal write buffer size:" << (bufferSize / 1024) << "KB for"
              << totalMemMB << "MB system";
-    
+
     return bufferSize;
 }
 

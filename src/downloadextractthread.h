@@ -35,6 +35,7 @@ public:
     explicit DownloadExtractThread(const QByteArray &url, const QByteArray &localfilename = "", const QByteArray &expectedHash = "", QObject *parent = nullptr);
 
     virtual ~DownloadExtractThread();
+    virtual void run() override;
     virtual void cancelDownload() override;
     virtual void extractImageRun();
     virtual void extractMultiFileRun();
@@ -83,6 +84,7 @@ protected:
     std::atomic<quint64> _totalRingBufferWaitMs;  // Time in _on_read() waiting for data
     std::atomic<quint64> _bytesReadFromRingBuffer;// Bytes read from ring buffer
 
+    void _allocateBuffers();
     void _pushQueue(const char *data, size_t len);
     void _cancelExtract();
     virtual size_t _writeData(const char *buf, size_t len) override;
