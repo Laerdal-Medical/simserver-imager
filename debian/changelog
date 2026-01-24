@@ -92,6 +92,10 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
     smooth hover/press state transitions. Created reusable ImScrollBar component
     that replaces default Qt ScrollBar styling across all list views and
     scrollable areas
+  * Button and Component Theming: Replace hardcoded Qt.rgba() disabled colors
+    with dedicated Style properties for consistent Laerdal branding. Remove
+    legacy raspberryRed alias and update all component focus/hover colors
+    to use laerdalBlue
   * Multi-Partition Detection: Added API to detect drives with multiple
     partitions for improved SPU copy warnings
   * QML Lint Compliance: Fixed unqualified property access across wizard
@@ -117,7 +121,7 @@ laerdal-simserver-imager (1.0.5) stable; urgency=medium
     storage selection
   * Write Complete Screen Alignment: Align "Write statistics:" section with
     "Your choices:" section by using consistent heading font size, proper
-    spacing, and fixed-width label columns (150px) to ensure data values
+    spacing, and fixed-width label columns (120px) to ensure data values
     align vertically across both sections for improved visual consistency
   * ImBadge Style Fix: Fix runtime ReferenceError by using Style singleton
     directly instead of qualified RpiImager.Style access
