@@ -56,6 +56,7 @@
 #include <QStringList>
 #include <QHostAddress>
 #include <QDateTime>
+#include <QTimer>
 #include "curlfetcher.h"
 #include "curlnetworkconfig.h"
 #include <QDebug>
@@ -807,7 +808,10 @@ void ImageWriter::startWrite()
             _artifactEntryForStreaming = targetFilename;
 
             // Continue with write flow (will use ArchiveEntryExtractThread)
-            startWrite();
+            // Defer long enough for QML render thread to sync and draw indeterminate animation.
+            // The render thread needs a vsync cycle (~16ms at 60fps) to synchronize with the
+            // main thread, so 100ms gives ~6 rendered frames before the blocking work begins.
+            QTimer::singleShot(100, this, &ImageWriter::startWrite);
             return;
         }
 
@@ -866,7 +870,8 @@ void ImageWriter::startWrite()
                     _artifactEntryForStreaming = targetFilename;
 
                     // Continue with write flow (will use ArchiveEntryExtractThread)
-                    startWrite();
+                    // Defer to let QML render the indeterminate progress animation
+                    QTimer::singleShot(0, this, &ImageWriter::startWrite);
                 }, Qt::SingleShotConnection);
 
         // Disconnect any existing progress connection to avoid duplicates on retry
@@ -1094,13 +1099,22 @@ void ImageWriter::startWrite()
         }
     }
 
-    if (_src.scheme() == "archive" && !_artifactZipForStreaming.isEmpty())
+    if (_src.scheme() == "archive")
     {
-        // Direct streaming from archive entry (uncompressed WIC)
-        qDebug() << "Using ArchiveEntryExtractThread for direct streaming from:" << _artifactZipForStreaming;
-        _thread = new ArchiveEntryExtractThread(_artifactZipForStreaming, _artifactEntryForStreaming,
+        QString zipPath = _artifactZipForStreaming;
+        QString entryName = _artifactEntryForStreaming;
+
+        // If streaming variables were cleared (e.g., second write of same image),
+        // reconstruct from the archive:// URL (format: archive:///path/to/zip#entry)
+        if (zipPath.isEmpty()) {
+            zipPath = _src.path();
+            entryName = _src.fragment();
+        }
+
+        // Direct streaming from archive entry
+        qDebug() << "Using ArchiveEntryExtractThread for direct streaming from:" << zipPath;
+        _thread = new ArchiveEntryExtractThread(zipPath, entryName,
                                                  writeDevicePath.toLatin1(), this);
-        // Clear the streaming info after use
         _artifactZipForStreaming.clear();
         _artifactEntryForStreaming.clear();
     }
