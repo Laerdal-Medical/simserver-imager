@@ -31,6 +31,8 @@ Item {
     // NOT a binding, so it won't auto-change when hasNetworkConnectivity changes.
     // The onOsListUnavailableChanged handler manages the offline→online transition.
     property int currentStep: 0
+    property int navigatedFromStep: -1  // Track where we came from for navigation decisions
+    property var navigationHistory: []  // Stack of visited steps for proper back navigation
     readonly property int totalSteps: 7
     
     // Track which steps have been made permissible/unlocked for navigation
@@ -80,7 +82,7 @@ Item {
     property bool supportsSerialConsoleOnly: false
     property bool supportsUsbGadget: false
     
-    // Track the source type used for the last OS list load (to detect CDN/GitHub switches)
+    // Track the source type used for the last OS list load (legacy, kept for compatibility)
     property string lastOsListSourceType: ""
 
     // Track customizations that were actually configured
@@ -319,7 +321,7 @@ Item {
     function invalidateDeviceDependentSteps() {
         // When device changes, invalidate all steps after device selection
         invalidateStepsFrom(stepOSSelection)
-        
+
         // Clear device-dependent state
         selectedOsName = ""
         selectedStorageName = ""
@@ -776,6 +778,8 @@ Item {
             }
 
             console.log("WizardContainer.nextStep(): Moving from step", root.currentStep, "to step", nextIndex)
+            root.navigatedFromStep = root.currentStep
+            root.navigationHistory.push(root.currentStep)
             root.currentStep = nextIndex
             var nextComponent = getStepComponent(root.currentStep)
             if (nextComponent) {
@@ -786,11 +790,14 @@ Item {
         }
     }
     
-    // Simplified previousStep - no customization steps to skip
+    // Go back to the previous step in navigation history
     function previousStep() {
-        if (root.currentStep > 0) {
-            var prevIndex = root.currentStep - 1
+        if (root.navigationHistory.length > 0) {
+            // Pop the last visited step from history
+            var prevIndex = root.navigationHistory.pop()
+            console.log("WizardContainer.previousStep(): Going back from step", root.currentStep, "to step", prevIndex)
 
+            root.navigatedFromStep = root.currentStep
             root.currentStep = prevIndex
             var prevComponent = getStepComponent(root.currentStep)
             if (prevComponent) {
@@ -798,11 +805,26 @@ Item {
                 wizardStack.clear()
                 wizardStack.push(prevComponent)
             }
+        } else if (root.currentStep > 0) {
+            // Fallback: no history, just decrement (shouldn't normally happen)
+            var fallbackIndex = root.currentStep - 1
+            console.log("WizardContainer.previousStep(): No history, falling back from step", root.currentStep, "to step", fallbackIndex)
+
+            root.navigatedFromStep = root.currentStep
+            root.currentStep = fallbackIndex
+            var fallbackComponent = getStepComponent(root.currentStep)
+            if (fallbackComponent) {
+                wizardStack.clear()
+                wizardStack.push(fallbackComponent)
+            }
         }
     }
     
     function jumpToStep(stepIndex) {
         if (stepIndex >= 0 && stepIndex < root.totalSteps) {
+            console.log("WizardContainer.jumpToStep(): Jumping from step", root.currentStep, "to step", stepIndex)
+            root.navigatedFromStep = root.currentStep
+            root.navigationHistory.push(root.currentStep)
             root.currentStep = stepIndex
             var stepComponent = getStepComponent(stepIndex)
             if (stepComponent) {
@@ -1420,6 +1442,8 @@ Item {
     function resetWizard() {
         // Reset all wizard state to initial values - Laerdal simplified
         currentStep = 0
+        navigatedFromStep = -1
+        navigationHistory = []
         permissibleStepsBitmap = 1  // Reset to only Device step permissible
         isWriting = false
         writeAnotherMode = false

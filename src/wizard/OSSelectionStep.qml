@@ -236,18 +236,23 @@ WizardStepBase {
     }
 
     Component.onCompleted: {
-        var modelHasData = root.osmodel && root.osmodel.rowCount() > 2
-        var currentSourceType = root.repoManager ? root.repoManager.selectedSourceType : "cdn"
-        var sourceTypeChanged = currentSourceType !== root.wizardContainer.lastOsListSourceType
+        // Reload when entering from Source Selection (step 1) to ensure fresh data
+        // after branch filter, source type, or device changes.
+        // Don't reload when coming back from CI Artifact Selection (step 3) to preserve selection.
+        var comingFromSourceSelection = root.wizardContainer.navigatedFromStep === 1  // stepSourceSelection
+        var comingFromCIArtifact = root.wizardContainer.navigatedFromStep === 3  // stepCIArtifactSelection
 
-        if (!modelHasData || sourceTypeChanged) {
-            console.log("OSSelectionStep: Loading data (source:", currentSourceType,
-                        "previous:", root.wizardContainer.lastOsListSourceType, ")")
+        if (comingFromSourceSelection || root.wizardContainer.navigatedFromStep === 0) {
+            // Coming from Device Selection or Source Selection - reload
+            root.modelLoaded = false
             onOsListPreparedHandler()
-            root.wizardContainer.lastOsListSourceType = currentSourceType
-        } else {
-            console.log("OSSelectionStep: Model already has data (", root.osmodel.rowCount(), "items) - skipping reload")
+        } else if (comingFromCIArtifact) {
+            // Coming back from CI Artifact Selection - don't reload, keep existing selection
             root.modelLoaded = true
+        } else {
+            // Other cases (initial load, etc.) - reload to be safe
+            root.modelLoaded = false
+            onOsListPreparedHandler()
         }
 
         // Register the OS list for keyboard navigation
