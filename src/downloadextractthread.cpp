@@ -205,8 +205,12 @@ void DownloadExtractThread::_emitProgressUpdate()
     quint64 currentDecompressNow = _bytesDecompressed.load();
     quint64 currentWriteNow = this->bytesWritten();
     
-    // For write progress, use extract size (uncompressed) if set, otherwise fall back to download size
-    quint64 writeTotal = currentExtractTotal > 0 ? currentExtractTotal : currentDlTotal;
+    // For write progress, use extract size (uncompressed) only.
+    // Do NOT fall back to download size - for compressed files, the download size is the
+    // compressed size which doesn't correspond to bytes written (decompressed).
+    // When extractTotal is 0, both this signal and asyncWriteProgress consistently report
+    // total=0, allowing the UI to stay in indeterminate mode.
+    quint64 writeTotal = currentExtractTotal;
     
     // Only emit signals if values have changed
     if (currentDlNow != _lastEmittedDlNow || (currentDlTotal > 0 && _lastEmittedDlNow == 0)) {
@@ -805,6 +809,28 @@ int DownloadExtractThread::_on_close(struct archive *)
         _currentReadSlot = nullptr;
     }
     return 0;
+}
+
+void DownloadExtractThread::_updateBottleneckState()
+{
+    // Dynamically determine the upstream bottleneck type based on ring buffer fill level.
+    // The input ring buffer holds compressed data from network download → decompression:
+    // - If buffer is mostly full: network is faster than decompression → Decompression bottleneck
+    // - If buffer is mostly empty: decompression is faster than network → Network bottleneck
+    if (_ringBuffer && _ringBuffer->numSlots() > 0) {
+        size_t committed = _ringBuffer->getCommittedCount();
+        size_t total = _ringBuffer->numSlots();
+
+        // Use 25% threshold: if less than 25% full, network can't keep up
+        if (committed < total / 4) {
+            _upstreamBottleneckType = BottleneckState::Network;
+        } else {
+            _upstreamBottleneckType = BottleneckState::Decompression;
+        }
+    }
+
+    // Call base class to perform the actual bottleneck state update and emit signals
+    DownloadThread::_updateBottleneckState();
 }
 
 void DownloadExtractThread::_configureArchiveOptions(struct archive *a)

@@ -100,6 +100,14 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     >100% write progress for compressed .wic.xz files from GitHub releases
     where extract_size reflects the compressed download size. Write progress
     shows indeterminate state when decompressed size is unknown
+  * Compressed Download Bottleneck Detection: Fix bottleneck detection during
+    compressed file downloads. Now correctly distinguishes between network and
+    decompression bottlenecks by monitoring ring buffer fill level (<25% full
+    indicates network bottleneck, otherwise decompression is limiting)
+  * Write Progress for Unknown Extract Size: Fix write progress no longer shows
+    misleading percentages when uncompressed size is unknown. Previously would
+    fall back to compressed download size as total, resulting in incorrect
+    progress. Now stays in indeterminate mode when extract size is unavailable
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 24 Jan 2025 12:00:00 +0000
 

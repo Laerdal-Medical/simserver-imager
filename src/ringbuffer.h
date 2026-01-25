@@ -140,6 +140,15 @@ public:
     size_t numSlots() const { return _numSlots; }
 
     /**
+     * @brief Get number of committed (filled) slots waiting to be read
+     *
+     * This can be used for bottleneck detection:
+     * - High count = producer is faster than consumer
+     * - Low count = consumer is faster than producer
+     */
+    size_t getCommittedCount() const { return _committedCount.load(); }
+
+    /**
      * @brief Reset the ring buffer for reuse
      */
     void reset();

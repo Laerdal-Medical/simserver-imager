@@ -299,7 +299,7 @@ protected:
     bool _debugSkipEndOfDevice;
     
     void _initializeSyncConfiguration();
-    void _updateBottleneckState();
+    virtual void _updateBottleneckState();
     
     // Bottleneck detection state
     BottleneckState _currentBottleneck;

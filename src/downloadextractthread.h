@@ -90,6 +90,7 @@ protected:
     virtual size_t _writeData(const char *buf, size_t len) override;
     virtual void _onDownloadSuccess() override;
     virtual void _onDownloadError(const QString &msg) override;
+    virtual void _updateBottleneckState() override;
     void _emitProgressUpdate();
     virtual void _onVerifyProgress() override;
 
