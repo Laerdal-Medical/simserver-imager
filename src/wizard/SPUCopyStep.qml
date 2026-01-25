@@ -326,11 +326,18 @@ WizardStepBase {
                         showText: true
                         indeterminate: root.bytesTotal === 0
                         indeterminateText: root.statusMessage
-                        text: root.bytesTotal > 0
-                            ? qsTr("Copying... %1 of %2")
-                                .arg(root.imageWriter.formatSize(root.bytesNow))
-                                .arg(root.imageWriter.formatSize(root.bytesTotal))
-                            : ""
+                        text: {
+                            if (root.bytesTotal === 0) {
+                                return ""
+                            } else if (root.copyProgress >= 1) {
+                                // Copy complete, show status message (e.g., "Safely ejecting...")
+                                return root.statusMessage
+                            } else {
+                                return qsTr("Copying... %1 of %2")
+                                    .arg(root.imageWriter.formatSize(root.bytesNow))
+                                    .arg(root.imageWriter.formatSize(root.bytesTotal))
+                            }
+                        }
 
                         Accessible.name: qsTr("Copy progress")
                     }

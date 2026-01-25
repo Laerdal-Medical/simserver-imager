@@ -108,6 +108,8 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     misleading percentages when uncompressed size is unknown. Previously would
     fall back to compressed download size as total, resulting in incorrect
     progress. Now stays in indeterminate mode when extract size is unavailable
+  * SPU Copy Ejecting Status: Fix progress bar showing "Safely ejecting..."
+    status during SPU copy completion phase. Previously changed too quickly
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 24 Jan 2025 12:00:00 +0000
 

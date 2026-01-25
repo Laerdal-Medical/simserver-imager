@@ -230,6 +230,9 @@ void SPUCopyThread::run()
         return;
     }
 
+    // Brief delay to allow UI to show ejecting status before switching to success
+    QThread::msleep(500);
+
     qDebug() << "SPUCopyThread: Copy operation completed successfully";
     emit success();
 }
