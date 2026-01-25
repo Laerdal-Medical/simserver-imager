@@ -369,6 +369,10 @@ WizardStepBase {
                         if (root.bottleneckStatus !== "") {
                             parts.push(root.bottleneckStatus)
                         }
+                        if (root.progressBytesTotal > 0) {
+                            parts.push(Utils.formatBytes(root.progressBytesNow) + " / " +
+                                      Utils.formatBytes(root.progressBytesTotal))
+                        }
                         // Show verification speed during verify, write speed otherwise
                         var throughput = root.isVerifying ? root.verifyThroughputKBps : root.writeThroughputKBps
                         if (throughput > 0) {

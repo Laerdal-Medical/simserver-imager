@@ -113,6 +113,8 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
   * Wizard Back Navigation: Fix back button now uses a history stack to return
     to the correct previous step instead of simply decrementing the step index,
     which could skip conditional steps like CI Artifact Selection
+  * Write Progress Bytes Display: Show bytes written and total (e.g., "1.5 GB
+    / 4.2 GB") in the write progress status line alongside speed and ETA
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 24 Jan 2025 12:00:00 +0000
 
