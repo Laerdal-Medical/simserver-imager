@@ -125,6 +125,13 @@ WizardStepBase {
                         }
                         if (root.downloadSpeedMbps > 0) {
                             parts.push(Math.round(root.downloadSpeedMbps) + " Mbps")
+                            // Calculate and display time remaining
+                            var timeRemaining = Utils.calculateTimeRemainingMbps(
+                                root.bytesReceived, root.bytesTotal, root.downloadSpeedMbps)
+                            var timeStr = Utils.formatTimeRemaining(timeRemaining)
+                            if (timeStr !== "") {
+                                parts.push(timeStr)
+                            }
                         }
                         return parts.join("  •  ")
                     }
