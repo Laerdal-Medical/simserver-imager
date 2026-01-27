@@ -1,3 +1,14 @@
+laerdal-simserver-imager (1.0.7) UNRELEASED; urgency=medium
+
+  * Device Selection Workflow: "Erase" and "Use custom" options moved from OS
+    selection to device/hardware selection step for a more intuitive workflow.
+    "Use custom" now supports SPU files in addition to WIC/VSI images
+  * Local File Bottleneck Detection: Fix bottleneck status incorrectly showing
+    "network" when extracting from local files. Now correctly identifies "disk
+    read" as the upstream bottleneck when throughput is limited
+
+ -- Laerdal Medical <support@laerdal.com>  Mon, 27 Jan 2025 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.6) stable; urgency=medium
 
   * Write Progress Display: Real-time speed (MB/s) and estimated time remaining
@@ -115,12 +126,6 @@ laerdal-simserver-imager (1.0.6) stable; urgency=medium
     which could skip conditional steps like CI Artifact Selection
   * Write Progress Bytes Display: Show bytes written and total (e.g., "1.5 GB
     / 4.2 GB") in the write progress status line alongside speed and ETA
-  * Device Selection Workflow: "Erase" and "Use custom" options moved from OS
-    selection to device/hardware selection step for a more intuitive workflow.
-    "Use custom" now supports SPU files in addition to WIC/VSI images
-  * Local File Bottleneck Detection: Fix bottleneck status incorrectly showing
-    "network" when extracting from local files. Now correctly identifies "disk
-    read" as the upstream bottleneck when throughput is limited
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 24 Jan 2025 12:00:00 +0000
 

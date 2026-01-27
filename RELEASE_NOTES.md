@@ -4,6 +4,20 @@
 
 ### Features
 
+### Improvements
+
+- **Device Selection Workflow**: "Erase" and "Use custom" options moved from OS selection to device/hardware selection step for a more intuitive workflow. "Use custom" now supports SPU files in addition to WIC/VSI images, allowing local firmware updates to be selected directly from device selection
+
+### Bug Fixes
+
+- **Local File Bottleneck Detection**: Fix bottleneck status incorrectly showing "network" when extracting from local files. Local file extraction now correctly identifies "disk read" as the upstream bottleneck when throughput is limited
+
+---
+
+## What's New in 1.0.6
+
+### Features
+
 - **Direct Artifact Streaming**: Single-file CI artifacts (.wic, .wic.xz, .spu) are detected by filename and stream directly to USB, bypassing the CI artifact selection step. WIC images use a new two-stage ZIP extraction pipeline (DownloadArchiveExtractThread) that decompresses on-the-fly. SPU artifacts download the ZIP to cache and extract the entry to FAT32
 - **SPU URL Streaming**: SPU downloads from CDN or GitHub releases now stream directly to the FAT32 mount point while simultaneously caching to disk, eliminating the intermediate temp file
 - **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
@@ -15,7 +29,6 @@
 
 ### Improvements
 
-- **Device Selection Workflow**: "Erase" and "Use custom" options moved from OS selection to device/hardware selection step for a more intuitive workflow. "Use custom" now supports SPU files in addition to WIC/VSI images, allowing local firmware updates to be selected directly from device selection
 - **Write Pipeline Memory Reduction**: Reduced write buffer size from 8MB to 1MB and right-sized ring buffers to match the actual io_uring queue depth. Previously, ring buffer over-allocation (4GB+) caused memory pressure that blocked the UI thread via page faults. Now uses ~40MB total, eliminating UI stuttering during writes
 - **Smooth Progress Bar**: Added width animation to progress bar fill, creating smooth visual transitions between completion events instead of discrete jumps
 - **Utils Singleton**: Consolidated utility functions (formatBytes, formatDuration, calculateThroughputMbps, etc.) into a centralized Utils.qml module, eliminating code duplication across wizard steps
@@ -28,7 +41,6 @@
 ### Bug Fixes
 
 - **Compressed Download Bottleneck Detection**: Fix bottleneck detection during compressed file downloads to correctly distinguish between network and decompression bottlenecks by monitoring the ring buffer fill level. When the buffer is less than 25% full, the network is identified as the bottleneck; otherwise decompression is the limiting factor
-- **Local File Bottleneck Detection**: Fix bottleneck status incorrectly showing "network" when extracting from local files. Local file extraction now correctly identifies "disk read" as the upstream bottleneck when throughput is limited
 - **Write Progress for Unknown Extract Size**: Fix write progress no longer showing misleading percentages when the uncompressed size is unknown. Previously it would fall back to using the compressed download size as the total, resulting in incorrect progress. Now the progress bar stays in indeterminate mode when the extract size is unavailable
 - **SPU Copy Ejecting Status**: Fix progress bar showing "Safely ejecting..." status during SPU copy completion phase. Previously the status changed too quickly to be visible
 - **Wizard Back Navigation**: Fix back button navigation now uses a history stack to return to the correct previous step. Previously it simply decremented the step index, which could skip steps when the wizard flow had conditional steps (e.g., CI Artifact Selection)
