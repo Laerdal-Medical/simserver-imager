@@ -11,9 +11,9 @@ on:
 
 # Cancel in-progress builds when a new build is triggered.
 # PRs: group by PR number (cancel old builds when new commits pushed)
-# Push/Tag: group by SHA (deduplicate tag + branch builds for same commit)
+# Branch/Tag: group by ref (cancel old builds when new commits pushed to same branch)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
