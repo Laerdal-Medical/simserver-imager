@@ -145,13 +145,26 @@ bool HWListModel::reload()
             indexOfDefault = _hwDevices.size() - 1;
     }
 
-    // Add "Use custom" option at the end - allows selecting a local WIC file
+    // Add "Erase" option - formats card as FAT32
+    HardwareDevice eraseDevice = {
+        tr("Erase"),
+        QJsonArray(),  // Empty tags = no device filtering
+        QJsonArray(),
+        "qrc:/qt/qml/RpiImager/icons/erase.png",
+        tr("Format card as FAT32"),
+        "inclusive",  // Show all OS images (no filtering)
+        "",  // No architecture preference
+        false  // Not disabled
+    };
+    _hwDevices.append(eraseDevice);
+
+    // Add "Use custom" option at the end - allows selecting a local image file
     HardwareDevice customDevice = {
         tr("Use custom"),
         QJsonArray(),  // Empty tags = no device filtering
         QJsonArray(),
         "qrc:/qt/qml/RpiImager/icons/use_custom.png",
-        tr("Select a local .wic image file"),
+        tr("Select a local .wic or .spu file"),
         "inclusive",  // Show all OS images (no filtering)
         "",  // No architecture preference
         false  // Not disabled

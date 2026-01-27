@@ -240,3 +240,15 @@ int LocalFileExtractThread::_archive_close_test(struct archive *, void *client_d
     // Don't actually close the file during testing
     return ARCHIVE_OK;
 }
+
+void LocalFileExtractThread::_updateBottleneckState()
+{
+    // For local files, use DiskRead instead of Network as the upstream bottleneck.
+    // When the write queue isn't full but throughput is low, the bottleneck is either:
+    // - DiskRead: local disk can't provide data fast enough
+    // - Decompression: CPU-bound decompression is slow (for compressed files)
+    _upstreamBottleneckType = BottleneckState::DiskRead;
+
+    // Call base class to perform the actual bottleneck state update
+    DownloadThread::_updateBottleneckState();
+}

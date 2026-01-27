@@ -835,6 +835,25 @@ Item {
         }
     }
 
+    // Check if "Erase" device is selected (for format card as FAT32)
+    function isEraseSelected() {
+        var hwModel = root.imageWriter.getHWList()
+        if (!hwModel || hwModel.currentIndex < 0) return false
+        var currentName = hwModel.currentName
+        return currentName === qsTr("Erase")
+    }
+
+    // Handle "Erase" selection - set up format flow and skip to storage selection
+    function handleEraseSelected() {
+        console.log("WizardContainer.handleEraseSelected: Setting up erase/format flow")
+        root.imageWriter.setSrc("internal://format", 0, 0, "", false, "", qsTr("Erase"), "")
+        root.selectedOsName = qsTr("Erase")
+        root.isSpuCopyMode = false
+        root.customizationSupported = false
+        // Skip Source and OS steps, go directly to Storage
+        root.jumpToStep(root.stepStorageSelection)
+    }
+
     // Check if "Use custom" device is selected (for local WIC file selection)
     function isUseCustomSelected() {
         var hwModel = root.imageWriter.getHWList()
@@ -875,9 +894,26 @@ Item {
     // Handle file selection for "Use custom" flow (from both native and fallback dialogs)
     function handleCustomFileSelected(fileUrl) {
         if (root.isUseCustomSelected() && root.currentStep === root.stepDeviceSelection && fileUrl.toString().length > 0) {
-            // Set the source to the selected file
-            root.imageWriter.setSrc(fileUrl)
-            root.selectedOsName = root.imageWriter.srcFileName()
+            console.log("WizardContainer.handleCustomFileSelected:", fileUrl)
+            var urlStr = fileUrl.toString().toLowerCase()
+            var isSpu = urlStr.endsWith(".spu")
+
+            if (isSpu) {
+                // SPU file - set up SPU copy mode
+                console.log("WizardContainer: SPU file selected from device selection")
+                var filePath = fileUrl.toString().replace("file://", "")
+                root.imageWriter.setSrcSpuFile(filePath)
+                var spuFileName = filePath.substring(filePath.lastIndexOf('/') + 1)
+                root.selectedOsName = spuFileName
+                root.selectedSpuName = spuFileName
+                root.isSpuCopyMode = true
+            } else {
+                // Regular image file
+                root.imageWriter.setSrc(fileUrl)
+                root.selectedOsName = root.imageWriter.srcFileName()
+                root.isSpuCopyMode = false
+            }
+
             root.customizationSupported = false  // Disabled for Laerdal SimServer Imager
             // Skip Source and OS steps, go directly to Storage
             root.jumpToStep(root.stepStorageSelection)
@@ -966,10 +1002,15 @@ Item {
             showBackButton: false
             appOptionsButton: optionsButton
             onNextClicked: {
-                // If "Use custom" is selected, open file dialog instead of going to next step
-                if (isUseCustomSelected()) {
+                // Handle special device selections
+                if (isEraseSelected()) {
+                    // Erase selected - set up format flow and skip to storage
+                    handleEraseSelected()
+                } else if (isUseCustomSelected()) {
+                    // Use custom selected - open file dialog
                     openCustomFileDialog()
                 } else {
+                    // Normal device - proceed to next step
                     root.nextStep()
                 }
             }

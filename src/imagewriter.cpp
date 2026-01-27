@@ -1504,6 +1504,9 @@ void ImageWriter::startWrite()
                     case DownloadThread::BottleneckState::Network:
                         statusText = tr("Limited by download speed");
                         break;
+                    case DownloadThread::BottleneckState::DiskRead:
+                        statusText = tr("Limited by disk read speed");
+                        break;
                     case DownloadThread::BottleneckState::Decompression:
                         statusText = tr("Limited by decompression speed");
                         break;
@@ -2091,13 +2094,7 @@ namespace {
             osList.append(osEntry);
         }
 
-        // Add "Use custom" option for local WIC files
-        QJsonObject customEntry;
-        customEntry["name"] = QObject::tr("Use custom");
-        customEntry["description"] = QObject::tr("Select a local .wic file");
-        customEntry["url"] = "internal://custom";
-        customEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
-        osList.append(customEntry);
+        // "Use custom" is only available in Device Selection, not here in OS Selection
 
         return osList;
     }
@@ -2189,7 +2186,7 @@ void ImageWriter::onOsListFetchComplete(const QByteArray &data, const QUrl &url)
         if (isTopLevelRequest && _completeOsList.isEmpty()) {
             qWarning() << "Top-level OS list fetch failed - malformed response. Operating in offline mode.";
             emit osListUnavailableChanged();
-			emit osListPrepared();  // Still emit so "Use custom" and "Erase" are available
+			emit osListPrepared();  // Still emit so device selection can proceed
         }
     }
 }
@@ -2352,19 +2349,7 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
         }
     }
 
-    reference_os_list_array.append(QJsonObject({
-            {"name", QCoreApplication::translate("main", "Erase")},
-            {"description", QCoreApplication::translate("main", "Format card as FAT32")},
-            {"icon", "qrc:/qt/qml/RpiImager/icons/erase.png"},
-            {"url", "internal://format"},
-        }));
-
-    reference_os_list_array.append(QJsonObject({
-            {"name", QCoreApplication::translate("main", "Use custom")},
-            {"description", QCoreApplication::translate("main", "Select a custom .wic file from your computer")},
-            {"icon", "qrc:/qt/qml/RpiImager/icons/use_custom.png"},
-            {"url", "internal://custom"},
-        }));
+    // "Erase" and "Use custom" are only available in Device Selection, not in OS Selection
 
     return QJsonDocument(
         QJsonObject({
@@ -2377,7 +2362,7 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
 void ImageWriter::beginOSListFetch() {
     const QUrl topUrl = osListUrl();
     if (!preflightValidateUrl(topUrl, QStringLiteral("repository:"))) {
-        // Even if we can't fetch, emit osListPrepared so "Use custom" and "Erase" are available
+        // Even if we can't fetch, emit osListPrepared so device selection can proceed
         emit osListPrepared();
         return;
     }
@@ -4391,6 +4376,9 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
                         break;
                     case DownloadThread::BottleneckState::Network:
                         statusText = tr("Limited by download speed");
+                        break;
+                    case DownloadThread::BottleneckState::DiskRead:
+                        statusText = tr("Limited by disk read speed");
                         break;
                     case DownloadThread::BottleneckState::Decompression:
                         statusText = tr("Limited by decompression speed");

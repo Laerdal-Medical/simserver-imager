@@ -303,42 +303,11 @@ WizardStepBase {
                 root.osmodel.reload()
             }
         }
-        // Handle native file selection for "Use custom"
+        // Handle native file selection - delegates to WizardContainer for "Use custom" from device selection
+        // This handler exists for signal routing; actual file handling is in WizardContainer.handleCustomFileSelected()
         function onFileSelected(fileUrl) {
-            // Ensure ImageWriter src is set to the chosen file explicitly
-            imageWriter.setSrc(fileUrl)
-            // Update selected OS name to the chosen file name
-            root.wizardContainer.selectedOsName = imageWriter.srcFileName()
-            root.wizardContainer.customizationSupported = false  // Disabled for Laerdal SimServer Imager
-            // For custom images, customization is not supported; clear any staged flags
-            if (!root.wizardContainer.customizationSupported) {
-                root.wizardContainer.hostnameConfigured = false
-                root.wizardContainer.localeConfigured = false
-                root.wizardContainer.userConfigured = false
-                root.wizardContainer.wifiConfigured = false
-                root.wizardContainer.sshEnabled = false
-                root.wizardContainer.piConnectEnabled = false
-                root.wizardContainer.piConnectAvailable = false
-                root.wizardContainer.secureBootAvailable = imageWriter.isSecureBootForcedByCliFlag()
-            }
-            root.customSelected = true
-            root.customSelectedSize = imageWriter.getSelectedSourceSize()
-            root.nextButtonEnabled = true
-            
-            // Scroll back to the "Use custom" option so user can see their selection
-            Qt.callLater(function() {
-                if (oslist && oslist.model) {
-                    // Find the "Use custom" item (url === "internal://custom")
-                    for (var i = 0; i < oslist.count; i++) {
-                        var itemData = oslist.getModelData(i)
-                        if (itemData && itemData.url === "internal://custom") {
-                            oslist.currentIndex = i
-                            oslist.positionViewAtIndex(i, ListView.Center)
-                            break
-                        }
-                    }
-                }
-            })
+            // File selection from device selection "Use custom" is handled by WizardContainer.handleCustomFileSelected()
+            // This signal handler is kept for compatibility but the actual work happens in WizardContainer
         }
     }
 

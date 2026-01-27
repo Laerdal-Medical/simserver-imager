@@ -23,9 +23,10 @@ public:
 
 protected:
     virtual void _cancelExtract();
-    virtual void run();
-    virtual ssize_t _on_read(struct archive *a, const void **buff);
-    virtual int _on_close(struct archive *a);
+    virtual void run() override;
+    virtual ssize_t _on_read(struct archive *a, const void **buff) override;
+    virtual int _on_close(struct archive *a) override;
+    virtual void _updateBottleneckState() override;
     void extractRawImageRun();
     bool _testArchiveFormat();
     static ssize_t _archive_read_test(struct archive *, void *client_data, const void **buff);

@@ -43,7 +43,7 @@ Button {
         text: control.text
         font: control.font
         color: control.enabled
-               ? (control.activeFocus || control.hovered ? Style.button2FocusedBackgroundColor : Style.button2ForegroundColor)
+               ? (control.activeFocus || control.hovered ? Style.button2FocusedForegroundColor : Style.button2ForegroundColor)
                : Style.button2DisabledForegroundColor
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter

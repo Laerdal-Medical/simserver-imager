@@ -34,6 +34,7 @@ public:
     enum class BottleneckState {
         None,           // Pipeline flowing smoothly
         Network,        // Waiting for network download
+        DiskRead,       // Waiting for local disk read (local file extraction)
         Decompression,  // CPU-bound decompression
         Storage         // Waiting for storage device
     };
