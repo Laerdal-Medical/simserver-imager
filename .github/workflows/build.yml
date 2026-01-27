@@ -9,11 +9,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# When a tag and branch push arrive for the same commit, only run once.
-# Tag builds are kept; branch builds are cancelled if a tag build starts.
+# Cancel in-progress builds when a new build is triggered.
+# PRs: group by PR number (cancel old builds when new commits pushed)
+# Push/Tag: group by SHA (deduplicate tag + branch builds for same commit)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.sha }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 env:
   QT_VERSION: '6.8.2'
