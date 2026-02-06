@@ -54,6 +54,8 @@ public:
         SourceOwnerRole,
         SourceRepoRole,
         ReleaseAssetIdRole,
+        ReleaseTagRole,
+        ReleaseAssetsRole,
     };
 
     struct OS {
@@ -76,6 +78,8 @@ public:
         QString branch;       // Branch name for artifacts
         QString sourceOwner;  // GitHub owner for artifacts
         QString sourceRepo;   // GitHub repo for artifacts
+        QString releaseTag;   // GitHub release tag for release asset selection
+        QString releaseAssetsJson;  // JSON array of release assets for multi-file releases
         qint64 artifactId = 0; // GitHub artifact ID for CI builds
         qint64 releaseAssetId = 0; // GitHub release asset ID for authenticated downloads
 

@@ -11,19 +11,30 @@ Item {
     id: root
 
     // === LAERDAL BRAND COLORS ===
+    // From Laerdal Life Design System: https://life.laerdal.com/5d20fd236/p/42a98c-color
     readonly property color mainBackgroundColor: "#ffffff"
-    readonly property color laerdalBlue: "#2e7fa1"           // Primary brand color
+    readonly property color backgroundColor: mainBackgroundColor  // Alias for convenience
+    readonly property color laerdalBlue: "#2e7fa1"           // Primary brand accent
     readonly property color laerdalDarkBlue: "#1a5a73"       // Darker variant for focus states
     readonly property color laerdalLightBlue: "#5fa8c4"      // Lighter variant
+    readonly property color laerdalRed: "#f24235"            // Active/alert accent
     readonly property color transparent: "transparent"
 
-    // Semantic colors for status/feedback
-    readonly property color successColor: "#37a851"          // Green for success states
+    // Text colors (Laerdal Life Design System)
+    readonly property color textColorPrimary: "#212121"      // Primary dark text
+    readonly property color textColorSecondary: "#2a2a2a"    // Secondary/body text
+    readonly property color textColorOnDark: "#ffffff"       // Text on dark backgrounds
+
+    // Semantic colors for status/feedback (Laerdal Life Design System)
+    readonly property color successColor: "#63913f"          // Laerdal success green
+    readonly property color successBackgroundColor: "#EBF6ED" // Do/success background
     readonly property color errorColor: "#d32f2f"            // Red for error states
-    readonly property color warningBackgroundColor: "#fff3cd" // Light yellow background for warnings
-    readonly property color warningTextColor: '#b18133'      // Dark yellow/brown text for warnings
+    readonly property color errorBackgroundColor: "#FFEEEB"  // Don't/error background
+    readonly property color warningBackgroundColor: "#FFF6F0" // Light peachy callout
+    readonly property color warningTextColor: "#b18133"      // Dark yellow/brown text for warnings
+    readonly property color infoBackgroundColor: "#C8E2F1"   // Light blue info callout
     readonly property color accentColor: laerdalBlue         // Accent color for highlights
-    readonly property color cardBackground: "#f8f9fa"        // Light gray for card backgrounds
+    readonly property color cardBackground: "#fafafa"        // Laerdal light background
 
     readonly property color buttonBackgroundColor: mainBackgroundColor
     readonly property color buttonForegroundColor: laerdalBlue
@@ -59,8 +70,8 @@ Item {
     readonly property color translucentWhite10: Qt.rgba(255, 255, 255, 0.1)
     readonly property color translucentWhite30: Qt.rgba(255, 255, 255, 0.3)
 
-    // descriptions in list views
-    readonly property color textDescriptionColor: "#1a1a1a"
+    // descriptions in list views (Laerdal primary text color)
+    readonly property color textDescriptionColor: "#2a2a2a"
     // Sidebar colors
     readonly property color sidebarActiveBackgroundColor: laerdalBlue
     readonly property color sidebarTextOnActiveColor: "#FFFFFF"
@@ -78,7 +89,7 @@ Item {
     readonly property color subtitleColor: "#ffffff"
 
     readonly property color progressBarTextColor: '#70c6e8'
-    readonly property color progressBarVerifyForegroundColor: "#37a851"  // Laerdal success green
+    readonly property color progressBarVerifyForegroundColor: successColor  // Laerdal success green
     readonly property color progressBarBackgroundColor: laerdalBlue
     // New: distinct colors for writing vs verification phases
     readonly property color progressBarWritingForegroundColor: laerdalBlue
@@ -91,12 +102,12 @@ Item {
     readonly property color formLabelErrorColor: "red"
     readonly property color formLabelDisabledColor: "#202e7fa1"
     // Active color for radio buttons, checkboxes, and switches
-    readonly property color formControlActiveColor: "#1955AE"
+    readonly property color formControlActiveColor: laerdalBlue
 
     readonly property color embeddedModeInfoTextColor: "#ffffff"
 
     // Focus/outline
-    readonly property color focusOutlineColor: "#0078d4"
+    readonly property color focusOutlineColor: laerdalBlue
     readonly property int focusOutlineWidth: 2
     readonly property int focusOutlineRadius: 4
     readonly property int focusOutlineMargin: -4

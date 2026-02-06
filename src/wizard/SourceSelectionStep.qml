@@ -141,7 +141,7 @@ WizardStepBase {
                         Layout.fillWidth: true
                         spacing: Style.spacingSmall
 
-                        RadioButton {
+                        ImRadioButton {
                             id: cdnRadio
                             checked: root.selectedSourceType === "cdn"
 
@@ -151,9 +151,7 @@ WizardStepBase {
                                 }
                             }
 
-                            Accessible.role: Accessible.RadioButton
-                            Accessible.name: qsTr("Laerdal CDN source")
-                            Accessible.description: qsTr("Download images from Laerdal CDN")
+                            accessibleDescription: qsTr("Download images from Laerdal CDN")
                         }
 
                         ColumnLayout {
@@ -194,7 +192,7 @@ WizardStepBase {
                         Layout.fillWidth: true
                         spacing: Style.spacingSmall
 
-                        RadioButton {
+                        ImRadioButton {
                             id: githubRadio
                             checked: root.selectedSourceType === "github"
                             enabled: root.isGitHubAvailable
@@ -205,9 +203,7 @@ WizardStepBase {
                                 }
                             }
 
-                            Accessible.role: Accessible.RadioButton
-                            Accessible.name: qsTr("GitHub CI Artifacts source")
-                            Accessible.description: root.isGitHubAvailable
+                            accessibleDescription: root.isGitHubAvailable
                                                     ? qsTr("Download images from GitHub CI artifacts")
                                                     : (!root.isGitHubAuthenticated
                                                        ? qsTr("Sign in to GitHub to enable this option")
@@ -379,13 +375,17 @@ WizardStepBase {
                         // Sync currentIndex to match selectedBranchName in the current model
                         function syncCurrentIndexToSelectedBranch() {
                             if (!selectedBranchName || selectedBranchName === "") {
-                                currentIndex = 0
+                                currentIndex = 0  // "Default branch"
+                                return
+                            }
+                            if (selectedBranchName === "RELEASES_ONLY") {
+                                currentIndex = 1  // "Releases"
                                 return
                             }
                             var branches = availableBranches
                             for (var i = 0; i < branches.length; i++) {
                                 if (branches[i] === selectedBranchName) {
-                                    currentIndex = i + 1  // +1 because "All branches" is at index 0
+                                    currentIndex = i + 2  // +2 because "Default branch" and "Releases" are at indices 0-1
                                     return
                                 }
                             }
@@ -401,7 +401,10 @@ WizardStepBase {
                         }
 
                         model: {
-                            var branches = [qsTr("All branches")].concat(availableBranches)
+                            // "Default branch" shows releases + all artifacts
+                            // "Releases" shows only releases (no CI artifacts)
+                            // Other branches show only CI artifacts from that branch
+                            var branches = [qsTr("Default branch"), qsTr("Releases")].concat(availableBranches)
                             return branches
                         }
 
@@ -446,9 +449,12 @@ WizardStepBase {
                             // User pressed Enter with typed text - use it as branch filter
                             var typedText = editText.trim()
                             if (root.repoManager) {
-                                if (typedText === "" || typedText === qsTr("All branches")) {
+                                if (typedText === "" || typedText === qsTr("Default branch")) {
                                     selectedBranchName = ""
                                     root.repoManager.setArtifactBranchFilter("")
+                                } else if (typedText === qsTr("Releases")) {
+                                    selectedBranchName = "RELEASES_ONLY"
+                                    root.repoManager.setArtifactBranchFilter("RELEASES_ONLY")
                                 } else {
                                     selectedBranchName = typedText
                                     root.repoManager.setArtifactBranchFilter(typedText)
@@ -459,10 +465,16 @@ WizardStepBase {
                         onActivated: function(index) {
                             if (root.repoManager) {
                                 if (index === 0) {
+                                    // "Default branch" - show releases + all artifacts
                                     selectedBranchName = ""
                                     root.repoManager.setArtifactBranchFilter("")
+                                } else if (index === 1) {
+                                    // "Releases" - show only releases (no CI artifacts)
+                                    selectedBranchName = "RELEASES_ONLY"
+                                    root.repoManager.setArtifactBranchFilter("RELEASES_ONLY")
                                 } else {
-                                    selectedBranchName = availableBranches[index - 1]
+                                    // Specific branch - show only CI artifacts from that branch
+                                    selectedBranchName = availableBranches[index - 2]
                                     root.repoManager.setArtifactBranchFilter(selectedBranchName)
                                 }
                             }

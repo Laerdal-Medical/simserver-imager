@@ -322,6 +322,10 @@ private:
     void setStatusMessage(const QString &message);
     void updateStatusMessage();
     void checkRefreshComplete();
+    static QString extractDeviceName(const QString &text);
+    static QString extractVersion(const QString &text);
+    static QString buildDisplayName(const QString &deviceName, const QString &version,
+                                    const QString &fallback);
 
     struct GitHubRepoInfo {
         QString owner;

@@ -58,6 +58,8 @@ MessageDialog {
         editingRepoOwner = ""
         editingRepoName = ""
         editingRepoBranch = ""
+        // Set initial focus to the repo list
+        repoListView.forceActiveFocus()
     }
 
     // Content goes directly in the BaseDialog (uses default property)
@@ -83,8 +85,25 @@ MessageDialog {
             anchors.margins: 1
             clip: true
             model: root.repos
+            activeFocusOnTab: true
+            keyNavigationEnabled: true
+            currentIndex: root.repos.length > 0 ? 0 : -1
+            highlightFollowsCurrentItem: true
+            highlightMoveDuration: 100
 
             ScrollBar.vertical: ImScrollBar { }
+
+            // Handle keyboard toggle
+            function toggleCurrentItem() {
+                if (currentIndex >= 0 && root.repoManager) {
+                    var item = root.repos[currentIndex]
+                    root.repoManager.setRepoEnabled(item.owner, item.repo, !item.enabled)
+                    root.repos = root.repoManager.githubRepos
+                }
+            }
+            Keys.onSpacePressed: toggleCurrentItem()
+            Keys.onReturnPressed: toggleCurrentItem()
+            Keys.onEnterPressed: toggleCurrentItem()
 
             delegate: Item {
                 id: repoDelegate
@@ -96,7 +115,12 @@ MessageDialog {
 
                 Rectangle {
                     anchors.fill: parent
-                    color: repoMouseArea.containsMouse ? Style.listViewHoverRowBackgroundColor : "transparent"
+                    color: repoMouseArea.containsMouse || repoDelegate.index === repoListView.currentIndex && repoListView.activeFocus
+                         ? Style.listViewHoverRowBackgroundColor : "transparent"
+                    border.color: repoDelegate.index === repoListView.currentIndex && repoListView.activeFocus
+                                ? Style.focusOutlineColor : "transparent"
+                    border.width: 2
+                    radius: 2
 
                     MouseArea {
                         id: repoMouseArea
@@ -126,9 +150,10 @@ MessageDialog {
                         anchors.rightMargin: Style.spacingMedium
                         spacing: Style.spacingMedium
 
-                        CheckBox {
+                        ImCheckBox {
                             id: repoCheckBox
                             checked: repoDelegate.modelData.enabled
+                            activeFocusOnTab: false  // Focus handled by ListView
                             onClicked: {
                                 if (root.repoManager) {
                                     root.repoManager.setRepoEnabled(
@@ -139,10 +164,6 @@ MessageDialog {
                                     root.repos = root.repoManager.githubRepos
                                 }
                             }
-
-                            Accessible.role: Accessible.CheckBox
-                            Accessible.name: repoDelegate.modelData.fullName
-                            Accessible.checked: checked
                         }
 
                         ColumnLayout {
@@ -449,10 +470,14 @@ MessageDialog {
             } else {
                 repoManager.addGitHubRepo(newRepoOwner, newRepoName, newRepoBranch)
             }
-            // Clear form after adding
+            // Clear form after adding - also reset combo boxes visual state
             newRepoOwner = ""
             newRepoName = ""
             newRepoBranch = ""
+            ownerCombo.currentIndex = -1
+            ownerCombo.editText = ""
+            repoCombo.currentIndex = -1
+            repoCombo.editText = ""
         }
     }
 

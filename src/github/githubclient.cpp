@@ -1173,7 +1173,7 @@ void GitHubClient::checkRateLimitHeaders(QNetworkReply *reply)
 
 QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QString &owner, const QString &repo)
 {
-    QJsonArray wicFiles;
+    QJsonArray releaseGroups;
 
     // Image file extensions to look for (WIC, VSI, SPU)
     QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
@@ -1186,41 +1186,57 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
         QString publishedAt = release["published_at"].toString();
 
         QJsonArray assets = release["assets"].toArray();
+        QJsonArray assetsInRelease;
 
         for (const auto &assetValue : assets) {
             QJsonObject asset = assetValue.toObject();
             QString name = asset["name"].toString();
+            QString nameLower = name.toLower();
 
-            // Check if it's a WIC file
-            bool isWic = false;
+            // Check if it's an image file (WIC, VSI, SPU)
+            bool isImageFile = false;
+            QString fileType;
             for (const QString &ext : fileExtensions) {
-                if (name.endsWith(ext, Qt::CaseInsensitive)) {
-                    isWic = true;
+                if (nameLower.endsWith(ext)) {
+                    isImageFile = true;
+                    if (ext == ".spu") {
+                        fileType = "spu";
+                    } else if (ext == ".vsi") {
+                        fileType = "vsi";
+                    } else {
+                        fileType = "wic";
+                    }
                     break;
                 }
             }
 
-            if (isWic) {
-                QJsonObject wicFile;
-                wicFile["name"] = name;
-                wicFile["tag"] = tagName;
-                wicFile["release_name"] = releaseName;
-                wicFile["prerelease"] = prerelease;
-                wicFile["published_at"] = publishedAt;
-                wicFile["size"] = asset["size"].toVariant().toLongLong();
-                wicFile["download_url"] = asset["browser_download_url"].toString();
-                wicFile["asset_id"] = asset["id"].toVariant().toLongLong();
-                wicFile["content_type"] = asset["content_type"].toString();
-                wicFile["owner"] = owner;
-                wicFile["repo"] = repo;
-
-                wicFiles.append(wicFile);
+            if (isImageFile) {
+                QJsonObject assetInfo;
+                assetInfo["name"] = name;
+                assetInfo["size"] = asset["size"].toVariant().toLongLong();
+                assetInfo["asset_id"] = asset["id"].toVariant().toLongLong();
+                assetInfo["download_url"] = asset["browser_download_url"].toString();
+                assetInfo["type"] = fileType;
+                assetsInRelease.append(assetInfo);
             }
+        }
+
+        // Only add releases that have image assets
+        if (!assetsInRelease.isEmpty()) {
+            QJsonObject releaseGroup;
+            releaseGroup["tag"] = tagName;
+            releaseGroup["release_name"] = releaseName;
+            releaseGroup["prerelease"] = prerelease;
+            releaseGroup["published_at"] = publishedAt;
+            releaseGroup["owner"] = owner;
+            releaseGroup["repo"] = repo;
+            releaseGroup["assets"] = assetsInRelease;
+            releaseGroups.append(releaseGroup);
         }
     }
 
-    qDebug() << "GitHubClient: Found" << wicFiles.size() << "WIC files in releases";
-    return wicFiles;
+    qDebug() << "GitHubClient: Found" << releaseGroups.size() << "releases with image files";
+    return releaseGroups;
 }
 
 QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,

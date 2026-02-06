@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QSet>
 #include <QTimer>
+#include <QRegularExpression>
 
 RepositoryManager::RepositoryManager(QObject *parent)
     : QObject(parent)
@@ -255,9 +256,9 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
         emit artifactBranchFilterChanged();
         qDebug() << "RepositoryManager: Artifact branch filter set to:" << branch;
 
-        // Fetch artifacts from the selected branch
+        // Handle filter change
         if (_githubClient && _selectedSourceType == "github") {
-            // Clear existing GitHub artifacts (keep releases)
+            // Clear existing GitHub artifacts (keep releases in storage)
             QJsonArray releasesOnly;
             for (const auto &item : _githubOsList) {
                 QJsonObject obj = item.toObject();
@@ -266,6 +267,12 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
                 }
             }
             _githubOsList = releasesOnly;
+
+            // "RELEASES_ONLY" filter - no need to fetch artifacts, just show releases
+            if (branch == QLatin1String("RELEASES_ONLY")) {
+                emit osListReady();
+                return;
+            }
 
             // Re-fetch artifacts with new branch
             _pendingRefreshCount = 0;
@@ -322,12 +329,13 @@ void RepositoryManager::fetchAvailableBranches()
 
     for (const auto &repo : _githubRepos) {
         if (repo.enabled) {
-            _pendingBranchFetchCount++;
+            _pendingBranchFetchCount += 2; // branches + tags
             _githubClient->fetchBranches(repo.owner, repo.repo);
+            _githubClient->fetchTags(repo.owner, repo.repo);
         }
     }
 
-    qDebug() << "RepositoryManager: Fetching branches from" << _pendingBranchFetchCount << "repos";
+    qDebug() << "RepositoryManager: Fetching branches and tags from" << (_pendingBranchFetchCount / 2) << "repos";
 
     // Set a timeout to ensure branches eventually get emitted even if some requests fail
     // This prevents the UI from hanging indefinitely if network requests fail silently
@@ -418,29 +426,32 @@ QJsonArray RepositoryManager::getCdnOsList() const
 
 QJsonArray RepositoryManager::getGitHubOsList() const
 {
-    // Filter artifacts by current branch filter (if set)
-    // Releases are always shown, artifacts are filtered by branch
+    // Filter options:
+    // - Empty ("Default branch"): show releases + default branch artifacts
+    // - "RELEASES_ONLY": show only releases (no CI artifacts)
+    // - Specific branch: show only CI artifacts from that branch (no releases)
     QJsonArray filtered;
+
     if (_artifactBranchFilter.isEmpty()) {
-        // No filter - use all items
+        // No filter - show all items (releases + artifacts)
         filtered = _githubOsList;
-    } else {
+    } else if (_artifactBranchFilter == QLatin1String("RELEASES_ONLY")) {
+        // Releases only - no CI artifacts
         for (const auto &item : _githubOsList) {
             QJsonObject obj = item.toObject();
-            QString sourceType = obj["source_type"].toString();
-
-            if (sourceType == "release") {
-                // Releases are always shown
+            if (obj["source_type"].toString() == "release") {
                 filtered.append(item);
-            } else if (sourceType == "artifact") {
-                // Filter artifacts by branch
+            }
+        }
+    } else {
+        // Branch filter set - only show artifacts matching the branch (no releases)
+        for (const auto &item : _githubOsList) {
+            QJsonObject obj = item.toObject();
+            if (obj["source_type"].toString() == "artifact") {
                 QString artifactBranch = obj["branch"].toString();
                 if (artifactBranch == _artifactBranchFilter) {
                     filtered.append(item);
                 }
-            } else {
-                // Unknown type - include it
-                filtered.append(item);
             }
         }
     }
@@ -480,6 +491,8 @@ void RepositoryManager::setGitHubClient(GitHubClient *client)
         connect(_githubClient, &GitHubClient::artifactWicFilesReady,
                 this, &RepositoryManager::onGitHubArtifactFilesReady);
         connect(_githubClient, &GitHubClient::branchesReady,
+                this, &RepositoryManager::onBranchesReady);
+        connect(_githubClient, &GitHubClient::tagsReady,
                 this, &RepositoryManager::onBranchesReady);
         connect(_githubClient, &GitHubClient::error,
                 this, &RepositoryManager::onSourceError);
@@ -603,77 +616,88 @@ void RepositoryManager::onCdnListReady(const QJsonArray &list)
     checkRefreshComplete();
 }
 
-void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &wicFiles)
+void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
 {
-    // Convert WIC files to OS list format and append
-    for (const auto &wicValue : wicFiles) {
-        QJsonObject wic = wicValue.toObject();
-        QString fileName = wic["name"].toString();
-        QString fileNameLower = fileName.toLower();
-        bool isVsi = fileNameLower.endsWith(".vsi");
+    // Convert release groups to OS list format (one entry per release)
+    for (const auto &releaseValue : releaseGroups) {
+        QJsonObject release = releaseValue.toObject();
+        QString releaseName = release["release_name"].toString();
+        QString tag = release["tag"].toString();
+        QString owner = release["owner"].toString();
+        QString repo = release["repo"].toString();
+        QJsonArray assets = release["assets"].toArray();
+
+        // Get version from release name or tag
+        QString version = extractVersion(releaseName);
+        if (version.isEmpty()) version = extractVersion(tag);
+
+        // Get device name from release name or tag (releases can be device-specific)
+        QString deviceName = extractDeviceName(releaseName);
+        if (deviceName.isEmpty()) deviceName = extractDeviceName(tag);
+
+        // Determine compatible devices and icon from assets
+        QSet<QString> deviceSet;
+        QString icon = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
+
+        for (const auto &assetValue : assets) {
+            QJsonObject asset = assetValue.toObject();
+            QString assetName = asset["name"].toString().toLower();
+
+            // Detect device from each asset filename
+            if (assetName.contains("simman3g-64") || assetName.contains("simman-64")) {
+                deviceSet.insert("simman3g-64");
+                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+            } else if (assetName.contains("simman3g-32") || assetName.contains("simman-32")) {
+                deviceSet.insert("simman3g-32");
+                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
+            } else if (assetName.contains("linkbox2")) {
+                deviceSet.insert("linkbox2");
+            } else if (assetName.contains("linkbox")) {
+                deviceSet.insert("linkbox");
+            } else if (assetName.contains("cancpu2")) {
+                deviceSet.insert("cancpu2");
+            } else if (assetName.contains("cancpu")) {
+                deviceSet.insert("cancpu");
+            } else if (assetName.contains("imx8") || assetName.contains("simpad2")) {
+                deviceSet.insert("imx8");
+                deviceSet.insert("linkbox2");
+                deviceSet.insert("cancpu2");
+                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
+            } else if (assetName.contains("imx6") || assetName.contains("simpad")) {
+                deviceSet.insert("imx6");
+                deviceSet.insert("linkbox");
+                deviceSet.insert("cancpu");
+                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
+            }
+        }
+
+        QJsonArray devices;
+        for (const QString &dev : deviceSet) {
+            devices.append(dev);
+        }
 
         QJsonObject osEntry;
-        osEntry["name"] = fileName;
-        osEntry["description"] = QString("%1/%2 - Release: %3").arg(wic["owner"].toString(), wic["repo"].toString(), wic["release_name"].toString());
-        osEntry["url"] = wic["download_url"].toString();
-        osEntry["extract_size"] = wic["size"].toVariant().toLongLong();
-        osEntry["image_download_size"] = wic["size"].toVariant().toLongLong();
-        osEntry["release_date"] = wic["published_at"].toString();
-        osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
+        osEntry["name"] = buildDisplayName(deviceName, version, releaseName);
+        osEntry["description"] = QString("%1/%2 - Release: %3").arg(owner, repo, releaseName);
+        osEntry["release_date"] = release["published_at"].toString();
+        osEntry["icon"] = icon;
         osEntry["init_format"] = "none";
         osEntry["source"] = "github";
         osEntry["source_type"] = "release";
-        osEntry["prerelease"] = wic["prerelease"].toBool();
-        osEntry["asset_id"] = wic["asset_id"].toVariant().toLongLong();
-        osEntry["source_owner"] = wic["owner"].toString();
-        osEntry["source_repo_name"] = wic["repo"].toString();
-
-        // Set devices array and icon based on file name
-        // SimPad: imx6 = SimPad Plus, imx8 = SimPad Plus 2
-        // SimMan: simman3g-64 = 64-bit, simman3g-32 = 32-bit
-        // WIC images for SimPad Plus also work on LinkBox and CANCPU devices
-        QJsonArray devices;
-        if (fileNameLower.contains("simman3g-64") || fileNameLower.contains("simman-64")) {
-            devices.append("simman3g-64");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-        } else if (fileNameLower.contains("simman3g-32") || fileNameLower.contains("simman-32")) {
-            devices.append("simman3g-32");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-        } else if (fileNameLower.contains("linkbox2")) {
-            devices.append("linkbox2");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox2.png";
-        } else if (fileNameLower.contains("linkbox")) {
-            devices.append("linkbox");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox.png";
-        } else if (fileNameLower.contains("cancpu2")) {
-            devices.append("cancpu2");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu2.png";
-        } else if (fileNameLower.contains("cancpu")) {
-            devices.append("cancpu");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu.png";
-        } else if (fileNameLower.contains("imx8")) {
-            devices.append("imx8");
-            // WIC images for SimPad Plus 2 also work on LinkBox2 and CANCPU2
-            if (!isVsi) {
-                devices.append("linkbox2");
-                devices.append("cancpu2");
-            }
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
-        } else if (fileNameLower.contains("imx6")) {
-            devices.append("imx6");
-            // WIC images for SimPad Plus also work on LinkBox and CANCPU
-            if (!isVsi) {
-                devices.append("linkbox");
-                devices.append("cancpu");
-            }
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
-        }
+        osEntry["prerelease"] = release["prerelease"].toBool();
+        osEntry["source_owner"] = owner;
+        osEntry["source_repo_name"] = repo;
+        osEntry["release_tag"] = tag;
+        osEntry["release_assets"] = assets;
         osEntry["devices"] = devices;
+
+        // Set URL to a placeholder (actual download uses asset selection)
+        osEntry["url"] = QString("github-release://%1/%2/releases/tag/%3").arg(owner, repo, tag);
 
         _githubOsList.append(osEntry);
     }
 
-    qDebug() << "RepositoryManager: GitHub WIC files added:" << wicFiles.size();
+    qDebug() << "RepositoryManager: GitHub release groups added:" << releaseGroups.size();
 
     _pendingRefreshCount--;
     checkRefreshComplete();
@@ -688,8 +712,11 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         QString artifactNameLower = artifactName.toLower();
         bool isVsi = artifactNameLower.endsWith(".vsi");
 
+        QString deviceName = extractDeviceName(artifactName);
+        QString version = extractVersion(artifactName);
+
         QJsonObject osEntry;
-        osEntry["name"] = artifactName;
+        osEntry["name"] = buildDisplayName(deviceName, version, artifactName);
         osEntry["description"] = QString("%1/%2 - Branch: %3").arg(wic["owner"].toString(), wic["repo"].toString(), wic["branch"].toString());
         osEntry["url"] = wic["download_url"].toString();
         osEntry["extract_size"] = wic["size"].toVariant().toLongLong();
@@ -728,7 +755,7 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         } else if (artifactNameLower.contains("cancpu")) {
             devices.append("cancpu");
             osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu.png";
-        } else if (artifactNameLower.contains("imx8")) {
+        } else if (artifactNameLower.contains("imx8") || artifactNameLower.contains("simpad2")) {
             devices.append("imx8");
             // WIC images for SimPad Plus 2 also work on LinkBox2 and CANCPU2
             if (!isVsi) {
@@ -736,7 +763,7 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
                 devices.append("cancpu2");
             }
             osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
-        } else if (artifactNameLower.contains("imx6")) {
+        } else if (artifactNameLower.contains("imx6") || artifactNameLower.contains("simpad")) {
             devices.append("imx6");
             // WIC images for SimPad Plus also work on LinkBox and CANCPU
             if (!isVsi) {
@@ -853,6 +880,60 @@ void RepositoryManager::checkRefreshComplete()
         qDebug() << "RepositoryManager: Refresh complete, total items:"
                  << getMergedOsList().size();
     }
+}
+
+QString RepositoryManager::extractDeviceName(const QString &text)
+{
+    QString lower = text.toLower();
+
+    // Check most specific patterns first, then broader ones
+    if (lower.contains("simman3g-64") || lower.contains("simman-64")) {
+        return QStringLiteral("SimMan 3G (64-bit)");
+    } else if (lower.contains("simman3g-32") || lower.contains("simman-32")) {
+        return QStringLiteral("SimMan 3G (32-bit)");
+    } else if (lower.contains("simman3g") || lower.contains("simman")) {
+        return QStringLiteral("SimMan 3G");
+    } else if (lower.contains("linkbox2")) {
+        return QStringLiteral("LinkBox 2");
+    } else if (lower.contains("linkbox")) {
+        return QStringLiteral("LinkBox");
+    } else if (lower.contains("cancpu2")) {
+        return QStringLiteral("CANCPU 2");
+    } else if (lower.contains("cancpu")) {
+        return QStringLiteral("CANCPU");
+    } else if (lower.contains("imx8") || lower.contains("simpad-plus2") || lower.contains("simpad_plus2")
+               || lower.contains("simpad plus 2") || lower.contains("simpadplus2")
+               || lower.contains("simpad2")) {
+        return QStringLiteral("SimPad Plus 2");
+    } else if (lower.contains("imx6") || lower.contains("simpad-plus") || lower.contains("simpad_plus")
+               || lower.contains("simpad plus") || lower.contains("simpadplus")
+               || lower.contains("simpad")) {
+        return QStringLiteral("SimPad Plus");
+    }
+    return QString();
+}
+
+QString RepositoryManager::extractVersion(const QString &text)
+{
+    // Match version with optional pre-release suffix (e.g., 9.3.0, 9.3.0.1, 9.3.0-alpha, 9.3.0-rc1)
+    static QRegularExpression versionRegex(QStringLiteral(R"(v?(\d+\.\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9.]+)?))"));
+    QRegularExpressionMatch match = versionRegex.match(text);
+    return match.hasMatch() ? match.captured(1) : QString();
+}
+
+QString RepositoryManager::buildDisplayName(const QString &deviceName, const QString &version,
+                                            const QString &fallback)
+{
+    if (!deviceName.isEmpty() && !version.isEmpty()) {
+        return QStringLiteral("%1 v%2").arg(deviceName, version);
+    }
+    if (!deviceName.isEmpty()) {
+        return deviceName;
+    }
+    if (!version.isEmpty()) {
+        return QStringLiteral("v%1").arg(version);
+    }
+    return fallback;
 }
 
 void RepositoryManager::updateStatusMessage()

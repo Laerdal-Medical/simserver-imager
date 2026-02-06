@@ -4,14 +4,11 @@
  */
 
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Controls.Material
-import QtQuick.Layouts
+import QtQuick.Controls.Basic
 import RpiImager
 
 RadioButton {
     id: control
-    Material.accent: Style.formControlActiveColor
     activeFocusOnTab: true
     
     // Allow custom accessibility description
@@ -50,37 +47,45 @@ RadioButton {
         return null;
     }
     
-    // Custom square indicator for embedded mode to avoid circular rendering artifacts
-    Component.onCompleted: {
-        if (control.imageWriter && control.imageWriter.isEmbeddedMode()) {
-            control.indicator = squareIndicatorComponent.createObject(control)
-        }
-    }
-    
-    Component {
-        id: squareIndicatorComponent
-        Rectangle {
-            implicitWidth: 20
-            implicitHeight: 20
-            x: control.leftPadding
-            y: control.height / 2 - height / 2
-            radius: 0  // Square instead of circle
-            border.color: control.checked ? Style.formControlActiveColor : "#bdbebf"
-            border.width: 2
-            color: Style.mainBackgroundColor
+    // Custom indicator with Laerdal colors for all modes
+    // Embedded mode uses square, regular mode uses circle
+    indicator: Rectangle {
+        implicitWidth: 20
+        implicitHeight: 20
+        x: control.leftPadding
+        y: control.height / 2 - height / 2
+        // Embedded mode: square (radius 0), Regular mode: circle (radius 10)
+        radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? 0 : 10
+        border.color: control.hovered ? Style.formControlActiveColor
+                    : (control.checked ? Style.formControlActiveColor : Style.laerdalLightBlue)
+        border.width: 2
+        color: control.hovered && !control.checked ? Style.infoBackgroundColor : Style.mainBackgroundColor
 
-            Rectangle {
-                width: 10
-                height: 10
-                x: 5
-                y: 5
-                radius: 0  // Square dot instead of circle
-                color: Style.formControlActiveColor
-                visible: control.checked
-            }
+        Rectangle {
+            width: 10
+            height: 10
+            x: 5
+            y: 5
+            // Embedded mode: square, Regular mode: circle
+            radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? 0 : 5
+            color: Style.formControlActiveColor
+            visible: control.checked
         }
     }
-    
+
+    // Add visual focus indicator - circle around the indicator
+    Rectangle {
+        width: 28
+        height: 28
+        x: control.indicator.x - 4
+        y: control.indicator.y - 4
+        color: Style.transparent
+        border.color: control.activeFocus ? Style.focusOutlineColor : Style.transparent
+        border.width: Style.focusOutlineWidth
+        radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? 0 : 14
+        z: -1
+    }
+
     // Accessibility properties - combine text with description in name
     Accessible.role: Accessible.RadioButton
     Accessible.name: {
@@ -92,17 +97,6 @@ RadioButton {
     Accessible.checkable: true
     Accessible.checked: checked
     Accessible.onPressAction: click()
-    
-    // Add visual focus indicator
-    Rectangle {
-        anchors.fill: parent
-        anchors.margins: Style.focusOutlineMargin
-        color: Style.transparent
-        border.color: control.activeFocus ? Style.focusOutlineColor : Style.transparent
-        border.width: Style.focusOutlineWidth
-        radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? 0 : Style.focusOutlineRadius
-        z: -1
-    }
     
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Space) {

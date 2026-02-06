@@ -55,6 +55,7 @@
         <file>icons/cat_digital_signage.png</file>
         <file>qmlcomponents/ImOptionPill.qml</file>
         <file>qmlcomponents/ImBanner.qml</file>
+        <file>qmlcomponents/ImBusyIndicator.qml</file>
         <file>qmlcomponents/ImLoadingBanner.qml</file>
         <file>qmlcomponents/ImTextField.qml</file>
         <file>qmlcomponents/ImPasswordField.qml</file>

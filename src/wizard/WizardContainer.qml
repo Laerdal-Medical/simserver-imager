@@ -54,6 +54,9 @@ Item {
     // Track pending artifact inspection for CIArtifactSelectionStep
     property var pendingArtifactInspection: null
 
+    // Track pending release inspection for CIArtifactSelectionStep (release assets)
+    property var pendingReleaseInspection: null
+
     // Cached OS selection for back navigation from CIArtifactSelectionStep
     // Store artifact_id instead of model object (which gets invalidated on re-sort)
     property int cachedOsArtifactId: -1
@@ -754,9 +757,9 @@ Item {
         if (root.currentStep < root.totalSteps - 1) {
             var nextIndex = root.currentStep + 1
 
-            // CI artifact routing: after OS selection, conditionally route to CI artifact selection
+            // CI artifact / Release routing: after OS selection, conditionally route to artifact selection
             if (root.currentStep === stepOSSelection) {
-                if (pendingArtifactInspection !== null) {
+                if (pendingArtifactInspection !== null || pendingReleaseInspection !== null) {
                     console.log("WizardContainer.nextStep(): Routing to CI artifact selection")
                     nextIndex = stepCIArtifactSelection
                 } else {

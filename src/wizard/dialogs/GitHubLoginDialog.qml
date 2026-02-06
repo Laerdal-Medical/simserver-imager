@@ -141,7 +141,7 @@ BaseDialog {
         Layout.preferredHeight: 80
         visible: root.authState === "idle"
 
-        BusyIndicator {
+        ImBusyIndicator {
             anchors.centerIn: parent
             running: root.authState === "idle"
         }
@@ -207,7 +207,7 @@ BaseDialog {
             spacing: Style.spacingSmall
             visible: root.authState === "polling"
 
-            BusyIndicator {
+            ImBusyIndicator {
                 Layout.preferredWidth: 20
                 Layout.preferredHeight: 20
                 running: root.authState === "polling"

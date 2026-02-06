@@ -76,6 +76,66 @@ WizardStepBase {
     readonly property var repoManager: imageWriter.getRepositoryManager()
     readonly property bool isLoadingCIImages: repoManager ? repoManager.isLoading : false
 
+    // Filter release assets by device - only show assets matching selected device
+    // Platform-independent files (no device pattern) are shown to all devices
+    function filterAssetsByDevice(assets, selectedDevice) {
+        if (!assets || !selectedDevice) return assets
+
+        return assets.filter(function(asset) {
+            var name = (asset.name || "").toLowerCase()
+
+            // Detect device from filename using same patterns as extractDeviceName()
+            var fileDevice = null
+            if (name.includes("simman3g-64") || name.includes("simman-64")) {
+                fileDevice = "simman3g-64"
+            } else if (name.includes("simman3g-32") || name.includes("simman-32")) {
+                fileDevice = "simman3g-32"
+            } else if (name.includes("simman3g") || name.includes("simman")) {
+                fileDevice = "simman3g"
+            } else if (name.includes("imx8") || name.includes("simpad2")) {
+                fileDevice = "imx8"
+            } else if (name.includes("imx6") || (name.includes("simpad") && !name.includes("simpad2"))) {
+                fileDevice = "imx6"
+            }
+            // No device detected = platform-independent, show to all
+
+            if (fileDevice === null) return true  // Generic file - always show
+            return fileDevice === selectedDevice   // Device-specific - match only
+        })
+    }
+
+    // Sort assets: factory-image first, then system update SPUs, then others
+    function sortAssetsByPriority(assets) {
+        if (!assets) return assets
+
+        // Regex to match system update SPU files: *-X.X.X.XXX.spu (version pattern)
+        var systemSpuRegex = /\d+\.\d+\.\d+\.\d+\.spu$/i
+
+        return assets.slice().sort(function(a, b) {
+            // CI artifacts use 'filename', release assets use 'name'
+            var nameA = (a.filename || a.name || "").toLowerCase()
+            var nameB = (b.filename || b.name || "").toLowerCase()
+
+            // Priority: factory-image = 0, system SPU (version pattern) = 1, update = 2, others = 3
+            function getPriority(name) {
+                if (name.includes("factory-image")) return 0
+                if (systemSpuRegex.test(name)) return 1  // System update SPU with version
+                if (name.includes("update")) return 2
+                return 3
+            }
+
+            var priorityA = getPriority(nameA)
+            var priorityB = getPriority(nameB)
+
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB
+            }
+
+            // Same priority - sort alphabetically
+            return nameA.localeCompare(nameB)
+        })
+    }
+
     content: [
         ColumnLayout {
             anchors.fill: parent
@@ -176,7 +236,7 @@ WizardStepBase {
                         required property var modelData
 
                         delegateIndex: fileDelegate.index
-                        itemTitle: fileDelegate.modelData.display_name || fileDelegate.modelData.filename
+                        itemTitle: fileDelegate.modelData.display_name || fileDelegate.modelData.filename || fileDelegate.modelData.name
                         itemDescription: Utils.formatBytes(fileDelegate.modelData.size || 0)
                         isItemSelected: root.selectedFileIndex === fileDelegate.index
 
@@ -199,12 +259,18 @@ WizardStepBase {
         // 1. If pendingArtifactInspection is null → going back from Storage, restore cache
         // 2. If pendingArtifactInspection exists and matches cache → same artifact, restore cache
         // 3. If pendingArtifactInspection exists but doesn't match → different artifact, reject cache
-        console.log("CIArtifactSelectionStep: Component.onCompleted - checking cache")
+        console.log("CIArtifactSelectionStep: Component.onCompleted - checking state")
+        console.log("  Initial isDownloading:", root.isDownloading)
+        console.log("  Initial imageFiles.length:", root.imageFiles.length)
         console.log("  cachedArtifactFiles.length:", root.wizardContainer.cachedArtifactFiles.length)
         console.log("  pendingArtifactInspection:", root.wizardContainer.pendingArtifactInspection ? "exists" : "null")
+        console.log("  pendingReleaseInspection:", root.wizardContainer.pendingReleaseInspection ? "exists" : "null")
         if (root.wizardContainer.pendingArtifactInspection) {
             console.log("  pendingArtifactInspection.artifact_id:", root.wizardContainer.pendingArtifactInspection.artifact_id)
             console.log("  pendingArtifactInspection.name:", root.wizardContainer.pendingArtifactInspection.name)
+        }
+        if (root.wizardContainer.pendingReleaseInspection) {
+            console.log("  pendingReleaseInspection.name:", root.wizardContainer.pendingReleaseInspection.name)
         }
         console.log("  cachedArtifactId:", root.wizardContainer.cachedArtifactId)
 
@@ -221,6 +287,8 @@ WizardStepBase {
 
         if (shouldRestoreCache) {
             console.log("CIArtifactSelectionStep: Cache validation PASSED - restoring cached artifact state with", root.wizardContainer.cachedArtifactFiles.length, "files")
+
+            // Restore all cached state
             root.imageFiles = root.wizardContainer.cachedArtifactFiles
             root.artifactId = root.wizardContainer.cachedArtifactId
             root.artifactNameForFiles = root.wizardContainer.cachedArtifactName
@@ -230,8 +298,15 @@ WizardStepBase {
             root.zipPath = root.wizardContainer.cachedArtifactZipPath
             root.artifactName = root.wizardContainer.cachedArtifactName
             root.selectedFileIndex = root.wizardContainer.cachedSelectedFileIndex
+
+            // Ensure download state is fully cleared (defensive)
             root.isDownloading = false
+            root.downloadIndeterminate = false
+            root.downloadProgress = 0
+            root.wizardContainer.isDownloading = false  // Clear container state too
+
             console.log("CIArtifactSelectionStep: Restored selected file index:", root.selectedFileIndex)
+            console.log("CIArtifactSelectionStep: imageFiles.length after restore:", root.imageFiles.length)
 
             // Sync ListView's currentIndex with selectedFileIndex to ensure consistent highlighting
             // This prevents multiple highlight colors from appearing
@@ -239,6 +314,55 @@ WizardStepBase {
                 fileListView.currentIndex = root.selectedFileIndex
                 console.log("CIArtifactSelectionStep: Synced ListView currentIndex to", root.selectedFileIndex)
             })
+            return
+        }
+
+        // Check for pending release inspection (release assets are already available)
+        var hasPendingRelease = root.wizardContainer.pendingReleaseInspection !== null
+
+        if (hasPendingRelease) {
+            console.log("CIArtifactSelectionStep: Loading release assets (no download needed)")
+            var release = root.wizardContainer.pendingReleaseInspection
+            root.artifactName = release.name
+            root.owner = release.owner
+            root.repo = release.repo
+            root.branch = release.tag  // Use tag as "branch" for display
+            root.artifactId = 0  // No artifact ID for releases
+            root.isDownloading = false
+
+            // Get selected device tag for filtering
+            var hwFilterList = root.imageWriter.getHWFilterList()
+            var selectedDevice = (hwFilterList && hwFilterList.length > 0) ? hwFilterList[0] : ""
+            console.log("CIArtifactSelectionStep: Filtering release assets by device:", selectedDevice)
+
+            var filteredAssets = root.filterAssetsByDevice(release.assets, selectedDevice)
+            console.log("CIArtifactSelectionStep: Filtered", release.assets.length, "assets to", filteredAssets.length)
+
+            // Sort: factory images first, then update images, then others
+            var sortedAssets = root.sortAssetsByPriority(filteredAssets)
+            root.imageFiles = sortedAssets
+
+            // Cache results for back navigation (release assets use artifactId = 0)
+            root.wizardContainer.cachedArtifactFiles = sortedAssets
+            root.wizardContainer.cachedArtifactId = 0  // Release assets have no artifact ID
+            root.wizardContainer.cachedArtifactName = release.name
+            root.wizardContainer.cachedArtifactOwner = release.owner
+            root.wizardContainer.cachedArtifactRepo = release.repo
+            root.wizardContainer.cachedArtifactBranch = release.tag
+            root.wizardContainer.cachedArtifactZipPath = ""  // No zip for releases
+            console.log("CIArtifactSelectionStep: Cached release asset state for back navigation")
+
+            // Clear pending release
+            root.wizardContainer.pendingReleaseInspection = null
+
+            // If only one asset matches, auto-select and proceed
+            if (filteredAssets.length === 1) {
+                console.log("CIArtifactSelectionStep: Only one matching asset, auto-selecting")
+                root.selectedFileIndex = 0
+                Qt.callLater(function() {
+                    root.nextClicked()
+                })
+            }
             return
         }
 
@@ -362,7 +486,8 @@ WizardStepBase {
                                Utils.formatBytes(imageFiles[i].size || 0))
                 }
 
-                root.imageFiles = imageFiles
+                // Sort: factory-image first, then system SPUs, then others
+                root.imageFiles = root.sortAssetsByPriority(imageFiles)
                 root.artifactId = artifactId
                 root.artifactNameForFiles = artifactName
                 root.owner = owner
@@ -421,29 +546,69 @@ WizardStepBase {
         if (root.selectedFileIndex >= 0) {
             // File selected - configure and advance
             var file = root.imageFiles[root.selectedFileIndex]
-            var displayName = file.display_name || file.filename
+            var displayName = file.display_name || file.filename || file.name
             var fileType = file.type || "wic"
 
-            if (fileType === "spu") {
-                root.imageWriter.setSrcSpuArtifact(
-                    root.artifactId, root.owner, root.repo, root.branch,
-                    file.filename, root.zipPath
-                )
-                root.wizardContainer.selectedSpuName = displayName
-                root.wizardContainer.isSpuCopyMode = true
-                root.wizardContainer.customizationSupported = false
-                root.wizardContainer.piConnectAvailable = false
-                root.wizardContainer.secureBootAvailable = false
+            // Check if this is a release asset (has asset_id and download_url)
+            // vs a CI artifact file (needs artifact streaming from ZIP)
+            var isReleaseAsset = typeof(file.asset_id) !== "undefined" && file.asset_id > 0
+
+            if (isReleaseAsset) {
+                // Release asset - use direct URL download with authentication
+                console.log("CIArtifactSelectionStep: Configuring release asset download:", displayName)
+
+                if (fileType === "spu") {
+                    root.imageWriter.setSrcSpuUrl(file.download_url, file.size || 0, displayName)
+                    // Set release asset info for authenticated download
+                    root.imageWriter.setGitHubReleaseAsset(file.asset_id, root.owner, root.repo)
+                    root.wizardContainer.selectedSpuName = displayName
+                    root.wizardContainer.isSpuCopyMode = true
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = false
+                } else {
+                    root.imageWriter.setSrc(
+                        file.download_url,
+                        file.size || 0,
+                        file.size || 0,  // extract_size (assume same as download for now)
+                        "",  // sha256
+                        false,  // not multiple files
+                        "",  // category
+                        displayName,
+                        "",  // init_format
+                        ""   // release_date
+                    )
+                    // Set release asset info for authenticated download
+                    root.imageWriter.setGitHubReleaseAsset(file.asset_id, root.owner, root.repo)
+                    root.wizardContainer.selectedOsName = displayName
+                    root.wizardContainer.isSpuCopyMode = false
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = root.imageWriter.isSecureBootForcedByCliFlag()
+                }
             } else {
-                root.imageWriter.setSrcArtifactWithTargetAndCache(
-                    root.artifactId, root.owner, root.repo, root.branch,
-                    file.size || 0, displayName, file.filename, root.zipPath
-                )
-                root.wizardContainer.selectedOsName = displayName
-                root.wizardContainer.isSpuCopyMode = false
-                root.wizardContainer.customizationSupported = false
-                root.wizardContainer.piConnectAvailable = false
-                root.wizardContainer.secureBootAvailable = root.imageWriter.isSecureBootForcedByCliFlag()
+                // CI artifact file - use artifact streaming from ZIP
+                if (fileType === "spu") {
+                    root.imageWriter.setSrcSpuArtifact(
+                        root.artifactId, root.owner, root.repo, root.branch,
+                        file.filename, root.zipPath
+                    )
+                    root.wizardContainer.selectedSpuName = displayName
+                    root.wizardContainer.isSpuCopyMode = true
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = false
+                } else {
+                    root.imageWriter.setSrcArtifactWithTargetAndCache(
+                        root.artifactId, root.owner, root.repo, root.branch,
+                        file.size || 0, displayName, file.filename, root.zipPath
+                    )
+                    root.wizardContainer.selectedOsName = displayName
+                    root.wizardContainer.isSpuCopyMode = false
+                    root.wizardContainer.customizationSupported = false
+                    root.wizardContainer.piConnectAvailable = false
+                    root.wizardContainer.secureBootAvailable = root.imageWriter.isSecureBootForcedByCliFlag()
+                }
             }
 
             // Cache selected file index for back navigation

@@ -4,14 +4,11 @@
  */
 
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Controls.Material
-import QtQuick.Layouts
+import QtQuick.Controls.Basic
 import RpiImager
 
 CheckBox {
     id: control
-    Material.accent: Style.formControlActiveColor
     activeFocusOnTab: true
     
     // Export the natural/desired width for dialog sizing calculations
@@ -47,37 +44,32 @@ CheckBox {
         width: control.availableWidth  // Constrain width so text wraps
     }
     
-    // Custom square indicator for embedded mode to avoid rendering artifacts
-    Component.onCompleted: {
-        if (control.imageWriter && control.imageWriter.isEmbeddedMode()) {
-            control.indicator = squareIndicatorComponent.createObject(control)
-        }
-    }
-    
-    Component {
-        id: squareIndicatorComponent
-        Rectangle {
-            implicitWidth: 20
-            implicitHeight: 20
-            x: control.leftPadding
-            y: control.height / 2 - height / 2
-            radius: 0  // Square checkbox
-            border.color: control.checked ? Style.formControlActiveColor : "#bdbebf"
-            border.width: 2
-            color: control.checked ? Style.formControlActiveColor : Style.mainBackgroundColor
+    // Custom indicator with Laerdal colors for all modes
+    // Embedded mode uses square corners, regular mode uses rounded corners
+    indicator: Rectangle {
+        implicitWidth: 20
+        implicitHeight: 20
+        x: control.leftPadding
+        y: control.height / 2 - height / 2
+        // Embedded mode: square (radius 0), Regular mode: rounded (radius 3)
+        radius: (control.imageWriter && control.imageWriter.isEmbeddedMode()) ? 0 : 3
+        border.color: control.hovered ? Style.formControlActiveColor
+                    : (control.checked ? Style.formControlActiveColor : Style.laerdalLightBlue)
+        border.width: 2
+        color: control.checked ? Style.formControlActiveColor
+             : (control.hovered ? Style.infoBackgroundColor : Style.mainBackgroundColor)
 
-            // Checkmark
-            Text {
-                anchors.centerIn: parent
-                text: "✓"
-                color: Style.mainBackgroundColor
-                font.pixelSize: 14
-                font.bold: true
-                visible: control.checked
-            }
+        // Checkmark
+        Text {
+            anchors.centerIn: parent
+            text: "✓"
+            color: Style.mainBackgroundColor
+            font.pixelSize: 14
+            font.bold: true
+            visible: control.checked
         }
     }
-    
+
     // Accessibility properties
     Accessible.role: Accessible.CheckBox
     Accessible.name: text
@@ -88,7 +80,7 @@ CheckBox {
     Keys.onEnterPressed: toggle()
     Keys.onReturnPressed: toggle()
     Keys.onSpacePressed: toggle()
-    
+
     Rectangle {
         // This rectangle serves as a high-contrast underline for focus
         anchors.left: control.contentItem.left

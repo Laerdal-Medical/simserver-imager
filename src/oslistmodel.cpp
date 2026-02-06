@@ -80,11 +80,22 @@ namespace {
             }
         }
 
-        // Sort regular items by version descending (highest version first)
+        // Sort regular items: releases first, then CI artifacts, each group sorted by version descending
         std::stable_sort(regularItems.begin(), regularItems.end(), [](const QJsonValue &a, const QJsonValue &b) {
             QJsonObject objA = a.toObject();
             QJsonObject objB = b.toObject();
 
+            // Primary sort: releases before CI artifacts
+            // source_type: "release" = GitHub release, "artifact" = CI artifact
+            QString sourceTypeA = objA["source_type"].toString();
+            QString sourceTypeB = objB["source_type"].toString();
+            bool isReleaseA = (sourceTypeA == "release");
+            bool isReleaseB = (sourceTypeB == "release");
+
+            if (isReleaseA && !isReleaseB) return true;   // Releases first
+            if (!isReleaseA && isReleaseB) return false;
+
+            // Secondary sort: by version descending
             QList<int> versionA = extractVersionFromName(objA["name"].toString());
             QList<int> versionB = extractVersionFromName(objB["name"].toString());
 
@@ -464,6 +475,12 @@ bool OSListModel::reload()
         os.sourceRepo = obj["source_repo_name"].toString();
         os.artifactId = obj["artifact_id"].toVariant().toLongLong();
         os.releaseAssetId = obj["asset_id"].toVariant().toLongLong();
+        os.releaseTag = obj["release_tag"].toString();
+        // Store release_assets as JSON string (will be parsed back in data())
+        if (obj.contains("release_assets")) {
+            os.releaseAssetsJson = QString::fromUtf8(
+                QJsonDocument(obj["release_assets"].toArray()).toJson(QJsonDocument::Compact));
+        }
 
         _osList.append(os);
     }
@@ -517,7 +534,9 @@ QHash<int, QByteArray> OSListModel::roleNames() const
         { ArtifactIdRole, "artifact_id" },
         { SourceOwnerRole, "source_owner" },
         { SourceRepoRole, "source_repo" },
-        { ReleaseAssetIdRole, "release_asset_id" }
+        { ReleaseAssetIdRole, "release_asset_id" },
+        { ReleaseTagRole, "release_tag" },
+        { ReleaseAssetsRole, "release_assets" }
     };
 }
 
@@ -552,6 +571,13 @@ QVariantMap OSListModel::getOsEntry(int index) const
     result["source_owner"] = os.sourceOwner;
     result["source_repo"] = os.sourceRepo;
     result["release_asset_id"] = static_cast<qint64>(os.releaseAssetId);
+    result["release_tag"] = os.releaseTag;
+    // Parse JSON string back to QVariantList for QML
+    if (!os.releaseAssetsJson.isEmpty()) {
+        result["release_assets"] = QJsonDocument::fromJson(os.releaseAssetsJson.toUtf8()).array().toVariantList();
+    } else {
+        result["release_assets"] = QVariantList();
+    }
 
     return result;
 }
@@ -612,6 +638,14 @@ QVariant OSListModel::data(const QModelIndex &index, int role) const {
             return os.sourceRepo;
         case ReleaseAssetIdRole:
             return os.releaseAssetId;
+        case ReleaseTagRole:
+            return os.releaseTag;
+        case ReleaseAssetsRole:
+            // Parse JSON string back to QVariantList for QML
+            if (os.releaseAssetsJson.isEmpty()) {
+                return QVariantList();
+            }
+            return QJsonDocument::fromJson(os.releaseAssetsJson.toUtf8()).array().toVariantList();
     }
 
     return {};

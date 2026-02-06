@@ -4,7 +4,6 @@
  */
 
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import RpiImager
 
@@ -36,23 +35,23 @@ Rectangle {
     // Whether to show loading spinner (takes precedence over type icon)
     property bool loading: false
 
-    // Optional: override background color (if not set, uses type-based color)
+    // Optional: override background color (if not set, uses type-based color from Laerdal Design System)
     property color bannerColor: {
         switch (root.bannerType) {
-            case ImBanner.Type.Warning: return "#FFF3CD"  // Light yellow
-            case ImBanner.Type.Error:   return "#F8D7DA"  // Light red
-            case ImBanner.Type.Success: return "#D4EDDA"  // Light green
-            default:                    return Style.buttonFocusedBackgroundColor
+            case ImBanner.Type.Warning: return Style.warningBackgroundColor
+            case ImBanner.Type.Error:   return Style.errorBackgroundColor
+            case ImBanner.Type.Success: return Style.successBackgroundColor
+            default:                    return Style.infoBackgroundColor
         }
     }
 
     // Optional: override text color (if not set, uses type-based color)
     property color textColor: {
         switch (root.bannerType) {
-            case ImBanner.Type.Warning: return "#856404"  // Dark yellow/brown
-            case ImBanner.Type.Error:   return Style.formLabelErrorColor
-            case ImBanner.Type.Success: return "#155724"  // Dark green
-            default:                    return Style.formLabelColor
+            case ImBanner.Type.Warning: return Style.warningTextColor
+            case ImBanner.Type.Error:   return Style.errorColor
+            case ImBanner.Type.Success: return Style.successColor
+            default:                    return Style.textColorPrimary
         }
     }
 
@@ -88,11 +87,11 @@ Rectangle {
         spacing: Style.spacingSmall
 
         // Loading spinner (shown when loading is true)
-        BusyIndicator {
+        ImBusyIndicator {
             visible: root.loading
             running: root.loading
-            Layout.preferredWidth: Style.fontSizeFormLabel
-            Layout.preferredHeight: Style.fontSizeFormLabel
+            Layout.preferredWidth: 24
+            Layout.preferredHeight: 24
         }
 
         // Type icon (shown when not loading and type has an icon)

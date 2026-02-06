@@ -625,6 +625,7 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/MarqueeText.qml
       qmlcomponents/ImBadge.qml
       qmlcomponents/ImBanner.qml
+      qmlcomponents/ImBusyIndicator.qml
       qmlcomponents/ImLoadingBanner.qml
       qmlcomponents/SelectionListView.qml
       qmlcomponents/SelectionListDelegate.qml

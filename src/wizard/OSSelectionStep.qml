@@ -78,14 +78,17 @@ WizardStepBase {
         // 1. GitHub CI artifacts (have artifact_id) ALWAYS need inspection
         // 2. ZIP files (URL ends with .zip) need inspection
         // 3. Artifacts marked with contains_multiple_files flag need inspection
+        // 4. GitHub releases with release_assets array need asset selection
         var isGitHubArtifact = typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0
         var isZipUrl = model.url && model.url.toLowerCase().endsWith(".zip")
         var hasMultipleFiles = typeof(model.contains_multiple_files) !== "undefined" && model.contains_multiple_files
-        var needsInspection = isGitHubArtifact || isZipUrl || hasMultipleFiles
+        var isGitHubRelease = typeof(model.release_assets) !== "undefined" && model.release_assets.length > 0
+        var needsInspection = isGitHubArtifact || isZipUrl || hasMultipleFiles || isGitHubRelease
 
         console.log("Artifact inspection check: isGitHubArtifact=" + isGitHubArtifact +
                     " isZipUrl=" + isZipUrl +
                     " hasMultipleFiles=" + hasMultipleFiles +
+                    " isGitHubRelease=" + isGitHubRelease +
                     " -> needsInspection=" + needsInspection)
 
         if (needsInspection) {
@@ -128,8 +131,24 @@ WizardStepBase {
                 root.nextButtonEnabled = true
                 root.customSelected = false
                 root.nextClicked()
+            } else if (isGitHubRelease) {
+                // GitHub release with multiple assets - store for CIArtifactSelectionStep
+                root.wizardContainer.pendingReleaseInspection = {
+                    tag: model.release_tag || "",
+                    name: model.name || "",
+                    owner: model.source_owner || "",
+                    repo: model.source_repo || "",
+                    assets: model.release_assets
+                }
+                // Cache selection IDs for back navigation
+                root.wizardContainer.cachedOsArtifactId = -1
+                root.wizardContainer.cachedOsName = model.name || ""
+                root.wizardContainer.cachedOsUrl = model.url || ""
+                console.log("OSSelectionStep: Caching release selection for back navigation - tag:", model.release_tag, "name:", model.name)
+                console.log("Routing to CIArtifactSelectionStep for release asset selection")
+                root.nextClicked()
             } else {
-                // Artifact needs inspection - store for CIArtifactSelectionStep
+                // CI Artifact needs inspection - store for CIArtifactSelectionStep
                 root.wizardContainer.pendingArtifactInspection = model
                 // Cache selection IDs for back navigation (model object gets invalidated on re-sort)
                 root.wizardContainer.cachedOsArtifactId = model.artifact_id || -1
@@ -399,12 +418,12 @@ WizardStepBase {
         anchors.fill: parent
         spacing: 0
 
-        // CI images loading banner
+        // CI images loading banner - hidden since we use the overlay instead
         ImLoadingBanner {
             id: loadingBanner
-            active: root.isLoadingCIImages
+            active: false
             text: qsTr("Loading CI images from GitHub...")
-            visible: !offlineBanner.visible && !ciStatusBanner. visible && root.isLoadingCIImages
+            visible: false
         }
 
         // CI images status banner (shown after loading completes)
@@ -443,7 +462,33 @@ WizardStepBase {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            
+
+            // Loading overlay - shown while fetching CI images
+            Rectangle {
+                id: loadingOverlay
+                anchors.fill: parent
+                color: Style.backgroundColor
+                visible: root.isLoadingCIImages
+                z: 10  // Above the list
+
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: Style.spacingMedium
+
+                    ImBusyIndicator {
+                        Layout.alignment: Qt.AlignHCenter
+                        running: root.isLoadingCIImages
+                    }
+
+                    Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Loading images from GitHub...")
+                        font.pixelSize: Style.fontSizeDescription
+                        color: Style.textColorSecondary
+                    }
+                }
+            }
+
             // OS SwipeView for navigation between categories
             SwipeView {
                 id: osswipeview
@@ -452,6 +497,7 @@ WizardStepBase {
                 clip: true
                 focus: false  // Don't let SwipeView steal focus from its children
                 activeFocusOnTab: false
+                opacity: root.isLoadingCIImages ? 0.3 : 1.0  // Dim while loading
 
                 onCurrentIndexChanged: {
                     _focusFirstItemInCurrentView()
@@ -541,6 +587,8 @@ WizardStepBase {
             required property var artifact_id
             required property string source_owner
             required property string source_repo
+            required property string release_tag
+            required property var release_assets
 
             // Format release_date to user's local timezone and locale format
             readonly property string formattedReleaseDate: {
@@ -798,7 +846,7 @@ WizardStepBase {
                     Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
                 }
             } else {
-                // Normal OS selection - check if this is a GitHub artifact
+                // Normal OS selection - check if this is a GitHub artifact or release with assets
                 if (typeof(model.source_type) === "string" && model.source_type === "artifact" &&
                     typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0) {
                     // GitHub CI artifact - defer download until double-click or Next button
@@ -811,10 +859,24 @@ WizardStepBase {
                         Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
                     }
                     return  // Exit early - inspection will happen on Next/double-click
+                } else if (typeof(model.source_type) === "string" && model.source_type === "release" &&
+                           typeof(model.release_assets) !== "undefined" && model.release_assets !== null &&
+                           typeof(model.release_assets.length) !== "undefined" && model.release_assets.length > 0) {
+                    // GitHub release with multiple assets - defer file selection until Next button
+                    // Just select/highlight the item for now
+                    console.log("Release selected (deferred file selection):", model.release_tag, model.name, "assets:", model.release_assets.length)
+                    root.selectedArtifactModel = model
+                    root.wizardContainer.selectedOsName = model.name
+                    root.nextButtonEnabled = true  // Enable Next so user can click it to show file selection
+                    if (fromMouse) {
+                        Qt.callLater(function() { _highlightMatchingEntryInCurrentView(model) })
+                    }
+                    return  // Exit early - file selection will happen on Next/double-click
                 } else {
                     // Regular OS (CDN or GitHub release)
                     // Check if this is an SPU file based on URL extension
-                    var urlLower = model.url.toString().toLowerCase()
+                    var modelUrl = model.url || ""
+                    var urlLower = modelUrl.toString().toLowerCase()
                     var isSpu = urlLower.endsWith(".spu")
 
                     if (isSpu) {
