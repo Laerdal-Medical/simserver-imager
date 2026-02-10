@@ -1,4 +1,4 @@
-laerdal-simserver-imager (1.0.7) UNRELEASED; urgency=medium
+laerdal-simserver-imager (1.0.7) stable; urgency=medium
 
   * GitHub Release Grouping: GitHub release assets are now grouped by release
     tag instead of showing each file as a separate entry. Selecting a release
@@ -18,7 +18,7 @@ laerdal-simserver-imager (1.0.7) UNRELEASED; urgency=medium
     "network" when extracting from local files. Now correctly identifies "disk
     read" as the upstream bottleneck when throughput is limited
 
- -- Laerdal Medical <support@laerdal.com>  Mon, 27 Jan 2025 12:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Tue, 10 Feb 2026 12:00:00 +0000
 
 laerdal-simserver-imager (1.0.6) stable; urgency=medium
 

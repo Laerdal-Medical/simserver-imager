@@ -1,6 +1,6 @@
 # Release Notes
 
-## What's New in {{VERSION}}
+## What's New in 1.0.7
 
 ### Features
 
@@ -14,50 +14,5 @@
 
 ### Bug Fixes
 
+- **Fix ADD Button**: Fixed the ADD button in the GitHub repository dialog remaining disabled after adding a repository
 - **Local File Bottleneck Detection**: Fix bottleneck status incorrectly showing "network" when extracting from local files. Local file extraction now correctly identifies "disk read" as the upstream bottleneck when throughput is limited
-
----
-
-## What's New in 1.0.6
-
-### Features
-
-- **Direct Artifact Streaming**: Single-file CI artifacts (.wic, .wic.xz, .spu) are detected by filename and stream directly to USB, bypassing the CI artifact selection step. WIC images use a new two-stage ZIP extraction pipeline (DownloadArchiveExtractThread) that decompresses on-the-fly. SPU artifacts download the ZIP to cache and extract the entry to FAT32
-- **SPU URL Streaming**: SPU downloads from CDN or GitHub releases now stream directly to the FAT32 mount point while simultaneously caching to disk, eliminating the intermediate temp file
-- **Write Progress Display**: Real-time speed (MB/s) and estimated time remaining shown during write operations. Completion screen now displays write statistics including total bytes written, duration, and average speed
-- **Download Speed Display**: Real-time download speed (Mbps) and estimated time remaining shown during download and verify operations with proper network/disk I/O units
-- **CI Artifact Selection Step**: Unified wizard step for downloading CI artifacts and selecting files from ZIP archives, replacing modal dialogs with integrated wizard flow. All GitHub CI artifacts are routed through the artifact selection step for inspection. Direct CDN artifact files (.wic, .spu, .vsi) skip this step and advance directly to storage selection
-- **Progress Bar Styling**: All progress bars (download, write, verify) now use consistent Laerdal brand colors - blue for writing/downloading operations and green for verification, with custom styling replacing Material Design defaults. Created reusable ImProgressBar component with rounded borders (8px radius), glassy effect (2px semi-transparent border), and indeterminate animation support
-- **ScrollBar Styling**: All scrollbars now use consistent Laerdal brand styling with rounded corners (fully rounded pill shape), Laerdal blue color, and smooth hover/press state transitions. Created reusable ImScrollBar component that replaces default Qt ScrollBar styling across all list views and scrollable areas
-- **Multi-Partition Detection**: Added API to detect drives with multiple partitions for improved SPU copy warnings
-
-### Improvements
-
-- **Write Pipeline Memory Reduction**: Reduced write buffer size from 8MB to 1MB and right-sized ring buffers to match the actual io_uring queue depth. Previously, ring buffer over-allocation (4GB+) caused memory pressure that blocked the UI thread via page faults. Now uses ~40MB total, eliminating UI stuttering during writes
-- **Smooth Progress Bar**: Added width animation to progress bar fill, creating smooth visual transitions between completion events instead of discrete jumps
-- **Utils Singleton**: Consolidated utility functions (formatBytes, formatDuration, calculateThroughputMbps, etc.) into a centralized Utils.qml module, eliminating code duplication across wizard steps
-- **QML Lint Compliance**: Fixed unqualified property access across wizard components using `pragma ComponentBehavior: Bound`
-- **Write Progress Status Consolidation**: Bottleneck status is now shown inline with speed and ETA instead of as a separate line below. Time remaining and throughput are displayed during both write and verify phases, and speed is only shown when a valid ETA is available. Bottleneck detection now distinguishes between storage, network, and decompression bottlenecks, only warning when throughput drops below 15 MB/s
-- **OS Selection Navigation**: OS list model is no longer unnecessarily reloaded and re-sorted when navigating back to the OS selection step. The C++ model persists across QML component recreation, so data is only loaded once per session, improving performance and eliminating redundant sorting
-- **CI Build Deduplication**: Prevent duplicate CI builds when a tag and branch push arrive for the same commit by using a SHA-based concurrency group. Tag builds take priority over branch builds
-- **Button and Component Theming**: Replace hardcoded `Qt.rgba()` disabled colors with dedicated Style properties (`buttonDisabledBackgroundColor`, `button2DisabledBackgroundColor`, `popupDisabledBorderColor`, etc.) for consistent Laerdal branding. Remove legacy `raspberryRed` alias and update all component focus/hover colors to use `laerdalBlue`
-
-### Bug Fixes
-
-- **Compressed Download Bottleneck Detection**: Fix bottleneck detection during compressed file downloads to correctly distinguish between network and decompression bottlenecks by monitoring the ring buffer fill level. When the buffer is less than 25% full, the network is identified as the bottleneck; otherwise decompression is the limiting factor
-- **Write Progress for Unknown Extract Size**: Fix write progress no longer showing misleading percentages when the uncompressed size is unknown. Previously it would fall back to using the compressed download size as the total, resulting in incorrect progress. Now the progress bar stays in indeterminate mode when the extract size is unavailable
-- **SPU Copy Ejecting Status**: Fix progress bar showing "Safely ejecting..." status during SPU copy completion phase. Previously the status changed too quickly to be visible
-- **Wizard Back Navigation**: Fix back button navigation now uses a history stack to return to the correct previous step. Previously it simply decremented the step index, which could skip steps when the wizard flow had conditional steps (e.g., CI Artifact Selection)
-- **Write Progress Bytes Display**: Show bytes written and total (e.g., "1.5 GB / 4.2 GB") in the write progress status line alongside speed and ETA
-- **Uncompressed WIC Progress**: Fix write progress showing incorrect total for uncompressed .wic files from CDN where JSON metadata has wrong extract_size. Now uses actual Content-Length from curl when no compression filter is detected
-- **Compressed Image Validation**: Fix "not a valid disk image" error and >100% write progress for .wic.xz files from GitHub releases where extract_size reflects the compressed size. The 512-byte alignment check is now skipped for compressed source files, and write progress shows indeterminate state when the decompressed size is unknown
-- **Private Repo Downloads**: Fix 404 errors when downloading release assets from private GitHub repositories by using the API asset endpoint with proper authentication headers
-- **SPU Release Discovery**: Include SPU files in GitHub release search filters so firmware updates are discovered alongside WIC and VSI images
-- **ImBadge Style Fix**: Fix runtime ReferenceError warnings by using Style singleton directly instead of qualified RpiImager.Style access
-- **Artifact File Type Detection**: Fix SPU and VSI files in CI artifacts being incorrectly identified as WIC, causing them to be written as disk images instead of using their correct write modes
-- **Artifact Download Freeze**: Fix CI artifact downloads hanging indefinitely by using proper API timeout on the initial redirect request and enabling cancellation during the redirect phase
-- **CI Artifact Step Navigation**: Fix CIArtifactSelectionStep not appearing in sidebar navigation, storage selection being skipped after file selection, OS selection state being lost when navigating to/from artifact selection, back button state preservation across navigation, wrong cached files being shown when selecting a different CI artifact, cached selections not being cleared when changing download source, cache not being restored when navigating back from storage selection, multiple items showing different highlight colors by synchronizing ListView currentIndex with selected file index, Back button skipping OSSelectionStep by removing duplicate signal handler in WizardContainer, improve download cancellation UX by enabling Back button during download instead of changing Next button to Cancel, and fix non-CI artifacts (Erase, Use custom, direct WIC/VSI/SPU files) incorrectly routing to artifact selection step instead of directly to storage selection
-- **Write Complete Screen Alignment**: Align "Write statistics:" section with "Your choices:" section by using consistent heading font size (Style.fontSizeHeading), proper spacing, and fixed-width label columns (120px) to ensure data values align vertically across both sections for improved visual consistency on the completion screen
-- **OS List Source Switch**: Fix system image list not updating when switching between CDN and GitHub artifact sources. The OS list model now detects source type changes and reloads accordingly
-- **Write Another Freeze**: Fix application freeze when writing the same artifact image a second time via "Write Another". The archive streaming variables were cleared after the first write, causing the second write to fall through to DownloadExtractThread which deadlocked trying to resolve the internal `archive://` URL scheme as a network host
-- **Close During Download Crash**: Fix segfault when closing the application during a CI artifact download. Network reply signals are now disconnected before abort in the GitHubClient destructor, and a quit confirmation dialog is shown when a download is in progress (matching the existing behavior for write operations)
