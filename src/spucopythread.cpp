@@ -348,12 +348,17 @@ bool SPUCopyThread::extractAndCopy(const QString &mountPoint)
             }
 
             delete[] buffer;
-            destFile.flush();
-            destFile.close();
 
             if (success)
             {
+                emit preparationStatusUpdate(tr("Flushing to USB drive..."));
+                destFile.flush();
+                destFile.close();
                 qDebug() << "SPUCopyThread: Successfully copied" << totalWritten << "bytes";
+            }
+            else
+            {
+                destFile.close();
             }
 
             break;
@@ -434,6 +439,12 @@ bool SPUCopyThread::copyDirectFile(const QString &mountPoint)
     }
 
     delete[] buffer;
+
+    if (success && !_cancelled)
+    {
+        emit preparationStatusUpdate(tr("Flushing to USB drive..."));
+    }
+
     destFile.flush();
     destFile.close();
     srcFile.close();
@@ -562,6 +573,11 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
             totalWritten += written;
             if (caching) cacheFile.write(remaining);
         }
+    }
+
+    if (success && !_cancelled)
+    {
+        emit preparationStatusUpdate(tr("Flushing to USB drive..."));
     }
 
     destFile.flush();

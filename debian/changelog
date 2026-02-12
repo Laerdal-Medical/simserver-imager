@@ -17,6 +17,10 @@ laerdal-simserver-imager (1.0.7) stable; urgency=medium
   * Local File Bottleneck Detection: Fix bottleneck status incorrectly showing
     "network" when extracting from local files. Now correctly identifies "disk
     read" as the upstream bottleneck when throughput is limited
+  * SPU Copy Speed Display: Show transfer speed (MB/s), bytes transferred, and
+    estimated time remaining during SPU copy operations
+  * SPU Copy Status: Show "Flushing to USB drive..." when data is being synced
+    after copy completes instead of stale preparation message
 
  -- Laerdal Medical <support@laerdal.com>  Tue, 10 Feb 2026 12:00:00 +0000
 

@@ -54,6 +54,11 @@ WizardStepBase {
     property int bytesNow: 0
     property int bytesTotal: 0
 
+    // Speed tracking
+    property real lastCopyBytes: 0
+    property real lastCopyTime: 0
+    property int copyThroughputKBps: 0
+
     // Format confirmation dialog state
     property bool showFormatDialog: false
     property bool driveHasCompatibleFs: false  // FAT32, exFAT, or NTFS
@@ -69,6 +74,19 @@ WizardStepBase {
             root.bytesTotal = total
             if (total > 0) {
                 root.copyProgress = now / total
+            }
+
+            // Calculate copy throughput
+            var result = Utils.calculateThroughputKBps(
+                now,
+                root.lastCopyBytes,
+                root.lastCopyTime,
+                500  // Update every 500ms
+            )
+            if (result !== null) {
+                root.copyThroughputKBps = result.throughputKBps
+                root.lastCopyBytes = result.newLastBytes
+                root.lastCopyTime = result.newLastTime
             }
         }
 
@@ -130,6 +148,9 @@ WizardStepBase {
         root.copyProgress = 0
         root.bytesNow = 0
         root.bytesTotal = 0
+        root.lastCopyBytes = 0
+        root.lastCopyTime = 0
+        root.copyThroughputKBps = 0
         root.statusMessage = qsTr("Preparing...")
 
         root.imageWriter.startSpuCopy(skipFormat)
@@ -144,6 +165,9 @@ WizardStepBase {
         root.copyProgress = 0
         root.bytesNow = 0
         root.bytesTotal = 0
+        root.lastCopyBytes = 0
+        root.lastCopyTime = 0
+        root.copyThroughputKBps = 0
         root.showFormatDialog = false
     }
 
@@ -333,13 +357,38 @@ WizardStepBase {
                                 // Copy complete, show status message (e.g., "Safely ejecting...")
                                 return root.statusMessage
                             } else {
-                                return qsTr("Copying... %1 of %2")
-                                    .arg(root.imageWriter.formatSize(root.bytesNow))
-                                    .arg(root.imageWriter.formatSize(root.bytesTotal))
+                                return qsTr("Copying...")
                             }
                         }
 
                         Accessible.name: qsTr("Copy progress")
+                    }
+
+                    // Speed and time remaining display
+                    Text {
+                        text: {
+                            var parts = []
+                            if (root.bytesTotal > 0) {
+                                parts.push(Utils.formatBytes(root.bytesNow) + " / " +
+                                          Utils.formatBytes(root.bytesTotal))
+                            }
+                            if (root.copyThroughputKBps > 0) {
+                                parts.push(Math.round(root.copyThroughputKBps / 1024) + " MB/s")
+                            }
+                            var timeRemaining = Utils.calculateTimeRemainingKBps(
+                                root.bytesNow, root.bytesTotal, root.copyThroughputKBps)
+                            var timeStr = Utils.formatTimeRemaining(timeRemaining)
+                            if (timeStr !== "") {
+                                parts.push(timeStr)
+                            }
+                            return parts.join("  \u2022  ")
+                        }
+                        font.pixelSize: Style.fontSizeDescription
+                        font.family: Style.fontFamily
+                        color: Style.formLabelColor
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        visible: root.bytesTotal > 0
                     }
                 }
 
