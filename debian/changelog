@@ -1,28 +1,11 @@
 laerdal-simserver-imager (1.0.7) stable; urgency=medium
 
-  * GitHub Release Grouping: GitHub release assets are now grouped by release
-    tag instead of showing each file as a separate entry. Selecting a release
-    opens the file selection step where users can pick from available assets
-    filtered by the selected device platform
-  * Release Filter Option: Added "Releases" filter option in the GitHub source
-    dropdown to show only releases without CI artifacts. Renamed "All branches"
-    to "Default branch" for clarity
-  * Loading Indicator: Added a loading spinner overlay when fetching GitHub
-    images to prevent showing stale data while the list updates
-  * Fix ADD Button: Fixed the ADD button in the GitHub repository dialog
-    remaining disabled after adding a repository
-  * Device Selection Workflow: "Erase" and "Use custom" options moved from OS
-    selection to device/hardware selection step for a more intuitive workflow.
-    "Use custom" now supports SPU files in addition to WIC/VSI images
-  * Local File Bottleneck Detection: Fix bottleneck status incorrectly showing
-    "network" when extracting from local files. Now correctly identifies "disk
-    read" as the upstream bottleneck when throughput is limited
   * SPU Copy Speed Display: Show transfer speed (MB/s), bytes transferred, and
     estimated time remaining during SPU copy operations
   * SPU Copy Status: Show "Flushing to USB drive..." when data is being synced
     after copy completes instead of stale preparation message
 
- -- Laerdal Medical <support@laerdal.com>  Tue, 10 Feb 2026 12:00:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Wed, 12 Feb 2026 12:00:00 +0000
 
 laerdal-simserver-imager (1.0.6) stable; urgency=medium
 
