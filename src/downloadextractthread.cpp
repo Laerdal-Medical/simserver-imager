@@ -211,6 +211,16 @@ void DownloadExtractThread::_emitProgressUpdate()
     // When extractTotal is 0, both this signal and asyncWriteProgress consistently report
     // total=0, allowing the UI to stay in indeterminate mode.
     quint64 writeTotal = currentExtractTotal;
+
+    // Safety: if bytes written already exceed the extract total, the total is wrong
+    // (e.g., compressed size was used instead of uncompressed). Reset to 0 so the UI
+    // switches to indeterminate mode instead of showing > 100%.
+    if (writeTotal > 0 && currentWriteNow > writeTotal) {
+        qDebug() << "Extract total" << writeTotal << "exceeded by bytesWritten"
+                 << currentWriteNow << "- switching to indeterminate progress";
+        _extractTotal.store(0);
+        writeTotal = 0;
+    }
     
     // Only emit signals if values have changed
     if (currentDlNow != _lastEmittedDlNow || (currentDlTotal > 0 && _lastEmittedDlNow == 0)) {

@@ -357,7 +357,7 @@ WizardStepBase {
                                 // Copy complete, show status message (e.g., "Safely ejecting...")
                                 return root.statusMessage
                             } else {
-                                return qsTr("Copying...")
+                                return qsTr("Copying... %1%").arg(Math.round(root.copyProgress * 100))
                             }
                         }
 

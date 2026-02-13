@@ -397,7 +397,11 @@ WizardStepBase {
                 root.selectedArtifactModel = entry
                 oslist.currentIndex = i
                 oslist.positionViewAtIndex(i, ListView.Center)
-                oslist.handleOSItemSelection(i, entry, true, false)
+                // Call selectOSitem directly with the entry from getOsEntry()
+                // (a complete JS object with all properties defined) instead of
+                // handleOSItemSelection which fetches modelData from the delegate
+                // proxy where properties like url/release_assets may be undefined.
+                root.selectOSitem(entry, false, false)
                 return
             }
         }

@@ -329,7 +329,19 @@ Item {
         selectedOsName = ""
         selectedStorageName = ""
         customizationSupported = false  // Disabled for Laerdal SimServer Imager
-        
+
+        // Clear cached artifact state so CIArtifactSelectionStep re-filters for the new device
+        cachedArtifactFiles = []
+        cachedSelectedFileIndex = -1
+        cachedArtifactId = 0
+        cachedArtifactName = ""
+        cachedArtifactOwner = ""
+        cachedArtifactRepo = ""
+        cachedArtifactBranch = ""
+        cachedArtifactZipPath = ""
+        pendingArtifactInspection = null
+        pendingReleaseInspection = null
+
         // Clear all customization flags
         hostnameConfigured = false
         localeConfigured = false

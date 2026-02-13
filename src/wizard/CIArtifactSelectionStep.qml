@@ -399,6 +399,8 @@ WizardStepBase {
         target: root.imageWriter.getRepositoryManager()
 
         function onArtifactDownloadProgress(bytesReceived, bytesTotal) {
+            // Ignore signals on zombie instances (being animated out after StackView.clear())
+            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) return
             if (!root.isDownloading) return
 
             root.bytesReceived = bytesReceived
@@ -431,6 +433,9 @@ WizardStepBase {
         }
 
         function onArtifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath) {
+            // Ignore signals on zombie instances (being animated out after StackView.clear())
+            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) return
+
             console.log("CIArtifactSelectionStep: Artifact contents ready -", artifactName)
             console.log("CIArtifactSelectionStep: Number of files found:", imageFiles.length)
 
@@ -513,6 +518,8 @@ WizardStepBase {
         }
 
         function onRefreshError(message) {
+            // Ignore signals on zombie instances (being animated out after StackView.clear())
+            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) return
             if (!root.isDownloading) return
             console.log("CIArtifactSelectionStep: Download error:", message)
             root.isDownloading = false
@@ -570,7 +577,7 @@ WizardStepBase {
                     root.imageWriter.setSrc(
                         file.download_url,
                         file.size || 0,
-                        file.size || 0,  // extract_size (assume same as download for now)
+                        0,  // extract_size unknown for compressed files; C++ will detect or use indeterminate
                         "",  // sha256
                         false,  // not multiple files
                         "",  // category
