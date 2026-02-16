@@ -1,3 +1,17 @@
+laerdal-simserver-imager (1.0.8) stable; urgency=medium
+
+  * SPU Copy Speed Display: Show transfer speed (MB/s), bytes transferred, and
+    estimated time remaining during SPU copy operations
+  * SPU Copy Status: Show "Flushing to USB drive..." when data is being synced
+    after copy completes instead of stale preparation message
+  * SPU Copy Progress: Show copy progress percentage in status text
+  * Fix: Device change now clears cached artifact state for proper re-filtering
+  * Fix: Write progress bar no longer exceeds 100% for compressed images
+  * Fix: TypeError on cached OS selection restoration via delegate proxy
+  * Fix: Duplicate signal handling in CI artifact step during StackView transitions
+
+ -- Laerdal Medical <support@laerdal.com>  Sun, 16 Feb 2026 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.7) stable; urgency=medium
 
   * SPU Copy Speed Display: Show transfer speed (MB/s), bytes transferred, and
