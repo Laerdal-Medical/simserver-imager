@@ -256,8 +256,8 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
         emit artifactBranchFilterChanged();
         qDebug() << "RepositoryManager: Artifact branch filter set to:" << branch;
 
-        // Handle filter change
-        if (_githubClient && _selectedSourceType == "github") {
+        // Handle filter change - only relevant for github-ci source type
+        if (_githubClient && _selectedSourceType == "github-ci") {
             // Clear existing GitHub artifacts (keep releases in storage)
             QJsonArray releasesOnly;
             for (const auto &item : _githubOsList) {
@@ -267,12 +267,6 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
                 }
             }
             _githubOsList = releasesOnly;
-
-            // "RELEASES_ONLY" filter - no need to fetch artifacts, just show releases
-            if (branch == QLatin1String("RELEASES_ONLY")) {
-                emit osListReady();
-                return;
-            }
 
             // Re-fetch artifacts with new branch
             _pendingRefreshCount = 0;
@@ -303,10 +297,10 @@ void RepositoryManager::setSelectedSourceType(const QString &sourceType)
         _settings.setValue(SETTINGS_SOURCE_TYPE, sourceType);
         emit selectedSourceTypeChanged();
 
-        // When switching to GitHub, fetch branches but don't fetch CI images yet
+        // When switching to a GitHub source type, fetch branches
         // CI images will be fetched when user clicks Next on the Source Selection step
-        if (sourceType == "github" && _githubClient) {
-            qDebug() << "RepositoryManager: Source type set to github, fetching branches...";
+        if ((sourceType == "github-releases" || sourceType == "github-ci") && _githubClient) {
+            qDebug() << "RepositoryManager: Source type set to" << sourceType << ", fetching branches...";
             fetchAvailableBranches();
         }
 
@@ -399,19 +393,15 @@ QJsonArray RepositoryManager::getMergedOsList() const
         for (const auto &item : _cdnOsList) {
             merged.append(item);
         }
-    } else if (_selectedSourceType == "github") {
-        // GitHub only (filtered by branch if applicable)
+    } else if (_selectedSourceType == "github-releases" || _selectedSourceType == "github-ci") {
+        // GitHub (filtered by source type and optionally by branch)
         QJsonArray githubItems = getGitHubOsList();
         for (const auto &item : githubItems) {
             merged.append(item);
         }
     } else {
-        // Default: show both (shouldn't happen with UI)
+        // Default: show CDN (fallback)
         for (const auto &item : _cdnOsList) {
-            merged.append(item);
-        }
-        QJsonArray githubItems = getGitHubOsList();
-        for (const auto &item : githubItems) {
             merged.append(item);
         }
     }
@@ -426,34 +416,37 @@ QJsonArray RepositoryManager::getCdnOsList() const
 
 QJsonArray RepositoryManager::getGitHubOsList() const
 {
-    // Filter options:
-    // - Empty ("Default branch"): show releases + default branch artifacts
-    // - "RELEASES_ONLY": show only releases (no CI artifacts)
-    // - Specific branch: show only CI artifacts from that branch (no releases)
+    // Filter based on selected source type:
+    // - "github-releases": show only releases
+    // - "github-ci": show only CI artifacts, optionally filtered by branch
     QJsonArray filtered;
 
-    if (_artifactBranchFilter.isEmpty()) {
-        // No filter - show all items (releases + artifacts)
-        filtered = _githubOsList;
-    } else if (_artifactBranchFilter == QLatin1String("RELEASES_ONLY")) {
-        // Releases only - no CI artifacts
+    if (_selectedSourceType == "github-releases") {
+        // Releases only
         for (const auto &item : _githubOsList) {
             QJsonObject obj = item.toObject();
             if (obj["source_type"].toString() == "release") {
                 filtered.append(item);
             }
         }
-    } else {
-        // Branch filter set - only show artifacts matching the branch (no releases)
+    } else if (_selectedSourceType == "github-ci") {
+        // CI artifacts only, optionally filtered by branch
         for (const auto &item : _githubOsList) {
             QJsonObject obj = item.toObject();
             if (obj["source_type"].toString() == "artifact") {
-                QString artifactBranch = obj["branch"].toString();
-                if (artifactBranch == _artifactBranchFilter) {
+                if (_artifactBranchFilter.isEmpty()) {
                     filtered.append(item);
+                } else {
+                    QString artifactBranch = obj["branch"].toString();
+                    if (artifactBranch == _artifactBranchFilter) {
+                        filtered.append(item);
+                    }
                 }
             }
         }
+    } else {
+        // Fallback: return all GitHub items
+        filtered = _githubOsList;
     }
 
     // Sort by release_date descending (newest first)
@@ -534,6 +527,27 @@ void RepositoryManager::loadSettings()
 
     // Load artifact branch filter (last used branch selection)
     _artifactBranchFilter = _settings.value(SETTINGS_ARTIFACT_BRANCH_FILTER).toString();
+
+    // Migrate old "github" source type to new values
+    if (_selectedSourceType == "github") {
+        if (_artifactBranchFilter == "RELEASES_ONLY") {
+            _selectedSourceType = "github-releases";
+            _artifactBranchFilter = "";
+            _settings.setValue(SETTINGS_ARTIFACT_BRANCH_FILTER, "");
+        } else {
+            _selectedSourceType = "github-ci";
+        }
+        _settings.setValue(SETTINGS_SOURCE_TYPE, _selectedSourceType);
+        _settings.sync();
+        qDebug() << "RepositoryManager: Migrated source type 'github' to" << _selectedSourceType;
+    }
+
+    // Clear any lingering "RELEASES_ONLY" filter value
+    if (_artifactBranchFilter == "RELEASES_ONLY") {
+        _artifactBranchFilter = "";
+        _settings.setValue(SETTINGS_ARTIFACT_BRANCH_FILTER, "");
+        _settings.sync();
+    }
 
     qDebug() << "RepositoryManager: Loaded settings, environment:"
              << environmentName(_environment)
@@ -941,11 +955,15 @@ void RepositoryManager::updateStatusMessage()
     if (_selectedSourceType == "cdn") {
         // CDN selected - clear the status message (CDN doesn't need a count banner)
         setStatusMessage(QString());
-    } else if (_selectedSourceType == "github") {
-        // GitHub selected - show CI image count
-        int imageCount = _githubOsList.size();
-        if (imageCount == 0) {
-            // Check if there are any enabled repos
+    } else if (_selectedSourceType == "github-releases") {
+        // GitHub releases selected - show release count
+        int releaseCount = 0;
+        for (const auto &item : _githubOsList) {
+            if (item.toObject()["source_type"].toString() == "release") {
+                releaseCount++;
+            }
+        }
+        if (releaseCount == 0) {
             bool hasEnabledRepos = false;
             for (const auto &repo : _githubRepos) {
                 if (repo.enabled) {
@@ -954,14 +972,36 @@ void RepositoryManager::updateStatusMessage()
                 }
             }
             if (hasEnabledRepos) {
-                setStatusMessage(tr("No CI images found for selected repositories"));
+                setStatusMessage(tr("No releases found for selected repositories"));
             } else {
                 setStatusMessage(tr("No GitHub repositories enabled"));
             }
         } else {
-            // Show total CI image count - will be updated with filtered count
-            // by ImageWriter after device filtering is applied
-            setStatusMessage(tr("%1 CI image(s) available").arg(imageCount));
+            setStatusMessage(tr("%1 release(s) available").arg(releaseCount));
+        }
+    } else if (_selectedSourceType == "github-ci") {
+        // GitHub CI artifacts selected - show artifact count
+        int artifactCount = 0;
+        for (const auto &item : _githubOsList) {
+            if (item.toObject()["source_type"].toString() == "artifact") {
+                artifactCount++;
+            }
+        }
+        if (artifactCount == 0) {
+            bool hasEnabledRepos = false;
+            for (const auto &repo : _githubRepos) {
+                if (repo.enabled) {
+                    hasEnabledRepos = true;
+                    break;
+                }
+            }
+            if (hasEnabledRepos) {
+                setStatusMessage(tr("No CI artifacts found for selected repositories"));
+            } else {
+                setStatusMessage(tr("No GitHub repositories enabled"));
+            }
+        } else {
+            setStatusMessage(tr("%1 CI artifact(s) available").arg(artifactCount));
         }
     }
 }
@@ -977,10 +1017,9 @@ void RepositoryManager::setFilteredImageCount(int filteredCount, int totalCount)
         } else {
             setStatusMessage(tr("%1 CDN images available, %2 for this device").arg(totalCount).arg(filteredCount));
         }
-    } else if (_selectedSourceType == "github") {
-        // GitHub source
+    } else if (_selectedSourceType == "github-releases") {
+        // GitHub releases
         if (filteredCount == 0 && totalCount == 0) {
-            // Check if there are any enabled repos
             bool hasEnabledRepos = false;
             for (const auto &repo : _githubRepos) {
                 if (repo.enabled) {
@@ -989,14 +1028,34 @@ void RepositoryManager::setFilteredImageCount(int filteredCount, int totalCount)
                 }
             }
             if (hasEnabledRepos) {
-                setStatusMessage(tr("No CI images found for selected repositories"));
+                setStatusMessage(tr("No releases found for selected repositories"));
             } else {
                 setStatusMessage(tr("No GitHub repositories enabled"));
             }
         } else if (filteredCount == totalCount) {
-            setStatusMessage(tr("%1 CI image(s) available").arg(totalCount));
+            setStatusMessage(tr("%1 release(s) available").arg(totalCount));
         } else {
-            setStatusMessage(tr("%1 CI images available, %2 for this device").arg(totalCount).arg(filteredCount));
+            setStatusMessage(tr("%1 releases available, %2 for this device").arg(totalCount).arg(filteredCount));
+        }
+    } else if (_selectedSourceType == "github-ci") {
+        // GitHub CI artifacts
+        if (filteredCount == 0 && totalCount == 0) {
+            bool hasEnabledRepos = false;
+            for (const auto &repo : _githubRepos) {
+                if (repo.enabled) {
+                    hasEnabledRepos = true;
+                    break;
+                }
+            }
+            if (hasEnabledRepos) {
+                setStatusMessage(tr("No CI artifacts found for selected repositories"));
+            } else {
+                setStatusMessage(tr("No GitHub repositories enabled"));
+            }
+        } else if (filteredCount == totalCount) {
+            setStatusMessage(tr("%1 CI artifact(s) available").arg(totalCount));
+        } else {
+            setStatusMessage(tr("%1 CI artifacts available, %2 for this device").arg(totalCount).arg(filteredCount));
         }
     }
 }

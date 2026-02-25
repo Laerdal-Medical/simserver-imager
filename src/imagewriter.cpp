@@ -2326,8 +2326,8 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
         reference_imager_metadata = _completeOsList.object().value("imager").toObject();
     }
 
-    // Include GitHub artifacts if source type is "github" and authenticated
-    if (sourceType == "github" && _repositoryManager && _githubAuth && _githubAuth->isAuthenticated()) {
+    // Include GitHub images if source type is a GitHub variant and authenticated
+    if ((sourceType == "github-releases" || sourceType == "github-ci") && _repositoryManager && _githubAuth && _githubAuth->isAuthenticated()) {
         QJsonArray githubOsList = _repositoryManager->getGitHubOsList();
         int totalCount = githubOsList.size();
         if (!_deviceFilter.isEmpty()) {

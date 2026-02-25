@@ -23,10 +23,10 @@ WizardStepBase {
     showNextButton: true
     nextButtonEnabled: true
 
-    // Fetch CI images when navigating to next step with GitHub selected
+    // Fetch images when navigating to next step with a GitHub source selected
     onNextClicked: {
-        if (root.selectedSourceType === "github" && root.repoManager) {
-            console.log("SourceSelectionStep: GitHub selected, fetching CI images before proceeding...")
+        if ((root.selectedSourceType === "github-releases" || root.selectedSourceType === "github-ci") && root.repoManager) {
+            console.log("SourceSelectionStep: GitHub source selected, fetching images before proceeding...")
             root.repoManager.refreshAllSources()
         }
     }
@@ -44,7 +44,7 @@ WizardStepBase {
     // Button group for radio buttons to make them mutually exclusive
     ButtonGroup {
         id: sourceTypeButtonGroup
-        buttons: [cdnRadio, githubRadio]
+        buttons: [cdnRadio, githubReleasesRadio, githubCIRadio]
     }
 
     // Listen for GitHub auth changes
@@ -70,7 +70,7 @@ WizardStepBase {
     Component.onCompleted: {
         // Register focus groups for keyboard navigation
         root.registerFocusGroup("source_type_section", function(){
-            return [cdnRadio, githubRadio]
+            return [cdnRadio, githubReleasesRadio, githubCIRadio]
         }, 0)
 
         root.registerFocusGroup("environment_section", function(){
@@ -128,7 +128,7 @@ WizardStepBase {
                 }
 
                 WizardDescriptionText {
-                    text: qsTr("Choose whether to download from Laerdal CDN or GitHub CI artifacts.")
+                    text: qsTr("Choose where to download images from.")
                     Layout.fillWidth: true
                 }
 
@@ -187,19 +187,81 @@ WizardStepBase {
                         }
                     }
 
-                    // GitHub Radio Option
+                    // GitHub Releases Radio Option
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Style.spacingSmall
 
                         ImRadioButton {
-                            id: githubRadio
-                            checked: root.selectedSourceType === "github"
+                            id: githubReleasesRadio
+                            checked: root.selectedSourceType === "github-releases"
                             enabled: root.isGitHubAvailable
 
                             onCheckedChanged: {
                                 if (checked) {
-                                    root.selectedSourceType = "github"
+                                    root.selectedSourceType = "github-releases"
+                                }
+                            }
+
+                            accessibleDescription: root.isGitHubAvailable
+                                                    ? qsTr("Download images from GitHub releases")
+                                                    : (!root.isGitHubAuthenticated
+                                                       ? qsTr("Sign in to GitHub to enable this option")
+                                                       : qsTr("No GitHub repositories configured"))
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: Style.spacingXXSmall
+
+                            Text {
+                                text: qsTr("GitHub Releases")
+                                font.pixelSize: Style.fontSizeFormLabel
+                                font.family: Style.fontFamilyBold
+                                font.bold: true
+                                color: githubReleasesRadio.enabled ? Style.formLabelColor : Style.formLabelDisabledColor
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: githubReleasesRadio.enabled
+                                    onClicked: githubReleasesRadio.checked = true
+                                    cursorShape: githubReleasesRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                }
+                            }
+
+                            Text {
+                                text: root.isGitHubAvailable
+                                      ? qsTr("Release candidates published on GitHub")
+                                      : (!root.isGitHubAuthenticated
+                                         ? qsTr("Sign in to GitHub in App Options to enable")
+                                         : qsTr("No GitHub repositories configured"))
+                                font.pixelSize: Style.fontSizeCaption
+                                font.family: Style.fontFamily
+                                color: githubReleasesRadio.enabled ? Style.textDescriptionColor : Style.formLabelDisabledColor
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: githubReleasesRadio.enabled
+                                    onClicked: githubReleasesRadio.checked = true
+                                    cursorShape: githubReleasesRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                }
+                            }
+                        }
+                    }
+
+                    // GitHub CI Artifacts Radio Option
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Style.spacingSmall
+
+                        ImRadioButton {
+                            id: githubCIRadio
+                            checked: root.selectedSourceType === "github-ci"
+                            enabled: root.isGitHubAvailable
+
+                            onCheckedChanged: {
+                                if (checked) {
+                                    root.selectedSourceType = "github-ci"
                                 }
                             }
 
@@ -219,13 +281,13 @@ WizardStepBase {
                                 font.pixelSize: Style.fontSizeFormLabel
                                 font.family: Style.fontFamilyBold
                                 font.bold: true
-                                color: githubRadio.enabled ? Style.formLabelColor : Style.formLabelDisabledColor
+                                color: githubCIRadio.enabled ? Style.formLabelColor : Style.formLabelDisabledColor
 
                                 MouseArea {
                                     anchors.fill: parent
-                                    enabled: githubRadio.enabled
-                                    onClicked: githubRadio.checked = true
-                                    cursorShape: githubRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    enabled: githubCIRadio.enabled
+                                    onClicked: githubCIRadio.checked = true
+                                    cursorShape: githubCIRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 }
                             }
 
@@ -237,13 +299,13 @@ WizardStepBase {
                                          : qsTr("No GitHub repositories configured"))
                                 font.pixelSize: Style.fontSizeCaption
                                 font.family: Style.fontFamily
-                                color: githubRadio.enabled ? Style.textDescriptionColor : Style.formLabelDisabledColor
+                                color: githubCIRadio.enabled ? Style.textDescriptionColor : Style.formLabelDisabledColor
 
                                 MouseArea {
                                     anchors.fill: parent
-                                    enabled: githubRadio.enabled
-                                    onClicked: githubRadio.checked = true
-                                    cursorShape: githubRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    enabled: githubCIRadio.enabled
+                                    onClicked: githubCIRadio.checked = true
+                                    cursorShape: githubCIRadio.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 }
                             }
                         }
@@ -319,7 +381,7 @@ WizardStepBase {
             // GitHub Artifact Branch Filter Section (visible when GitHub is selected)
             WizardSectionContainer {
                 Layout.fillWidth: true
-                visible: root.selectedSourceType === "github" && root.isGitHubAvailable
+                visible: root.selectedSourceType === "github-ci" && root.isGitHubAvailable
 
                 WizardFormLabel {
                     text: qsTr("Branch Filter")
@@ -378,14 +440,10 @@ WizardStepBase {
                                 currentIndex = 0  // "Default branch"
                                 return
                             }
-                            if (selectedBranchName === "RELEASES_ONLY") {
-                                currentIndex = 1  // "Releases"
-                                return
-                            }
                             var branches = availableBranches
                             for (var i = 0; i < branches.length; i++) {
                                 if (branches[i] === selectedBranchName) {
-                                    currentIndex = i + 2  // +2 because "Default branch" and "Releases" are at indices 0-1
+                                    currentIndex = i + 1  // +1 because "Default branch" is at index 0
                                     return
                                 }
                             }
@@ -401,10 +459,9 @@ WizardStepBase {
                         }
 
                         model: {
-                            // "Default branch" shows releases + all artifacts
-                            // "Releases" shows only releases (no CI artifacts)
-                            // Other branches show only CI artifacts from that branch
-                            var branches = [qsTr("Default branch"), qsTr("Releases")].concat(availableBranches)
+                            // "Default branch" shows CI artifacts from repo default branch
+                            // Other branches show CI artifacts from that specific branch
+                            var branches = [qsTr("Default branch")].concat(availableBranches)
                             return branches
                         }
 
@@ -452,9 +509,6 @@ WizardStepBase {
                                 if (typedText === "" || typedText === qsTr("Default branch")) {
                                     selectedBranchName = ""
                                     root.repoManager.setArtifactBranchFilter("")
-                                } else if (typedText === qsTr("Releases")) {
-                                    selectedBranchName = "RELEASES_ONLY"
-                                    root.repoManager.setArtifactBranchFilter("RELEASES_ONLY")
                                 } else {
                                     selectedBranchName = typedText
                                     root.repoManager.setArtifactBranchFilter(typedText)
@@ -465,16 +519,12 @@ WizardStepBase {
                         onActivated: function(index) {
                             if (root.repoManager) {
                                 if (index === 0) {
-                                    // "Default branch" - show releases + all artifacts
+                                    // "Default branch" - show CI artifacts from default branch
                                     selectedBranchName = ""
                                     root.repoManager.setArtifactBranchFilter("")
-                                } else if (index === 1) {
-                                    // "Releases" - show only releases (no CI artifacts)
-                                    selectedBranchName = "RELEASES_ONLY"
-                                    root.repoManager.setArtifactBranchFilter("RELEASES_ONLY")
                                 } else {
                                     // Specific branch - show only CI artifacts from that branch
-                                    selectedBranchName = availableBranches[index - 2]
+                                    selectedBranchName = availableBranches[index - 1]
                                     root.repoManager.setArtifactBranchFilter(selectedBranchName)
                                 }
                             }

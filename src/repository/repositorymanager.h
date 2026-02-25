@@ -152,8 +152,8 @@ public:
     Q_INVOKABLE void setArtifactBranchFilter(const QString &branch);
 
     /**
-     * @brief Set the selected source type (cdn or github)
-     * @param sourceType "cdn" or "github"
+     * @brief Set the selected source type
+     * @param sourceType "cdn", "github-releases", or "github-ci"
      */
     Q_INVOKABLE void setSelectedSourceType(const QString &sourceType);
 
@@ -347,7 +347,7 @@ private:
     QString _errorMessage;
     QString _statusMessage;
     QString _artifactBranchFilter;
-    QString _selectedSourceType = "cdn";  // "cdn" or "github"
+    QString _selectedSourceType = "cdn";  // "cdn", "github-releases", or "github-ci"
     QStringList _availableBranches;
 
     int _pendingRefreshCount = 0;

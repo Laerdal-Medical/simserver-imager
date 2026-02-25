@@ -20,10 +20,24 @@ WizardStepBase {
     readonly property HWListModel hwmodel: imageWriter.getHWList()
     readonly property OSListModel osmodel: imageWriter.getOSList()
     
-    title: repoManager && repoManager.selectedSourceType == 'github' ? 
-        qsTr("Choose CI Artifact") : qsTr("Choose system image")
-    subtitle: repoManager && repoManager.selectedSourceType == 'github' ? 
-        qsTr("Choose CI Artifact to install on your device") : qsTr("Select a system image to install on your device")
+    title: {
+        if (repoManager) {
+            if (repoManager.selectedSourceType === 'github-ci')
+                return qsTr("Choose CI Artifact")
+            if (repoManager.selectedSourceType === 'github-releases')
+                return qsTr("Choose Release")
+        }
+        return qsTr("Choose system image")
+    }
+    subtitle: {
+        if (repoManager) {
+            if (repoManager.selectedSourceType === 'github-ci')
+                return qsTr("Choose CI Artifact to install on your device")
+            if (repoManager.selectedSourceType === 'github-releases')
+                return qsTr("Choose a release to install on your device")
+        }
+        return qsTr("Select a system image to install on your device")
+    }
     showNextButton: true
     // Disable Next until a concrete OS has been selected
     nextButtonEnabled: oslist.currentIndex !== -1 && wizardContainer.selectedOsName.length > 0
