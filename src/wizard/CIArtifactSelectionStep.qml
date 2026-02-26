@@ -76,31 +76,12 @@ WizardStepBase {
     readonly property var repoManager: imageWriter.getRepositoryManager()
     readonly property bool isLoadingCIImages: repoManager ? repoManager.isLoading : false
 
-    // Filter release assets by device - only show assets matching selected device
-    // Platform-independent files (no device pattern) are shown to all devices
+    // Filter release assets by device - delegates to DeviceDetection::isFileCompatibleWithDevice() in C++
     function filterAssetsByDevice(assets, selectedDevice) {
         if (!assets || !selectedDevice) return assets
-
+        var mgr = root.repoManager
         return assets.filter(function(asset) {
-            var name = (asset.name || "").toLowerCase()
-
-            // Detect device from filename using same patterns as extractDeviceName()
-            var fileDevice = null
-            if (name.includes("simman3g-64") || name.includes("simman-64")) {
-                fileDevice = "simman3g-64"
-            } else if (name.includes("simman3g-32") || name.includes("simman-32")) {
-                fileDevice = "simman3g-32"
-            } else if (name.includes("simman3g") || name.includes("simman")) {
-                fileDevice = "simman3g"
-            } else if (name.includes("imx8") || name.includes("simpad2")) {
-                fileDevice = "imx8"
-            } else if (name.includes("imx6") || (name.includes("simpad") && !name.includes("simpad2"))) {
-                fileDevice = "imx6"
-            }
-            // No device detected = platform-independent, show to all
-
-            if (fileDevice === null) return true  // Generic file - always show
-            return fileDevice === selectedDevice   // Device-specific - match only
+            return mgr.isFileCompatibleWithDevice(asset.name || "", selectedDevice)
         })
     }
 

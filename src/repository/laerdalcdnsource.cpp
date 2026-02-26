@@ -4,6 +4,7 @@
  */
 
 #include "laerdalcdnsource.h"
+#include "../devicedetection.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -86,8 +87,19 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
         // Create OS list entry
         QJsonObject osEntry;
 
+        // Detect device type from structured CDN simpadType
+        auto deviceType = DeviceDetection::detectFromCdnType(simpadType);
+        bool isVsi = url.toLower().endsWith(".vsi");
+
         // Name with device type and version
-        osEntry["name"] = getDisplayName(simpadType, version);
+        QString deviceName = DeviceDetection::getDisplayName(deviceType);
+        if (deviceName.isEmpty()) {
+            // Unknown type: capitalize first letter as fallback
+            deviceName = simpadType;
+            if (!deviceName.isEmpty())
+                deviceName[0] = deviceName[0].toUpper();
+        }
+        osEntry["name"] = QString("%1 v%2").arg(deviceName, version);
 
         // Description from info field
         osEntry["description"] = info.isEmpty() ? releaseNotes : info;
@@ -107,22 +119,11 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
         // Mark as no customization support (WIC files don't support cloud-init)
         osEntry["init_format"] = "none";
 
-        // Device tag for filtering
-        QString tag = mapSimpadTypeToTag(simpadType);
-        osEntry["devices"] = QJsonArray({tag});
+        // Device tags for filtering (include cross-device compatibility)
+        osEntry["devices"] = DeviceDetection::getDeviceTags(deviceType, isVsi);
 
         // Icon based on device type
-        if (simpadType.contains("plus2", Qt::CaseInsensitive) ||
-            simpadType.contains("imx8", Qt::CaseInsensitive)) {
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
-        } else if (simpadType.contains("plus", Qt::CaseInsensitive) ||
-                   simpadType.contains("imx6", Qt::CaseInsensitive)) {
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
-        } else if (simpadType.contains("simman", Qt::CaseInsensitive)) {
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-        } else {
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
-        }
+        osEntry["icon"] = DeviceDetection::getIconPath(deviceType);
 
         // Source identifier
         osEntry["source"] = "laerdal_cdn";
@@ -138,47 +139,3 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
     return osList;
 }
 
-QString LaerdalCdnSource::mapSimpadTypeToTag(const QString &simpadType)
-{
-    QString type = simpadType.toLower();
-
-    if (type == "plus" || type == "imx6") {
-        return "imx6";
-    }
-    if (type == "plus2" || type == "imx8") {
-        return "imx8";
-    }
-    if (type.contains("simman") && type.contains("32")) {
-        return "simman3g-32";
-    }
-    if (type.contains("simman") && type.contains("64")) {
-        return "simman3g-64";
-    }
-
-    // Default to the type as-is
-    return type;
-}
-
-QString LaerdalCdnSource::getDisplayName(const QString &simpadType, const QString &version)
-{
-    QString type = simpadType.toLower();
-    QString deviceName;
-
-    if (type == "plus" || type == "imx6") {
-        deviceName = "SimPad Plus";
-    } else if (type == "plus2" || type == "imx8") {
-        deviceName = "SimPad Plus 2";
-    } else if (type.contains("simman") && type.contains("32")) {
-        deviceName = "SimMan 3G (32-bit)";
-    } else if (type.contains("simman") && type.contains("64")) {
-        deviceName = "SimMan 3G (64-bit)";
-    } else {
-        // Capitalize first letter
-        deviceName = simpadType;
-        if (!deviceName.isEmpty()) {
-            deviceName[0] = deviceName[0].toUpper();
-        }
-    }
-
-    return QString("%1 v%2").arg(deviceName, version);
-}

@@ -22,6 +22,7 @@
 #include "wlancredentials.h"
 #include "device_info.h"
 #include "platformquirks.h"
+#include "devicedetection.h"
 #ifndef CLI_ONLY_BUILD
 #include "iconimageprovider.h"
 #include "iconmultifetcher.h"
@@ -2009,7 +2010,6 @@ bool ImageWriter::checkSWCapability(const QString &cap) {
 
 namespace {
     // Convert Laerdal CDN "updates" format to standard "os_list" format
-    // This is placed here (before handleNetworkRequestFinished) to be visible when called
     QJsonArray convertLaerdalCdnFormat(const QJsonArray &updates) {
         QJsonArray osList;
 
@@ -2023,70 +2023,27 @@ namespace {
             QString info = update["info"].toString();
             QString releaseNotes = update["releasenotes"].toString();
 
-            // Create OS list entry
-            QJsonObject osEntry;
+            auto deviceType = DeviceDetection::detectFromCdnType(simpadType);
+            bool isVsi = url.toLower().endsWith(".vsi");
 
             // Name with device type and version
-            QString deviceName;
-            QString type = simpadType.toLower();
-            if (type == "plus" || type == "imx6") {
-                deviceName = "SimPad Plus";
-            } else if (type == "plus2" || type == "imx8") {
-                deviceName = "SimPad Plus 2";
-            } else if (type.contains("simman") && type.contains("32")) {
-                deviceName = "SimMan 3G (32-bit)";
-            } else if (type.contains("simman") && type.contains("64")) {
-                deviceName = "SimMan 3G (64-bit)";
-            } else {
+            QString deviceName = DeviceDetection::getDisplayName(deviceType);
+            if (deviceName.isEmpty()) {
                 deviceName = simpadType;
-                if (!deviceName.isEmpty()) {
+                if (!deviceName.isEmpty())
                     deviceName[0] = deviceName[0].toUpper();
-                }
             }
+
+            QJsonObject osEntry;
             osEntry["name"] = QString("%1 v%2").arg(deviceName, version);
-
-            // Description from info field
             osEntry["description"] = info.isEmpty() ? releaseNotes : info;
-
-            // Download URL
             osEntry["url"] = url;
-
-            // MD5 hash
             osEntry["extract_md5"] = md5;
-
-            // Mark as no customization support (WIC files don't support cloud-init)
             osEntry["init_format"] = "none";
-
-            // Device tag for filtering
-            QString tag;
-            if (type == "plus" || type == "imx6") {
-                tag = "imx6";
-            } else if (type == "plus2" || type == "imx8") {
-                tag = "imx8";
-            } else if (type.contains("simman") && type.contains("32")) {
-                tag = "simman3g-32";
-            } else if (type.contains("simman") && type.contains("64")) {
-                tag = "simman3g-64";
-            } else {
-                tag = type;
-            }
-            osEntry["devices"] = QJsonArray({tag});
-
-            // Icon based on device type
-            if (type.contains("plus2") || type.contains("imx8")) {
-                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
-            } else if (type.contains("plus") || type.contains("imx6")) {
-                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
-            } else if (type.contains("simman")) {
-                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-            } else {
-                osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
-            }
-
-            // Source identifier
+            osEntry["devices"] = DeviceDetection::getDeviceTags(deviceType, isVsi);
+            osEntry["icon"] = DeviceDetection::getIconPath(deviceType);
             osEntry["source"] = "laerdal_cdn";
 
-            // Full release notes if available
             if (!releaseNotes.isEmpty()) {
                 osEntry["release_notes"] = releaseNotes;
             }
@@ -2094,11 +2051,9 @@ namespace {
             osList.append(osEntry);
         }
 
-        // "Use custom" is only available in Device Selection, not here in OS Selection
-
         return osList;
     }
-} // anonymous namespace for convertLaerdalCdnFormat
+} // anonymous namespace
 
 void ImageWriter::onOsListFetchComplete(const QByteArray &data, const QUrl &url)
 {

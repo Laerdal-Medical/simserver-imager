@@ -72,18 +72,6 @@ private:
      */
     QJsonArray convertLaerdalFormat(const QJsonObject &laerdalJson);
 
-    /**
-     * @brief Map simpadtype to device tags
-     * @param simpadType The simpadtype field value
-     * @return Device tag (e.g., "imx6", "imx8")
-     */
-    QString mapSimpadTypeToTag(const QString &simpadType);
-
-    /**
-     * @brief Get display name for simpadtype
-     */
-    QString getDisplayName(const QString &simpadType, const QString &version);
-
     QNetworkAccessManager _networkManager;
     bool _isFetching = false;
 };

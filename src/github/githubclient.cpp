@@ -52,6 +52,9 @@ GitHubClient::~GitHubClient()
 
 void GitHubClient::cancelArtifactInspection(bool preserveForResume)
 {
+    // Set flag first — prevents the redirect handler from starting a new download
+    _inspectionCancelled = true;
+
     if (_activeInspectionReply) {
         qDebug() << "GitHubClient: Cancelling artifact inspection download, preserveForResume:" << preserveForResume;
 
@@ -88,8 +91,12 @@ void GitHubClient::cancelArtifactInspection(bool preserveForResume)
         _activeInspectionReply->abort();
         // Don't deleteLater here - the finished signal handler does that
         // Don't set to nullptr here - the finished handler does that
-        emit artifactInspectionCancelled();
+    } else {
+        qDebug() << "GitHubClient: cancelArtifactInspection called but no active reply"
+                 << "(may be between redirect and download start)";
     }
+
+    emit artifactInspectionCancelled();
 }
 
 void GitHubClient::setAuthToken(const QString &token)
@@ -438,6 +445,8 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
 {
     qDebug() << "GitHubClient: Inspecting artifact contents for" << artifactName << "id:" << artifactId;
 
+    _inspectionCancelled = false;
+
     // Create cache directory for artifact download (persistent across sessions)
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QString artifactCacheDir = cacheDir + "/artifacts";
@@ -473,6 +482,12 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
     connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
         _activeInspectionReply = nullptr;
         reply->deleteLater();
+
+        // Don't start the redirect download if inspection was cancelled
+        if (_inspectionCancelled) {
+            qDebug() << "GitHubClient: Inspection cancelled, not following redirect";
+            return;
+        }
 
         // Check for redirect (302)
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -514,6 +529,11 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
                                            qint64 artifactId, const QString &artifactName,
                                            const QString &branch, const QString &zipPath)
 {
+    if (_inspectionCancelled) {
+        qDebug() << "GitHubClient: inspectArtifactFromUrl skipped - inspection was cancelled";
+        return;
+    }
+
     QString partialPath = zipPath + ".partial";
 
     // Check if we're resuming a partial download
@@ -807,6 +827,8 @@ void GitHubClient::inspectArtifactSpuContents(const QString &owner, const QStrin
                                                const QString &branch)
 {
     qDebug() << "GitHubClient: Inspecting artifact for SPU contents:" << artifactName;
+
+    _inspectionCancelled = false;
 
     // Get the download URL
     QString downloadUrl = getArtifactDownloadUrl(owner, repo, artifactId);

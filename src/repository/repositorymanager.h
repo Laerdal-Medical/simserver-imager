@@ -253,6 +253,15 @@ public:
                                          const QString &owner, const QString &repo,
                                          const QString &branch);
 
+    /**
+     * @brief Check if a file is compatible with a selected device (for QML asset filtering)
+     *
+     * Delegates to DeviceDetection::isFileCompatibleWithDevice().
+     * Generic files (no device pattern in name) are compatible with all devices.
+     */
+    Q_INVOKABLE bool isFileCompatibleWithDevice(const QString &filename,
+                                                 const QString &deviceTag) const;
+
 signals:
     /**
      * @brief Emitted when artifact inspection is cancelled

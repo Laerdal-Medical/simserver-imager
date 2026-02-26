@@ -419,6 +419,7 @@ private:
     QHash<QNetworkReply*, RunInfo> _artifactRunInfo;
 
     // Track ongoing artifact inspection download for cancellation and resume
+    bool _inspectionCancelled = false;  // Prevents starting redirect download after cancel
     QNetworkReply *_activeInspectionReply = nullptr;
     QString _activeInspectionZipPath;  // Final path for the completed download
     QString _activeInspectionPartialPath;  // Partial file path during download

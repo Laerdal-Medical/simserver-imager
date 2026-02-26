@@ -6,6 +6,7 @@
 #include "repositorymanager.h"
 #include "laerdalcdnsource.h"
 #include "../github/githubclient.h"
+#include "../devicedetection.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
@@ -651,37 +652,34 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
 
         // Determine compatible devices and icon from assets
         QSet<QString> deviceSet;
-        QString icon = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
+        QString icon = DeviceDetection::getIconPath(DeviceDetection::DeviceType::Unknown);
 
         for (const auto &assetValue : assets) {
             QJsonObject asset = assetValue.toObject();
-            QString assetName = asset["name"].toString().toLower();
+            QString assetName = asset["name"].toString();
+            bool isVsi = assetName.toLower().endsWith(".vsi");
 
-            // Detect device from each asset filename
-            if (assetName.contains("simman3g-64") || assetName.contains("simman-64")) {
-                deviceSet.insert("simman3g-64");
-                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-            } else if (assetName.contains("simman3g-32") || assetName.contains("simman-32")) {
-                deviceSet.insert("simman3g-32");
-                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-            } else if (assetName.contains("linkbox2")) {
-                deviceSet.insert("linkbox2");
-            } else if (assetName.contains("linkbox")) {
-                deviceSet.insert("linkbox");
-            } else if (assetName.contains("cancpu2")) {
-                deviceSet.insert("cancpu2");
-            } else if (assetName.contains("cancpu")) {
-                deviceSet.insert("cancpu");
-            } else if (assetName.contains("imx8") || assetName.contains("simpad2")) {
-                deviceSet.insert("imx8");
-                deviceSet.insert("linkbox2");
-                deviceSet.insert("cancpu2");
-                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
-            } else if (assetName.contains("imx6") || assetName.contains("simpad")) {
-                deviceSet.insert("imx6");
-                deviceSet.insert("linkbox");
-                deviceSet.insert("cancpu");
-                if (icon.contains("use_custom")) icon = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
+            auto type = DeviceDetection::detectFromFilename(assetName);
+            if (type != DeviceDetection::DeviceType::Unknown) {
+                QJsonArray devTags = DeviceDetection::getDeviceTags(type, isVsi);
+                for (const auto &t : devTags)
+                    deviceSet.insert(t.toString());
+                if (icon.contains("use_custom"))
+                    icon = DeviceDetection::getIconPath(type);
+            }
+        }
+
+        // Fall back to release name/tag for device detection when
+        // asset filenames don't contain device identifiers
+        if (deviceSet.isEmpty()) {
+            auto type = DeviceDetection::detectFromFilename(releaseName);
+            if (type == DeviceDetection::DeviceType::Unknown)
+                type = DeviceDetection::detectFromFilename(tag);
+            if (type != DeviceDetection::DeviceType::Unknown) {
+                QJsonArray devTags = DeviceDetection::getDeviceTags(type, false);
+                for (const auto &t : devTags)
+                    deviceSet.insert(t.toString());
+                icon = DeviceDetection::getIconPath(type);
             }
         }
 
@@ -746,49 +744,9 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         osEntry["source_repo_name"] = wic["repo"].toString();
 
         // Set devices array and icon based on artifact name
-        // SimPad: imx6 = SimPad Plus, imx8 = SimPad Plus 2
-        // SimMan: simman3g-64 = 64-bit, simman3g-32 = 32-bit
-        // WIC images for SimPad Plus also work on LinkBox and CANCPU devices
-        QJsonArray devices;
-
-        if (artifactNameLower.contains("simman3g-64") || artifactNameLower.contains("simman-64")) {
-            devices.append("simman3g-64");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-        } else if (artifactNameLower.contains("simman3g-32") || artifactNameLower.contains("simman-32")) {
-            devices.append("simman3g-32");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simman3g.png";
-        } else if (artifactNameLower.contains("linkbox2")) {
-            devices.append("linkbox2");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox2.png";
-        } else if (artifactNameLower.contains("linkbox")) {
-            devices.append("linkbox");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/linkbox.png";
-        } else if (artifactNameLower.contains("cancpu2")) {
-            devices.append("cancpu2");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu2.png";
-        } else if (artifactNameLower.contains("cancpu")) {
-            devices.append("cancpu");
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/cancpu.png";
-        } else if (artifactNameLower.contains("imx8") || artifactNameLower.contains("simpad2")) {
-            devices.append("imx8");
-            // WIC images for SimPad Plus 2 also work on LinkBox2 and CANCPU2
-            if (!isVsi) {
-                devices.append("linkbox2");
-                devices.append("cancpu2");
-            }
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus2.png";
-        } else if (artifactNameLower.contains("imx6") || artifactNameLower.contains("simpad")) {
-            devices.append("imx6");
-            // WIC images for SimPad Plus also work on LinkBox and CANCPU
-            if (!isVsi) {
-                devices.append("linkbox");
-                devices.append("cancpu");
-            }
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/simpad_plus.png";
-        } else {
-            osEntry["icon"] = "qrc:/qt/qml/RpiImager/icons/use_custom.png";
-        }
-        osEntry["devices"] = devices;
+        auto deviceType = DeviceDetection::detectFromFilename(artifactName);
+        osEntry["devices"] = DeviceDetection::getDeviceTags(deviceType, isVsi);
+        osEntry["icon"] = DeviceDetection::getIconPath(deviceType);
 
         _githubOsList.append(osEntry);
     }
@@ -898,33 +856,7 @@ void RepositoryManager::checkRefreshComplete()
 
 QString RepositoryManager::extractDeviceName(const QString &text)
 {
-    QString lower = text.toLower();
-
-    // Check most specific patterns first, then broader ones
-    if (lower.contains("simman3g-64") || lower.contains("simman-64")) {
-        return QStringLiteral("SimMan 3G (64-bit)");
-    } else if (lower.contains("simman3g-32") || lower.contains("simman-32")) {
-        return QStringLiteral("SimMan 3G (32-bit)");
-    } else if (lower.contains("simman3g") || lower.contains("simman")) {
-        return QStringLiteral("SimMan 3G");
-    } else if (lower.contains("linkbox2")) {
-        return QStringLiteral("LinkBox 2");
-    } else if (lower.contains("linkbox")) {
-        return QStringLiteral("LinkBox");
-    } else if (lower.contains("cancpu2")) {
-        return QStringLiteral("CANCPU 2");
-    } else if (lower.contains("cancpu")) {
-        return QStringLiteral("CANCPU");
-    } else if (lower.contains("imx8") || lower.contains("simpad-plus2") || lower.contains("simpad_plus2")
-               || lower.contains("simpad plus 2") || lower.contains("simpadplus2")
-               || lower.contains("simpad2")) {
-        return QStringLiteral("SimPad Plus 2");
-    } else if (lower.contains("imx6") || lower.contains("simpad-plus") || lower.contains("simpad_plus")
-               || lower.contains("simpad plus") || lower.contains("simpadplus")
-               || lower.contains("simpad")) {
-        return QStringLiteral("SimPad Plus");
-    }
-    return QString();
+    return DeviceDetection::getDisplayName(DeviceDetection::detectFromFilename(text));
 }
 
 QString RepositoryManager::extractVersion(const QString &text)
@@ -1112,6 +1044,12 @@ void RepositoryManager::cancelArtifactInspection()
         setStatusMessage(tr("Download cancelled"));
         emit artifactInspectionCancelled();
     }
+}
+
+bool RepositoryManager::isFileCompatibleWithDevice(const QString &filename,
+                                                    const QString &deviceTag) const
+{
+    return DeviceDetection::isFileCompatibleWithDevice(filename, deviceTag);
 }
 
 void RepositoryManager::inspectSpuArtifact(qint64 artifactId, const QString &artifactName,

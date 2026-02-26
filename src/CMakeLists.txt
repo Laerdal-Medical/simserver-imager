@@ -334,7 +334,9 @@ set(SOURCES_BASE
     # Laerdal repository management
     "repository/repositorymanager.cpp"
     "repository/laerdalcdnsource.cpp"
-    "repository/githubsource.cpp")
+    "repository/githubsource.cpp"
+    # Laerdal device detection utilities
+    "devicedetection.cpp")
 
 # Add GUI-specific sources only for non-CLI builds
 if(BUILD_CLI_ONLY)
