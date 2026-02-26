@@ -257,37 +257,9 @@ void RepositoryManager::setArtifactBranchFilter(const QString &branch)
         emit artifactBranchFilterChanged();
         qDebug() << "RepositoryManager: Artifact branch filter set to:" << branch;
 
-        // Handle filter change - only relevant for github-ci source type
-        if (_githubClient && _selectedSourceType == "github-ci") {
-            // Clear existing GitHub artifacts (keep releases in storage)
-            QJsonArray releasesOnly;
-            for (const auto &item : _githubOsList) {
-                QJsonObject obj = item.toObject();
-                if (obj["source_type"].toString() == "release") {
-                    releasesOnly.append(item);
-                }
-            }
-            _githubOsList = releasesOnly;
-
-            // Re-fetch artifacts with new branch
-            _pendingRefreshCount = 0;
-            for (const auto &repo : _githubRepos) {
-                if (repo.enabled) {
-                    _pendingRefreshCount++;
-                    QString branchToFetch = branch.isEmpty() ? repo.defaultBranch : branch;
-                    _githubClient->searchWicFilesInArtifacts(repo.owner, repo.repo, branchToFetch);
-                }
-            }
-
-            if (_pendingRefreshCount > 0) {
-                setLoading(true);
-                qDebug() << "RepositoryManager: Branch filter refresh started, pending:" << _pendingRefreshCount;
-            } else {
-                // No enabled repos, complete immediately
-                setLoading(false);
-                emit osListReady();
-            }
-        }
+        // Note: callers are expected to call refreshAllSources() after this
+        // to fetch artifacts with the new branch filter. We don't start
+        // fetches here to avoid race conditions with overlapping requests.
     }
 }
 
@@ -353,6 +325,7 @@ void RepositoryManager::refreshAllSources()
 
     _cdnOsList = QJsonArray();
     _githubOsList = QJsonArray();
+
     _pendingRefreshCount = 1; // CDN source
 
     // Count enabled GitHub repos (releases + artifacts = 2 requests per repo)

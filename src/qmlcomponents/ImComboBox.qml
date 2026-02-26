@@ -56,7 +56,23 @@ ComboBox {
     // Configuration
     selectTextByMouse: true
     editable: false
-    
+
+    // For editable combos with our custom popup, Qt's internal Enter handling
+    // can't close the popup. Connect to the text field's accepted signal to
+    // select the highlighted item and close the popup.
+    Connections {
+        target: root.editable ? root.contentItem : null
+        function onAccepted() {
+            if (root.popup.visible) {
+                var listView = root.popup.contentItem
+                if (listView && listView.currentIndex >= 0 && listView.currentIndex < root.count) {
+                    root.currentIndex = listView.currentIndex
+                }
+                root.popup.close()
+            }
+        }
+    }
+
     // Clear search when popup closes
     onPopupChanged: {
         if (!popup.visible) {
@@ -284,14 +300,15 @@ ComboBox {
     // Note: Key handling for open popup is left to the focused items inside the popup
     
     // Handle Enter/Return to open popup when ComboBox is focused (but popup closed)
+    // For editable combos, let Enter submit the text (triggers onAccepted) instead
     Keys.onReturnPressed: (event) => {
-        if (!popup.visible) {
+        if (!popup.visible && !root.editable) {
             popup.open()
             event.accepted = true
         }
     }
     Keys.onEnterPressed: (event) => {
-        if (!popup.visible) {
+        if (!popup.visible && !root.editable) {
             popup.open()
             event.accepted = true
         }

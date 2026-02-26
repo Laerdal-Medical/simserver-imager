@@ -408,8 +408,15 @@ bool OSListModel::reload()
 
     QJsonArray list = parseOSJson(root);
     if (list.isEmpty()) {
-        emit eventOsListParse(static_cast<quint32>(parseTimer.elapsed()), false);
-        return false;
+        // Empty list is valid (e.g., no CI artifacts for selected branch).
+        // Clear the model so stale items from a previous view don't persist.
+        if (!_osList.isEmpty()) {
+            beginResetModel();
+            _osList.clear();
+            endResetModel();
+        }
+        emit eventOsListParse(static_cast<quint32>(parseTimer.elapsed()), true);
+        return true;
     }
 
     // Get the preferred architecture from the currently selected device

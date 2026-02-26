@@ -405,6 +405,13 @@ WizardStepBase {
                         // Make editable so user can type to filter and see their input
                         editable: true
 
+                        // Select all text when field gains focus for easy re-editing
+                        onActiveFocusChanged: {
+                            if (activeFocus && contentItem) {
+                                contentItem.selectAll()
+                            }
+                        }
+
                         // Use a stable internal copy of branches to avoid model updates while popup is open
                         // This prevents focus loss during typing when branches are being fetched
                         property var availableBranches: []
@@ -452,12 +459,6 @@ WizardStepBase {
                             currentIndex = 0
                         }
 
-                        // Initialize with current branches
-                        Component.onCompleted: {
-                            availableBranches = pendingBranches
-                            syncCurrentIndexToSelectedBranch()
-                        }
-
                         model: {
                             // "Default branch" shows CI artifacts from repo default branch
                             // Other branches show CI artifacts from that specific branch
@@ -469,22 +470,33 @@ WizardStepBase {
                         // to prevent it from being reset when the model changes
                         currentIndex: 0
 
+                        // Track the popup highlight during filtering, separate from
+                        // currentIndex to avoid overwriting editText while typing
+                        property int _matchedIndex: -1
+                        property bool _filtering: false
+
                         // Handle text input for filtering - find and highlight matching branch
                         onEditTextChanged: {
+                            if (_filtering) return
                             if (!editText || editText.trim() === "") {
+                                _matchedIndex = -1
                                 return
                             }
+                            _filtering = true
                             var searchText = editText.trim().toLowerCase()
                             var branches = model
 
                             // Find first matching branch (case-insensitive prefix match)
                             for (var i = 0; i < branches.length; i++) {
                                 if (branches[i].toLowerCase().startsWith(searchText)) {
-                                    currentIndex = i
-                                    // If popup is open, scroll to highlight the match
+                                    _matchedIndex = i
+                                    // Only update popup highlight - don't set currentIndex
+                                    // (setting currentIndex overwrites editText in editable combos)
                                     if (popup.visible && popup.contentItem) {
                                         popup.contentItem.currentIndex = i
+                                        popup.contentItem.positionViewAtIndex(i, ListView.Center)
                                     }
+                                    _filtering = false
                                     return
                                 }
                             }
@@ -492,27 +504,49 @@ WizardStepBase {
                             // No prefix match - try contains match
                             for (var j = 0; j < branches.length; j++) {
                                 if (branches[j].toLowerCase().indexOf(searchText) >= 0) {
-                                    currentIndex = j
+                                    _matchedIndex = j
                                     if (popup.visible && popup.contentItem) {
                                         popup.contentItem.currentIndex = j
+                                        popup.contentItem.positionViewAtIndex(j, ListView.Center)
                                     }
+                                    _filtering = false
                                     return
                                 }
                             }
+
+                            // No match found
+                            _matchedIndex = -1
+                            _filtering = false
                         }
 
-                        // Handle when user accepts typed text (Enter key) or selects from dropdown
-                        onAccepted: {
-                            // User pressed Enter with typed text - use it as branch filter
-                            var typedText = editText.trim()
-                            if (root.repoManager) {
-                                if (typedText === "" || typedText === qsTr("Default branch")) {
+                        function applyFilterAndAdvance() {
+                            // Use _matchedIndex from typing, fall back to currentIndex
+                            // (which ImComboBox sets from the popup highlight on Enter)
+                            var selectedIndex = _matchedIndex >= 0 ? _matchedIndex : currentIndex
+                            console.log("applyFilterAndAdvance: _matchedIndex =", _matchedIndex,
+                                        "currentIndex =", currentIndex, "selectedIndex =", selectedIndex)
+
+                            if (root.repoManager && selectedIndex >= 0 && selectedIndex < model.length) {
+                                if (selectedIndex === 0) {
                                     selectedBranchName = ""
                                     root.repoManager.setArtifactBranchFilter("")
                                 } else {
-                                    selectedBranchName = typedText
-                                    root.repoManager.setArtifactBranchFilter(typedText)
+                                    selectedBranchName = availableBranches[selectedIndex - 1]
+                                    root.repoManager.setArtifactBranchFilter(selectedBranchName)
                                 }
+                                currentIndex = selectedIndex
+                            }
+                            _matchedIndex = -1
+                            root.nextClicked()
+                        }
+
+                        // Connect to text field's accepted signal in onCompleted
+                        // to ensure contentItem is fully initialized
+                        Component.onCompleted: {
+                            availableBranches = pendingBranches
+                            syncCurrentIndexToSelectedBranch()
+                            if (contentItem && contentItem.accepted) {
+                                contentItem.accepted.connect(applyFilterAndAdvance)
                             }
                         }
 
