@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  QT_VERSION: '6.8.2'
+  QT_VERSION: '6.10.1'
   BUILD_TYPE: MinSizeRel
 
 jobs:
