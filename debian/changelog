@@ -1,3 +1,14 @@
+laerdal-simserver-imager (1.0.9) stable; urgency=medium
+
+  * GitHub Releases as top-level source type alongside CDN and GitHub CI
+  * Branch filter ComboBox usability: typing no longer jumps cursor, Enter
+    selects and advances, focus selects all text for quick re-editing
+  * Centralized device detection with improved CANCPU/LinkBox filtering
+  * Fix: Stale OS list items no longer persist when switching source types
+    or branches — model properly clears on empty results
+
+ -- Laerdal Medical <support@laerdal.com>  Wed, 26 Feb 2026 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.8) stable; urgency=medium
 
   * SPU Copy Speed Display: Show transfer speed (MB/s), bytes transferred, and
