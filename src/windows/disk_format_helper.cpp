@@ -132,7 +132,7 @@ FormatResult formatDeviceFat32(const QString &device, const QString &volumeLabel
     // Convert device path for DiskFormatter (it expects "\\\\.\\PhysicalDriveN" format)
     std::string devicePath = device.toStdString();
 
-    auto formatResult = formatter.FormatDrive(devicePath);
+    auto formatResult = formatter.FormatDrive(devicePath, volumeLabel.toStdString());
     if (!formatResult) {
         qWarning() << "DiskFormatHelper: DiskFormatter failed with error:" << static_cast<int>(formatResult.error());
         result.errorMessage = "Failed to write FAT32 filesystem to drive";

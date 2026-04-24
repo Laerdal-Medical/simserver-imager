@@ -76,10 +76,11 @@ class Result<void> {
 // Configuration for FAT32 formatting
 struct Fat32Config {
   std::uint32_t total_sectors;
+  std::uint32_t partition_start_sector = 0;  // LBA of partition start; written into hidden_sectors BPB field
   std::uint32_t sectors_per_cluster = 8;  // 4KB clusters
   std::uint16_t reserved_sectors = 32;
   std::uint8_t num_fats = 2;
-  std::string volume_label = "BOOT";       // More Pi-appropriate than "SDCARD"
+  std::string volume_label = "BOOT";
   std::uint32_t volume_id = 0x12345678;
 };
 
@@ -160,7 +161,8 @@ class DiskFormatter {
   DiskFormatter& operator=(DiskFormatter&&) = default;
 
   // Format a device with MBR partition table and FAT32 filesystem
-  Result<void> FormatDrive(const std::string& device_path);
+  Result<void> FormatDrive(const std::string& device_path,
+                           const std::string& volume_label = "BOOT");
 
   // Format to a file for testing
   Result<void> FormatFile(
@@ -183,7 +185,8 @@ class DiskFormatter {
   // Write FAT32 filesystem
   Result<void> WriteFat32(
       std::uint32_t partition_start_sector,
-      std::uint32_t partition_size_sectors) const;
+      std::uint32_t partition_size_sectors,
+      const std::string& volume_label) const;
 
   // Helper functions
   Result<void> WriteBootSector(

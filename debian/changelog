@@ -1,3 +1,14 @@
+laerdal-simserver-imager (1.0.10) stable; urgency=medium
+
+  * Fix: FAT32 backup boot sector written at correct sector (6) on Windows;
+    backup previously landed at sector 16 causing firmware to reject volumes
+  * Fix: FAT32 hidden_sectors BPB field now correctly reflects partition start
+    in backup boot sector copy (Windows DiskFormatter path)
+  * Fix: Drive volume label now correctly set to "LAERDAL" on Windows (was
+    hardcoded "BOOT")
+
+ -- Laerdal Medical <support@laerdal.com>  Thu, 24 Apr 2026 14:00:00 +0000
+
 laerdal-simserver-imager (1.0.9) stable; urgency=medium
 
   * GitHub Releases as top-level source type alongside CDN and GitHub CI

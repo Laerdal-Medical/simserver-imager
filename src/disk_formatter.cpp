@@ -105,7 +105,8 @@ FormatError DiskFormatter::ConvertError(FileError error) const {
   return ConvertFileError(error);
 }
 
-Result<void> DiskFormatter::FormatDrive(const std::string& device_path) {
+Result<void> DiskFormatter::FormatDrive(const std::string& device_path,
+                                       const std::string& volume_label) {
   // Pre-format checks for Windows physical drives
 #ifdef _WIN32
   if (device_path.find("\\\\.\\PHYSICALDRIVE") == 0) {
@@ -139,7 +140,7 @@ Result<void> DiskFormatter::FormatDrive(const std::string& device_path) {
   std::uint32_t partition_size_sectors = total_sectors - kPartitionStartSector;
 
   // Write FAT32 filesystem
-  return WriteFat32(kPartitionStartSector, partition_size_sectors);
+  return WriteFat32(kPartitionStartSector, partition_size_sectors, volume_label);
 }
 
 Result<void> DiskFormatter::FormatFile(
@@ -162,7 +163,7 @@ Result<void> DiskFormatter::FormatFile(
   std::uint32_t partition_size_sectors = total_sectors - kPartitionStartSector;
 
   // Write FAT32 filesystem
-  return WriteFat32(kPartitionStartSector, partition_size_sectors);
+  return WriteFat32(kPartitionStartSector, partition_size_sectors, "BOOT");
 }
 
 Result<void> DiskFormatter::WriteMbr(
@@ -228,10 +229,13 @@ Result<void> DiskFormatter::WriteMbr(
 
 Result<void> DiskFormatter::WriteFat32(
     std::uint32_t partition_start_sector,
-    std::uint32_t partition_size_sectors) const {
-  
+    std::uint32_t partition_size_sectors,
+    const std::string& volume_label) const {
+
   Fat32Config config = CalculateFat32Config(partition_size_sectors);
   config.total_sectors = partition_size_sectors;
+  config.volume_label = volume_label;
+  config.partition_start_sector = partition_start_sector;
 
   // Write boot sector
   if (auto result = WriteBootSector(partition_start_sector, config); !result) {
@@ -243,8 +247,9 @@ Result<void> DiskFormatter::WriteFat32(
     return result;
   }
 
-  // Write backup boot sector
-  if (auto result = WriteBootSector(partition_start_sector + config.reserved_sectors / 2, config); !result) {
+  // Write backup boot sector at sector 6 relative to partition start, matching the
+  // backup_boot_sector BPB field value of 6 set in WriteBootSector.
+  if (auto result = WriteBootSector(partition_start_sector + 6, config); !result) {
     return result;
   }
 
@@ -286,7 +291,7 @@ Result<void> DiskFormatter::WriteBootSector(
   boot_sector.sectors_per_fat_16 = 0;  // FAT32
   boot_sector.sectors_per_track = ToLittleEndian(static_cast<std::uint16_t>(63));
   boot_sector.num_heads = ToLittleEndian(static_cast<std::uint16_t>(255));
-  boot_sector.hidden_sectors = ToLittleEndian(static_cast<std::uint32_t>(offset_sectors));
+  boot_sector.hidden_sectors = ToLittleEndian(static_cast<std::uint32_t>(config.partition_start_sector));
   boot_sector.total_sectors_32 = ToLittleEndian(config.total_sectors);
 
   // FAT32 specific fields

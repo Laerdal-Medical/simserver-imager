@@ -14,3 +14,5 @@
 ### Bug Fixes
 
 - **Stale OS List Items**: Fixed Release items persisting in the CI Artifact view (and vice versa) when switching source types or branches — the model now properly clears when there are no matching results
+- **FAT32 Backup Boot Sector (Windows)**: Fixed backup boot sector being written at the wrong sector offset (16 instead of 6) and containing an incorrect `hidden_sectors` BPB field — firmware that validates the backup sector no longer rejects the volume
+- **FAT32 Volume Label (Windows)**: Drive is now correctly labeled "LAERDAL" instead of hardcoded "BOOT" when formatting on Windows

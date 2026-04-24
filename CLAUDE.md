@@ -219,7 +219,7 @@ The CMakeLists.txt is located in the `src/` directory. When configuring, use `-S
 
 When running CMake, always use the following settings:
 
-- **Qt 6 Location**: Qt is installed at `/opt/Qt/`. Look for available versions in `/opt/Qt/6.*/gcc_64` and use the latest one. Currently using `/opt/Qt/6.10.1/gcc_64`.
+- **Qt 6 Location**: Qt is installed at `/home/viktor/Qt/`. Look for available versions in `/home/viktor/Qt/6.*/gcc_64` and use the latest one. Currently using `/home/viktor/Qt/6.11.0/gcc_64`.
 - **Parallel Builds**: Always use `--parallel` flag with cmake build commands
 
 Example commands:
@@ -229,7 +229,7 @@ Example commands:
 ls -d /opt/Qt/6.*/gcc_64
 
 # Configure (use the latest available Qt version)
-cmake -B build -S src -DCMAKE_PREFIX_PATH=/opt/Qt/6.10.1/gcc_64
+cmake -B build -S src -DCMAKE_PREFIX_PATH=/home/viktor/Qt/6.11.0/gcc_64
 
 # Build (always use --parallel)
 cmake --build build --parallel
