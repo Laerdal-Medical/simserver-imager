@@ -146,10 +146,16 @@ WizardStepBase {
             highlightFollowsCurrentItem: false
             
             onItemSelected: function(index, item) {
-                console.log("StorageSelectionStep: onItemSelected called, index:", index, "item:", item)
+                console.log("StorageSelectionStep: onItemSelected called, index:", index,
+                            "item.device:", (item && item.device !== undefined) ? item.device : "(no device prop)",
+                            "has selectDrive:", (item && typeof item.selectDrive === "function"))
                 if (index >= 0 && index < dstlist.count) {
-                    // Try to use the delegate item if available
-                    if (item && typeof item.selectDrive === "function") {
+                    // Prefer direct device access on the item (avoids any ID-resolution
+                    // ambiguity inside selectDrive() when pragma ComponentBehavior: Bound
+                    // is in effect across multiple delegate instances)
+                    if (item && typeof item.device === "string" && item.device.length > 0) {
+                        root.selectDstItem(item)
+                    } else if (item && typeof item.selectDrive === "function") {
                         item.selectDrive()
                     } else {
                         // Fallback: get data directly from the model
@@ -162,10 +168,10 @@ WizardStepBase {
             }
             
             onItemDoubleClicked: function(index, item) {
-                console.log("StorageSelectionStep: onItemDoubleClicked called!")
+                console.log("StorageSelectionStep: onItemDoubleClicked called, device:", item ? item.device : "(null)")
                 // First select the item
-                if (index >= 0 && index < count && item && typeof item.selectDrive === "function") {
-                    item.selectDrive()
+                if (index >= 0 && index < count && item && typeof item.device === "string" && item.device.length > 0) {
+                    root.selectDstItem(item)
 
                     // Then advance to next step if possible (same as pressing Return)
                     Qt.callLater(function() {
@@ -285,12 +291,16 @@ WizardStepBase {
             required property bool isReadOnly
             required property bool isSystem
             required property var mountpoints
-            required property QtObject modelData
 
             // Expose isSystem for system drive confirmation
             readonly property bool unselectable: isReadOnly
 
-            // Function called by keyboard selection
+            Component.onCompleted: {
+                console.log("StorageSelectionStep: delegate created - index:", dstitem.index, "device:", dstitem.device)
+            }
+
+            // Function called by keyboard selection (direct device reference avoids
+            // any ID-resolution ambiguity under pragma ComponentBehavior: Bound)
             function selectDrive() {
                 if (!unselectable) {
                     root.selectDstItem(dstitem)
@@ -318,6 +328,7 @@ WizardStepBase {
     
     // Storage selection function
     function selectDstItem(dstitem) {
+        console.log("StorageSelectionStep: selectDstItem called, device:", dstitem.device, "description:", dstitem.description)
         if (dstitem.unselectable) {
             return
         }

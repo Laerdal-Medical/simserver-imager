@@ -273,7 +273,8 @@ Item {
         enabled: !root.isDisabled
 
         onClicked: {
-            console.log("MouseArea onClicked for delegateIndex:", root.delegateIndex)
+            console.log("MouseArea onClicked for delegateIndex:", root.delegateIndex,
+                        "itemTitle:", root.itemTitle)
             if (root.parentListView && !root.isDisabled) {
                 if (root.parentListView.currentSelectionIsFromMouse !== undefined) {
                     root.parentListView.currentSelectionIsFromMouse = true

@@ -6,6 +6,8 @@ laerdal-simserver-imager (1.0.10) stable; urgency=medium
     in backup boot sector copy (Windows DiskFormatter path)
   * Fix: Drive volume label now correctly set to "LAERDAL" on Windows (was
     hardcoded "BOOT")
+  * Fix: Storage selection with multiple drives now writes to the clicked drive
+    instead of always selecting the first drive in the list
 
  -- Laerdal Medical <support@laerdal.com>  Thu, 24 Apr 2026 14:00:00 +0000
 
