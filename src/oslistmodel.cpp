@@ -18,18 +18,19 @@
 #include <QUrl>
 #include <QFileInfo>
 #include <QElapsedTimer>
+#include <cstdint>
 
 namespace {
 
     // Extract version tuple from name string (e.g., "SimPad Plus v9.2.0.127" -> {9, 2, 0, 127})
     // Returns empty list if no version found
-    QList<int> extractVersionFromName(const QString &name) {
+    QList<std::int32_t> extractVersionFromName(const QString &name) {
         // Match version pattern: vX.Y.Z.B or X.Y.Z.B (with optional 'v' prefix)
         static QRegularExpression versionRegex(R"(v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?)");
         QRegularExpressionMatch match = versionRegex.match(name);
 
         if (match.hasMatch()) {
-            QList<int> version;
+            QList<std::int32_t> version;
             version.append(match.captured(1).toInt());  // Major
             version.append(match.captured(2).toInt());  // Minor
             version.append(match.captured(3).toInt());  // Patch
@@ -44,12 +45,12 @@ namespace {
     }
 
     // Compare two version tuples, returns true if a > b (for descending sort)
-    bool isVersionGreater(const QList<int> &a, const QList<int> &b) {
+    bool isVersionGreater(const QList<std::int32_t> &a, const QList<std::int32_t> &b) {
         if (a.isEmpty() && b.isEmpty()) return false;
         if (a.isEmpty()) return false;  // Items without version go last
         if (b.isEmpty()) return true;   // Items without version go last
 
-        for (int i = 0; i < qMin(a.size(), b.size()); ++i) {
+        for (std::int32_t i = 0; i < qMin(a.size(), b.size()); ++i) {
             if (a[i] > b[i]) return true;
             if (a[i] < b[i]) return false;
         }
@@ -80,24 +81,42 @@ namespace {
             }
         }
 
-        // Sort regular items: releases first, then CI artifacts, each group sorted by version descending
+        // Sort regular items into groups: GitHub releases first, then
+        // main-branch CI artifacts, then everything else (feature-branch
+        // artifacts, CDN images). Releases and feature-branch builds are sorted
+        // by version descending; main-branch CI builds are sorted by date
+        // descending (see below).
         std::stable_sort(regularItems.begin(), regularItems.end(), [](const QJsonValue &a, const QJsonValue &b) {
             QJsonObject objA = a.toObject();
             QJsonObject objB = b.toObject();
 
-            // Primary sort: releases before CI artifacts
-            // source_type: "release" = GitHub release, "artifact" = CI artifact
-            QString sourceTypeA = objA["source_type"].toString();
-            QString sourceTypeB = objB["source_type"].toString();
-            bool isReleaseA = (sourceTypeA == "release");
-            bool isReleaseB = (sourceTypeB == "release");
+            // Group ordering. source_type: "release" = GitHub release,
+            // "artifact" = CI artifact (CDN images have no source_type).
+            auto groupRank = [](const QJsonObject &o) -> std::int32_t {
+                if (o["source_type"].toString() == "release") return 0;
+                if (o["source_type"].toString() == "artifact" && o["branch"].toString() == "main") return 1;
+                return 2;
+            };
 
-            if (isReleaseA && !isReleaseB) return true;   // Releases first
-            if (!isReleaseA && isReleaseB) return false;
+            std::int32_t rankA = groupRank(objA);
+            std::int32_t rankB = groupRank(objB);
+            if (rankA != rankB) return rankA < rankB;
+
+            // Main-branch CI builds are sorted by date (newest first). Their
+            // embedded build numbers come from independent CI runs across
+            // repositories (e.g. simserver-mcbapp, simpad-app-next) and are not
+            // comparable to each other, so the highest number is not the newest
+            // build. The artifact creation date is the reliable ordering key.
+            if (rankA == 1) {
+                QString dateA = objA["release_date"].toString();
+                QString dateB = objB["release_date"].toString();
+                if (dateA != dateB) return dateA > dateB;
+                // Fall through to version comparison as a tiebreaker
+            }
 
             // Secondary sort: by version descending
-            QList<int> versionA = extractVersionFromName(objA["name"].toString());
-            QList<int> versionB = extractVersionFromName(objB["name"].toString());
+            QList<std::int32_t> versionA = extractVersionFromName(objA["name"].toString());
+            QList<std::int32_t> versionB = extractVersionFromName(objB["name"].toString());
 
             // Items without version go last, use release_date as tiebreaker
             if (versionA.isEmpty() && versionB.isEmpty()) {
@@ -130,7 +149,7 @@ namespace {
         // Log the first item after sorting to verify
         if (!list.isEmpty()) {
             QJsonObject first = list[0].toObject();
-            QList<int> firstVersion = extractVersionFromName(first["name"].toString());
+            QList<std::int32_t> firstVersion = extractVersionFromName(first["name"].toString());
             QString versionStr = firstVersion.isEmpty() ? "no version" :
                 QString("%1.%2.%3.%4").arg(firstVersion[0]).arg(firstVersion[1])
                     .arg(firstVersion[2]).arg(firstVersion.size() > 3 ? firstVersion[3] : 0);
