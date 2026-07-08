@@ -1,3 +1,15 @@
+laerdal-simserver-imager (1.0.11) stable; urgency=medium
+
+  * Improve OS list ordering: GitHub releases first, then main-branch CI
+    builds sorted by date (newest first), then feature-branch builds and CDN
+    images by version. Main-branch builds are ordered by date rather than
+    build number because build numbers from different CI pipelines are not
+    comparable
+  * Cached CI artifact ZIP files now include the image version in their
+    filename (e.g. artifact_<id>_v9.2.0.127.zip) for easier identification
+
+ -- Laerdal Medical <support@laerdal.com>  Wed, 08 Jul 2026 12:00:00 +0000
+
 laerdal-simserver-imager (1.0.10) stable; urgency=medium
 
   * Fix: FAT32 backup boot sector written at correct sector (6) on Windows;
