@@ -6,6 +6,7 @@
 #include "downloadextractthread.h"
 #include "downloadarchiveextractthread.h"
 #include "imagewriter.h"
+#include "artifact_cache_name.h"
 #include "embedded_config.h"
 #include "config.h"
 #include "file_operations.h"
@@ -826,7 +827,7 @@ void ImageWriter::startWrite()
             if (_cacheManager && _artifactId > 0) {
                 QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/artifacts";
                 QDir().mkpath(cacheDir);
-                QString cacheFilePath = cacheDir + QString("/artifact_%1.zip").arg(_artifactId);
+                QString cacheFilePath = cacheDir + "/" + artifactCacheFileName(_artifactId, _osName);
                 thread->setCacheFile(cacheFilePath);
             }
 
@@ -941,7 +942,7 @@ void ImageWriter::startWrite()
 
         // Create temp directory for artifact download
         QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-        QString zipPath = tempDir + QString("/artifact_%1.zip").arg(_artifactId);
+        QString zipPath = tempDir + "/" + artifactCacheFileName(_artifactId, _osName);
 
         // Connect to download completion
         connect(_githubClient, &GitHubClient::artifactDownloadComplete, this,

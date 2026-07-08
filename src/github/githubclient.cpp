@@ -4,6 +4,7 @@
  */
 
 #include "githubclient.h"
+#include "../artifact_cache_name.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -451,7 +452,7 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QString artifactCacheDir = cacheDir + "/artifacts";
     QDir().mkpath(artifactCacheDir);
-    QString zipPath = artifactCacheDir + QString("/artifact_%1.zip").arg(artifactId);
+    QString zipPath = artifactCacheDir + "/" + artifactCacheFileName(artifactId, artifactName);
 
     // Check if artifact is already cached and valid
     if (QFile::exists(zipPath)) {
@@ -837,7 +838,7 @@ void GitHubClient::inspectArtifactSpuContents(const QString &owner, const QStrin
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QString artifactCacheDir = cacheDir + "/github-artifacts";
     QDir().mkpath(artifactCacheDir);
-    QString zipPath = artifactCacheDir + QString("/artifact_%1.zip").arg(artifactId);
+    QString zipPath = artifactCacheDir + "/" + artifactCacheFileName(artifactId, artifactName);
 
     // Check if artifact is already cached and valid
     if (QFile::exists(zipPath)) {
