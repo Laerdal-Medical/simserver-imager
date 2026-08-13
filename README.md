@@ -40,7 +40,7 @@ sudo apt install --no-install-recommends build-essential cmake ninja-build git l
 #### Get the source
 
 ```sh
-git clone https://github.com/laerdal/simserver-imager
+git clone git@github.com:Laerdal-Medical/simserver-imager.git
 cd simserver-imager
 ```
 
