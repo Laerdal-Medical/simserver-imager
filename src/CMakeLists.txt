@@ -342,7 +342,7 @@ set(SOURCES_BASE
 if(BUILD_CLI_ONLY)
   # CLI builds need imagewriter but not the GUI components
   set(SOURCES ${SOURCES_BASE} "imagewriter.cpp" "hwlistmodel.cpp"
-              "oslistmodel.cpp")
+              "oslistmodel.cpp" "downloadonly.cpp")
 else()
   set(SOURCES ${SOURCES_BASE} "networkaccessmanagerfactory.cpp" "qml.qrc"
               "nativefiledialog.cpp" "iconimageprovider.cpp")
@@ -615,6 +615,7 @@ if(NOT BUILD_CLI_ONLY)
       qmlcomponents/ImComboBox.qml
       qmlcomponents/ImFileDialog.qml
       qmlcomponents/ImSaveFileDialog.qml
+      qmlcomponents/DownloadOnlyDialog.qml
       qmlcomponents/ImPopup.qml
       qmlcomponents/ImRadioButton.qml
       qmlcomponents/ImOptionPill.qml
@@ -661,7 +662,7 @@ if(NOT BUILD_CLI_ONLY)
 
   # C++ types exposed to QML
   set(IMAGER_QML_CPP_TYPES imagewriter.cpp hwlistmodel.cpp oslistmodel.cpp
-                           urlfmt.cpp clipboardhelper.cpp platformhelper.cpp)
+                           urlfmt.cpp clipboardhelper.cpp platformhelper.cpp downloadonly.cpp)
 endif()
 
 # Only create QML module for GUI builds

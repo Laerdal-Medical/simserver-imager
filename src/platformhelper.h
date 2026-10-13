@@ -7,6 +7,7 @@
 #define PLATFORMHELPER_H
 
 #include <QObject>
+#include <QUrl>
 #ifndef CLI_ONLY_BUILD
 #include <QQmlEngine>
 #endif
@@ -56,7 +57,8 @@ public:
      * @return true if scroll direction should be inverted (natural scrolling)
      */
     Q_INVOKABLE bool isScrollInverted(bool qtInvertedFlag) const;
+    Q_INVOKABLE QUrl localFileUrl(const QString &path) const;
+    Q_INVOKABLE bool directoryExists(const QUrl &url) const;
 };
 
 #endif // PLATFORMHELPER_H
-

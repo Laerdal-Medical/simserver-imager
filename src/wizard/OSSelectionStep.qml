@@ -41,6 +41,16 @@ WizardStepBase {
     showNextButton: true
     // Disable Next until a concrete OS has been selected
     nextButtonEnabled: oslist.currentIndex !== -1 && wizardContainer.selectedOsName.length > 0
+    property var downloadSource: null
+    showDownloadButton: root.downloadSource !== null
+    downloadButtonEnabled: !root.imageWriter.downloadOnly.busy
+    onDownloadClicked: downloadDialog.choose(root.downloadSource)
+
+    DownloadOnlyDialog {
+        id: downloadDialog
+        writer: root.imageWriter
+        parent: root.wizardContainer.overlayRootRef
+    }
     
     property alias oslist: oslist
     property alias osswipeview: osswipeview
@@ -790,6 +800,8 @@ WizardStepBase {
 
     // OS selection functions (adapted from OSPopup.qml)
     function selectOSitem(model, navigateOnly, fromMouse) {
+        root.downloadSource = null
+        root.selectedArtifactModel = null
         if (navigateOnly === undefined) {
             navigateOnly = false
         }
@@ -880,6 +892,30 @@ WizardStepBase {
                 }
             } else {
                 // Normal OS selection - check if this is a GitHub artifact or release with assets
+                var artifactId = model.artifact_id || 0
+                var hasAssets = model.release_assets && model.release_assets.length > 0
+                var artifactFilename = model.name || ""
+                var singleImageArtifact = /\.(wic(\.(xz|gz|bz2|zst|lz4))?|spu|vsi)$/i.test(artifactFilename)
+                var downloadUrl = String(model.url || "")
+                if (artifactId > 0 && singleImageArtifact) {
+                    root.downloadSource = {
+                        artifact_id: artifactId,
+                        owner: model.source_owner || model.owner || "",
+                        repo: model.source_repo || model.repo || "",
+                        filename: artifactFilename,
+                        entry: artifactFilename,
+                        match_basename: true
+                    }
+                } else if (!artifactId && !hasAssets && !model.contains_multiple_files
+                           && downloadUrl.length > 0 && !/\.zip(?:[?#]|$)/i.test(downloadUrl)
+                           && !downloadUrl.startsWith("internal://")) {
+                    root.downloadSource = {
+                        url: downloadUrl,
+                        asset_id: model.release_asset_id || 0,
+                        owner: model.source_owner || "",
+                        repo: model.source_repo || ""
+                    }
+                }
                 if (typeof(model.source_type) === "string" && model.source_type === "artifact" &&
                     typeof(model.artifact_id) !== "undefined" && model.artifact_id > 0) {
                     // GitHub CI artifact - defer download until double-click or Next button

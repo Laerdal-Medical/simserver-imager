@@ -42,6 +42,9 @@ FocusScope {
     property bool showBackButton: true
     property bool showNextButton: true
     property bool showSkipButton: false
+    property bool showDownloadButton: false
+    property bool downloadButtonEnabled: true
+    onShowDownloadButtonChanged: Qt.callLater(rebuildFocusOrder)
     property string nextButtonText: qsTr("Next")
     property string backButtonText: CommonStrings.back
     property string skipButtonText: qsTr("Skip customisation")
@@ -76,6 +79,7 @@ FocusScope {
     signal nextClicked()
     signal backClicked()
     signal skipClicked()
+    signal downloadClicked()
     
     // Main layout
     ColumnLayout {
@@ -196,6 +200,17 @@ FocusScope {
                 KeyNavigation.backtab: nextButton
             }
             
+            ImButton {
+                id: downloadButton
+                text: qsTr("Download only…")
+                visible: customButtonArea.children.length === 0 && root.showDownloadButton
+                enabled: root.downloadButtonEnabled
+                accessibleDescription: qsTr("Save the original image to a file without writing a storage device")
+                Layout.preferredHeight: Style.buttonHeightStandard
+                Layout.minimumWidth: Style.buttonWidthMinimum * 1.5
+                onClicked: root.downloadClicked()
+            }
+
             ImButtonRed {
                 id: nextButton
                 text: root.nextButtonText
@@ -322,6 +337,7 @@ FocusScope {
         
         // Add navigation buttons in order (include if visible, regardless of enabled state)
         if (nextButton.visible) navigationChain.push(nextButton)
+        if (downloadButton.visible) navigationChain.push(downloadButton)
         if (backButton.visible) navigationChain.push(backButton)
         if (skipButton.visible) navigationChain.push(skipButton)
         if (appOptionsButton && appOptionsButton.visible) navigationChain.push(appOptionsButton)
@@ -359,6 +375,7 @@ FocusScope {
 
         var allFocusable = _focusableItems.slice() // copy array
         if (nextButton.visible && nextButton.enabled) allFocusable.push(nextButton)
+        if (downloadButton.visible && downloadButton.enabled) allFocusable.push(downloadButton)
         if (backButton.visible && backButton.enabled) allFocusable.push(backButton)
         if (skipButton.visible && skipButton.enabled) allFocusable.push(skipButton)
 
@@ -382,6 +399,7 @@ FocusScope {
 
         var allFocusable = _focusableItems.slice() // copy array
         if (nextButton.visible && nextButton.enabled) allFocusable.push(nextButton)
+        if (downloadButton.visible && downloadButton.enabled) allFocusable.push(downloadButton)
         if (backButton.visible && backButton.enabled) allFocusable.push(backButton)
         if (skipButton.visible && skipButton.enabled) allFocusable.push(skipButton)
 

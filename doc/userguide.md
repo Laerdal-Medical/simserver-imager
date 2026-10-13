@@ -6,6 +6,7 @@ This guide explains how to use Laerdal SimServer Imager to write system images t
 
 - [Getting Started](#getting-started)
 - [Image Types](#image-types)
+- [Downloading Without Writing](#downloading-without-writing)
 - [Writing an Image](#writing-an-image)
   - [From Laerdal CDN](#from-laerdal-cdn)
   - [From GitHub CI Builds](#from-github-ci-builds)
@@ -33,6 +34,29 @@ The application supports three types of images, indicated by colored badges in t
 | ![VSI](https://img.shields.io/badge/VSI-06b6d4?style=flat-square) | **Versioned Sparse Image** | Efficient delta update format for incremental updates. |
 
 **Warning:** WIC and VSI images will **erase all data** on the target device. SPU updates preserve existing data.
+
+## Downloading Without Writing
+
+No SD card or USB drive is required:
+
+1. Select your device type and image source, then select an image.
+2. Choose **Download only…** beside **Next**. For a GitHub release or
+   multi-file CI artifact, first use **Next** to select the actual image file;
+   **Download only…** is then available on the file-selection screen.
+3. Choose a folder and filename. The original filename is suggested.
+   Existing files are replaced only after confirmation and a successful download.
+4. Follow the progress dialog. **Cancel** removes the incomplete download and
+   leaves an existing destination unchanged. Errors appear in the dialog.
+5. When complete, choose **Open containing folder** to find your saved image.
+
+Files retain their original format: a `.wic.xz` stays compressed, and `.spu`
+and `.vsi` files are saved unchanged. For CI artifact ZIPs, only the selected
+image file is saved, not the surrounding ZIP. GitHub authentication is used
+for private release assets and CI artifacts.
+
+Saved downloads remain in your chosen folder independently of the application
+cache. **App Options → Cache → Cache folder → Open** opens the temporary cache
+for inspection; clearing the cache does not delete downloads saved elsewhere.
 
 ## Writing an Image
 

@@ -109,6 +109,22 @@ namespace {
 // Initialize static member for secure boot CLI override
 bool ImageWriter::_forceSecureBootEnabled = false;
 
+void ImageWriter::startDownloadOnly(const QVariantMap &source, const QUrl &destination, bool overwrite)
+{
+    QVariantMap downloadSource = source;
+    if (_githubClient) {
+        const QString owner = source.value("owner").toString();
+        const QString repo = source.value("repo").toString();
+        const qint64 artifactId = source.value("artifact_id").toLongLong();
+        const qint64 assetId = source.value("asset_id").toLongLong();
+        if (artifactId > 0)
+            downloadSource["url"] = _githubClient->getArtifactDownloadUrl(owner, repo, artifactId);
+        else if (assetId > 0)
+            downloadSource["url"] = _githubClient->getAssetDownloadUrl(owner, repo, assetId);
+    }
+    _downloadOnly->start(downloadSource, destination, _githubClient ? _githubClient->authToken() : QString(), overwrite);
+}
+
 ImageWriter::ImageWriter(QObject *parent)
     : QObject(parent),
       _cacheManager(nullptr),
@@ -142,6 +158,10 @@ ImageWriter::ImageWriter(QObject *parent)
       _piConnectToken()
 #endif
 {
+    _downloadOnly->setFolderLauncher([this](const QUrl &url) {
+        return launchUrl(url, false);
+    });
+
     // Initialise CacheManager
     _cacheManager = new CacheManager(this);
     
@@ -4442,6 +4462,11 @@ void ImageWriter::reboot()
 
 void ImageWriter::openUrl(const QUrl &url)
 {
+    launchUrl(url, true);
+}
+
+bool ImageWriter::launchUrl(const QUrl &url, bool allowQtFallback)
+{
     qDebug() << "Opening URL:" << url.toString();
 
     bool success = false;
@@ -4588,14 +4613,15 @@ void ImageWriter::openUrl(const QUrl &url)
 #endif
 
     // Fallback to Qt's method if platform command failed or platform is unsupported
-    if (!success) {
+    if (!success && allowQtFallback) {
 #ifndef CLI_ONLY_BUILD
         qDebug() << "Falling back to QDesktopServices::openUrl";
-        QDesktopServices::openUrl(url);
+        success = QDesktopServices::openUrl(url);
 #else
         qWarning() << "Unable to open URL in CLI mode:" << url.toString();
 #endif
     }
+    return success;
 }
 
 void ImageWriter::copyToClipboard(const QString &text)

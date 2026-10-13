@@ -29,6 +29,7 @@ BaseDialog {
     // Use Dialog's built-in accepted/rejected signals; do not redeclare to avoid overrides
 
     property string _currentFilename: suggestedFilename
+    property string validationError: ""
 
     // Settings for persisting last folder
     Settings {
@@ -46,27 +47,54 @@ BaseDialog {
 
         // Restore last used folder, or use sensible default
         var savedFolder = isSaveDialog ? dialogSettings.lastSaveFolder : dialogSettings.lastOpenFolder
-        if (savedFolder && savedFolder.length > 0) {
-            dialog.currentFolder = savedFolder
-        } else if (String(dialog.currentFolder).length === 0) {
-            // No saved folder and no folder set - use Downloads as default
-            var defaultFolder = String(StandardPaths.writableLocation(StandardPaths.DownloadLocation))
-            if (defaultFolder && defaultFolder.length > 0) {
-                dialog.currentFolder = (Qt.platform.os === "windows")
-                    ? ("file:///" + defaultFolder)
-                    : ("file://" + defaultFolder)
+        var restoredUrl = PlatformHelper.localFileUrl(savedFolder)
+        dialog.validationError = ""
+        if (savedFolder && PlatformHelper.directoryExists(restoredUrl)) {
+            dialog.currentFolder = restoredUrl
+        } else {
+            if (savedFolder) {
+                dialog.validationError = qsTr("The previous folder is unavailable: %1. Choose an existing local folder.").arg(savedFolder)
+                if (isSaveDialog) dialogSettings.lastSaveFolder = ""
+                else dialogSettings.lastOpenFolder = ""
+            }
+            var configuredUrl = PlatformHelper.localFileUrl(String(dialog.currentFolder))
+            if (PlatformHelper.directoryExists(configuredUrl)) {
+                dialog.currentFolder = configuredUrl
             } else {
-                // Fallback to home if Downloads not available
-                var homeFolder = String(StandardPaths.writableLocation(StandardPaths.HomeLocation))
-                dialog.currentFolder = (Qt.platform.os === "windows")
-                    ? ("file:///" + homeFolder)
-                    : ("file://" + homeFolder)
+                var defaultUrl = PlatformHelper.localFileUrl(
+                            String(StandardPaths.writableLocation(StandardPaths.DownloadLocation)))
+                if (PlatformHelper.directoryExists(defaultUrl)) {
+                    dialog.currentFolder = defaultUrl
+                } else {
+                    dialog.currentFolder = PlatformHelper.localFileUrl(
+                                String(StandardPaths.writableLocation(StandardPaths.HomeLocation)))
+                }
             }
         }
 
         dialog.visible = true
     }
     function close() { dialog.visible = false }
+
+    function acceptSave() {
+        var folderUrl = PlatformHelper.localFileUrl(pathField.text)
+        if (!PlatformHelper.directoryExists(folderUrl)) {
+            dialog.validationError = qsTr("Folder does not exist or is not a local folder: %1").arg(pathField.text)
+            return
+        }
+        var filename = String(dialog._currentFilename).trim()
+        if (!filename || filename === "." || filename === ".."
+                || filename.indexOf("/") >= 0 || filename.indexOf("\\") >= 0) {
+            dialog.validationError = qsTr("Enter a filename without folder separators.")
+            return
+        }
+        dialog.currentFolder = folderUrl
+        dialog.selectedFile = dialog._toFileUrl(dialog._buildFilePath())
+        dialogSettings.lastSaveFolder = String(folderUrl)
+        dialog.validationError = ""
+        dialog.close()
+        dialog.accepted()
+    }
     
     // Build the full file path from current folder and filename (for save mode)
     function _buildFilePath() {
@@ -104,30 +132,14 @@ BaseDialog {
 
     // Normalize a typed path to a file URL
     function _toFileUrl(path) {
-        if (!path)
-            return "";
-        var s = String(path).trim()
-        // Expand ~ to home
-        if (s === "~" || s.indexOf("~/") === 0) {
-            var home = String(StandardPaths.writableLocation(StandardPaths.HomeLocation))
-            s = home + s.substring(1)
-        }
-        if (s.indexOf("file://") === 0)
-            return s
-        // Allow absolute paths
-        if (s.indexOf("/") === 0)
-            return "file://" + s
-        return s // fallback; caller may provide URL
+        return String(PlatformHelper.localFileUrl(String(path || "")))
     }
 
     // Convert a URL to a display path (strip file:// scheme)
     function _toDisplayPath(u) {
-        var s = String(u || "").trim()
-        if (s.indexOf("file://") === 0) {
-            var p = s.substring(7)
-            return p.length > 0 ? p : "/"
-        }
-        return s
+        var normalized = PlatformHelper.localFileUrl(String(u || ""))
+        return String(normalized).length > 0
+                ? UrlFmt.display(normalized) : String(u || "").trim()
     }
 
     // Get enforced image globs from provided filters; otherwise return defaults
@@ -408,8 +420,11 @@ BaseDialog {
             activeFocusOnTab: true
             onAccepted: {
                 var newUrl = dialog._toFileUrl(text)
-                if (newUrl && newUrl.length > 0) {
+                if (PlatformHelper.directoryExists(newUrl)) {
+                    dialog.validationError = ""
                     dialog.currentFolder = newUrl
+                } else {
+                    dialog.validationError = qsTr("Folder does not exist or is not a local folder: %1").arg(text)
                 }
             }
         }
@@ -439,13 +454,17 @@ BaseDialog {
                 dialog._currentFilename = text
             }
             onAccepted: {
-                if (text.trim().length > 0) {
-                    dialog.selectedFile = dialog._toFileUrl(dialog._buildFilePath())
-                    dialog.close()
-                    dialog.accepted()
-                }
+                dialog.acceptSave()
             }
         }
+    }
+
+    Label {
+        Layout.fillWidth: true
+        visible: dialog.validationError.length > 0
+        text: dialog.validationError
+        color: Style.warningTextColor
+        wrapMode: Text.WordWrap
     }
 
     // Main content with left navigation and file list
@@ -957,7 +976,8 @@ BaseDialog {
             activeFocusOnTab: true
             onClicked: {
                 if (dialog.isSaveDialog) {
-                    dialog.selectedFile = dialog._toFileUrl(dialog._buildFilePath())
+                    dialog.acceptSave()
+                    return
                 }
                 // Save current folder for next time
                 if (dialog.isSaveDialog) {
@@ -971,6 +991,3 @@ BaseDialog {
         }
     }
 }
-
-
-

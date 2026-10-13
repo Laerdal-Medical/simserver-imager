@@ -38,6 +38,21 @@ target_compile_options(
 # Register with CTest for automatic test discovery
 catch_discover_tests(customization_generator_test)
 
+add_executable(downloadonly_test downloadonly_test.cpp
+               ../downloadonly.cpp ../curlnetworkconfig.cpp ../platformhelper.cpp
+               ../urlfmt.cpp)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_sources(downloadonly_test PRIVATE ../linux/platformquirks_linux.cpp)
+endif()
+set_target_properties(downloadonly_test PROPERTIES AUTOMOC ON)
+target_compile_definitions(downloadonly_test PRIVATE CLI_ONLY_BUILD)
+target_include_directories(downloadonly_test PRIVATE ..
+                           ${CURL_INCLUDE_DIRS} ${LibArchive_INCLUDE_DIRS})
+target_compile_features(downloadonly_test PRIVATE cxx_std_20)
+target_link_libraries(downloadonly_test PRIVATE Catch2::Catch2WithMain
+                      Qt6::Core Qt6::Network ${CURL_LIBRARIES} ${LibArchive_LIBRARIES})
+catch_discover_tests(downloadonly_test)
+
 # Also add a custom target for manual running
 add_custom_target(
   test_customization_generator

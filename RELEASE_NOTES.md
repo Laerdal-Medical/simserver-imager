@@ -4,6 +4,12 @@
 
 ### New Features
 
+- Download selected images without selecting or writing a storage device.
+  Save CDN images, authenticated GitHub release assets, or the selected file
+  from CI artifacts in their original format, with progress, cancellation,
+  overwrite confirmation, and an Open containing folder action
+- Open the application cache folder from App Options → Cache
+
 ### Improvements
 
 - Configure all five standard Laerdal GitHub build repositories by default,

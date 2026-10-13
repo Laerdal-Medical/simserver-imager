@@ -32,6 +32,7 @@
 #include "device_info.h"
 #include "imageadvancedoptions.h"
 #include "performancestats.h"
+#include "downloadonly.h"
 
 class QQmlApplicationEngine;
 class DownloadThread;
@@ -73,6 +74,9 @@ public:
     Q_PROPERTY(WriteState writeState READ writeState NOTIFY writeStateChanged)
     Q_PROPERTY(bool isOsListUnavailable READ isOsListUnavailable NOTIFY osListUnavailableChanged)
     Q_PROPERTY(QUrl startupImageUrl READ startupImageUrl WRITE setStartupImageUrl NOTIFY startupImageUrlChanged)
+    Q_PROPERTY(DownloadOnly* downloadOnly READ downloadOnly CONSTANT)
+    DownloadOnly *downloadOnly() const { return _downloadOnly; }
+    Q_INVOKABLE void startDownloadOnly(const QVariantMap &source, const QUrl &destination, bool overwrite = false);
 
     /* Set URL to download from, and if known download length and uncompressed length */
     Q_INVOKABLE void setSrc(const QUrl &url, quint64 downloadLen = 0, quint64 extrLen = 0, QByteArray expectedHash = "", bool multifilesinzip = false, QString parentcategory = "", QString osname = "", QByteArray initFormat = "", QString releaseDate = "");
@@ -537,6 +541,8 @@ protected slots:
     void onOsListRefreshTimeout();
 
 private:
+    bool launchUrl(const QUrl &url, bool allowQtFallback);
+    DownloadOnly *_downloadOnly = new DownloadOnly(this);
     void setWriteState(WriteState state);
     WriteState writeState() const { return _writeState; }
     // Cache management

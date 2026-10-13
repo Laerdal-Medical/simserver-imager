@@ -1,5 +1,11 @@
 laerdal-simserver-imager (1.0.11) stable; urgency=medium
 
+  * Add Download only for selected CDN images, GitHub release assets and
+    CI artifact image files, preserving original formats without drive writes
+  * Show download progress/errors, support safe cancellation and confirmed
+    atomic replacement, and open the containing folder after completion
+  * Add Open cache folder to App Options, separate from persistent downloads
+
   * Configure the five standard Laerdal GitHub build repositories by default
     and extend repository suggestions, preserving saved settings
   * Improve OS list ordering: GitHub releases first, then CI builds on all

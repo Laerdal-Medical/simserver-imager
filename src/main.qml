@@ -77,10 +77,11 @@ ApplicationWindow {
     }
 
     onClosing: function (close) {
-        if ((wizardContainer.isWriting || wizardContainer.isDownloading) && !forceQuit) {
+        if ((wizardContainer.isWriting || wizardContainer.isDownloading || imageWriter.downloadOnly.busy) && !forceQuit) {
             close.accepted = false;
             quitDialog.open();
         } else {
+            imageWriter.downloadOnly.cancel()
             // Cancel any active download before closing
             if (wizardContainer.isDownloading) {
                 var repoManager = imageWriter.getRepositoryManager()
@@ -197,6 +198,7 @@ ApplicationWindow {
 
         onAccepted: {
             // Cancel any active artifact download before quitting
+            imageWriter.downloadOnly.cancel()
             if (wizardContainer.isDownloading) {
                 var repoManager = imageWriter.getRepositoryManager()
                 if (repoManager) {

@@ -26,6 +26,27 @@ WizardStepBase {
     showNextButton: true
     nextButtonEnabled: !root.isDownloading && root.selectedFileIndex >= 0  // Can advance if file selected and not downloading
     backButtonEnabled: true  // Always enabled - cancels download if in progress
+    showDownloadButton: !root.isDownloading && root.selectedFileIndex >= 0
+    downloadButtonEnabled: !root.imageWriter.downloadOnly.busy
+    onDownloadClicked: {
+        var file = root.imageFiles[root.selectedFileIndex]
+        downloadDialog.choose({
+            url: file.download_url || "",
+            filename: file.filename || file.name || "",
+            asset_id: file.asset_id || 0,
+            artifact_id: root.artifactId,
+            owner: root.owner,
+            repo: root.repo,
+            zip_path: root.zipPath,
+            entry: file.asset_id > 0 ? "" : file.filename
+        })
+    }
+
+    DownloadOnlyDialog {
+        id: downloadDialog
+        writer: root.imageWriter
+        parent: root.wizardContainer.overlayRootRef
+    }
 
     // Download state
     property bool isDownloading: false
@@ -340,9 +361,6 @@ WizardStepBase {
             if (filteredAssets.length === 1) {
                 console.log("CIArtifactSelectionStep: Only one matching asset, auto-selecting")
                 root.selectedFileIndex = 0
-                Qt.callLater(function() {
-                    root.nextClicked()
-                })
             }
             return
         }
@@ -431,41 +449,8 @@ WizardStepBase {
                 Qt.callLater(function() {
                     root.wizardContainer.previousStep()
                 })
-            } else if (imageFiles.length === 1) {
-                // Single file - configure and advance
-                var file = imageFiles[0]
-                var displayName = file.display_name || file.filename
-                var fileType = file.type || "wic"
-
-                console.log("CIArtifactSelectionStep: Single file found -", displayName, "(" + fileType + ")")
-                console.log("CIArtifactSelectionStep: Auto-advancing to storage")
-
-                if (fileType === "spu") {
-                    root.imageWriter.setSrcSpuArtifact(artifactId, owner, repo, branch, file.filename, zipPath)
-                    root.wizardContainer.selectedSpuName = displayName
-                    root.wizardContainer.isSpuCopyMode = true
-                    root.wizardContainer.customizationSupported = false
-                    root.wizardContainer.piConnectAvailable = false
-                    root.wizardContainer.secureBootAvailable = false
-                } else {
-                    root.imageWriter.setSrcArtifactWithTargetAndCache(
-                        artifactId, owner, repo, branch,
-                        file.size || 0, displayName, file.filename, zipPath
-                    )
-                    root.wizardContainer.selectedOsName = displayName
-                    root.wizardContainer.isSpuCopyMode = false
-                    root.wizardContainer.customizationSupported = false
-                    root.wizardContainer.piConnectAvailable = false
-                    root.wizardContainer.secureBootAvailable = root.imageWriter.isSecureBootForcedByCliFlag()
-                }
-
-                // Auto-advance to storage
-                Qt.callLater(function() {
-                    root.wizardContainer.nextStep()
-                })
             } else {
-                // Multiple files - show inline file selection
-                console.log("CIArtifactSelectionStep: Multiple files found - showing file selection")
+                // Keep file selection visible so Download only is available without choosing storage.
                 for (var i = 0; i < imageFiles.length; i++) {
                     console.log("  File", i + ":", imageFiles[i].display_name || imageFiles[i].filename,
                                "(" + (imageFiles[i].type || "wic") + ")",
@@ -482,13 +467,17 @@ WizardStepBase {
                 root.zipPath = zipPath
 
                 // Cache results for back navigation
-                root.wizardContainer.cachedArtifactFiles = imageFiles
+                root.wizardContainer.cachedArtifactFiles = root.imageFiles
                 root.wizardContainer.cachedArtifactId = artifactId
                 root.wizardContainer.cachedArtifactName = artifactName
                 root.wizardContainer.cachedArtifactOwner = owner
                 root.wizardContainer.cachedArtifactRepo = repo
                 root.wizardContainer.cachedArtifactBranch = branch
                 root.wizardContainer.cachedArtifactZipPath = zipPath
+                if (root.imageFiles.length === 1) {
+                    root.selectedFileIndex = 0
+                    fileListView.currentIndex = 0
+                }
                 console.log("CIArtifactSelectionStep: Cached artifact state for back navigation")
 
                 // Subtitle will update to "Select an image file..."

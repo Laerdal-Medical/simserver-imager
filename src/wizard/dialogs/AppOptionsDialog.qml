@@ -80,6 +80,7 @@ ConfirmDialog {
                 items.push(githubReposButton.focusItem)
             // Cache button
             items.push(clearCacheButton.focusItem)
+            items.push(openCacheButton.focusItem)
             return items
         }, 1)
     }
@@ -348,9 +349,27 @@ ConfirmDialog {
                 Component.onCompleted: {
                     focusItem.activeFocusOnTab = true
                 }
+
                 onClicked: {
                     var freed = imageWriter.clearArtifactCache()
                     popup.updateCacheSize()
+                }
+            }
+
+            ImOptionButton {
+                id: openCacheButton
+                text: qsTr("Cache folder")
+                btnText: qsTr("Open")
+                accessibleDescription: qsTr("Open the temporary application cache, separate from saved downloads")
+                Layout.fillWidth: true
+                Component.onCompleted: {
+                    focusItem.activeFocusOnTab = true
+                }
+                onClicked: {
+                    if (!popup.imageWriter.downloadOnly.openCacheFolder()) {
+                        cacheFolderError.message = popup.imageWriter.downloadOnly.error
+                        cacheFolderError.open()
+                    }
                 }
             }
 
@@ -383,6 +402,13 @@ ConfirmDialog {
     // Apply settings when accepted
     onAccepted: {
         popup.applySettings()
+    }
+
+    ErrorDialog {
+        id: cacheFolderError
+        parent: popup.parent
+        imageWriter: popup.imageWriter
+        title: qsTr("Could not open cache folder")
     }
 
     RepositoryDialog {
