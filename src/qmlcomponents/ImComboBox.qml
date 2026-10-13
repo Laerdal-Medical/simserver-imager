@@ -38,6 +38,7 @@ ComboBox {
     
     // Enhanced properties
     property bool indicateError: false
+    property bool expandPopupToWindow: false
     
     // Internal search functionality
     property string searchString: ""
@@ -350,9 +351,28 @@ ComboBox {
     popup: Popup {
         id: popupComponent
         padding: 0
+        parent: root
         y: root.height
         width: root.width
-        height: Math.min(300, Math.max(150, contentItem.implicitHeight))
+        topMargin: root.expandPopupToWindow ? Style.spacingMedium : -1
+        bottomMargin: root.expandPopupToWindow ? Style.spacingMedium : -1
+        property real spaceBelowSelector: 0
+        function updateAvailableSpace() {
+            if (root.Window.window) {
+                spaceBelowSelector = Math.max(0, root.Window.window.height
+                    - root.mapToItem(root.Window.window.contentItem, 0, root.height).y
+                    - Style.spacingMedium)
+            }
+        }
+        onAboutToShow: updateAvailableSpace()
+        Connections {
+            target: root.Window.window
+            function onHeightChanged() { popupComponent.updateAvailableSpace() }
+        }
+        height: root.expandPopupToWindow && root.Window.window
+                ? Math.min(popupComponent.spaceBelowSelector,
+                           Math.max(150, root.count * root.itemHeight))
+                : Math.min(300, Math.max(150, contentItem.implicitHeight))
         closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
         
         // Clear search string when popup opens or closes (only for non-editable combobox)
@@ -536,7 +556,7 @@ ComboBox {
                     }
                     
                     // Calculate new position with bounds checking
-                    var newY = dropdownList.contentY + dy
+                    var newY = dropdownList.contentY - dy
                     var maxY = Math.max(0, dropdownList.contentHeight - dropdownList.height)
                     newY = Math.max(0, Math.min(newY, maxY))
                     

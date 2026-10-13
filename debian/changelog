@@ -1,5 +1,7 @@
 laerdal-simserver-imager (1.0.11) stable; urgency=medium
 
+  * Expand the branch filter dropdown to use window space below its selector
+  * Correct reversed mouse-wheel scrolling in dropdown lists
   * Expand behavioral unit coverage and separate automated application tests
     from hardware diagnostics and bundled-library tests
   * Preserve partial download caches and reject undersized format targets

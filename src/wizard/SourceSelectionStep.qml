@@ -401,6 +401,7 @@ WizardStepBase {
                         id: branchFilterCombo
                         Layout.fillWidth: true
                         Layout.preferredHeight: Style.buttonHeightStandard
+                        expandPopupToWindow: true
 
                         // Make editable so user can type to filter and see their input
                         editable: true

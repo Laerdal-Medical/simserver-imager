@@ -3,6 +3,7 @@
  * Copyright (C) 2026 Laerdal Medical
  */
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_session.hpp>
 #include <catch2/catch_approx.hpp>
 #include <QDateTime>
 #include <QGuiApplication>
@@ -12,15 +13,13 @@
 #include <QVariant>
 #include <memory>
 
-namespace {
-void application()
+int main(int argc, char *argv[])
 {
-    static int argc = 1;
-    static char name[] = "qml_utils_test";
-    static char *argv[] = {name, nullptr};
-    static QGuiApplication app(argc, argv);
+    QGuiApplication application(argc, argv);
+    return Catch::Session().run(argc, argv);
 }
 
+namespace {
 struct Utils {
     QQmlEngine engine;
     QQmlComponent component{&engine, QUrl::fromLocalFile(QStringLiteral(TEST_QML_SOURCE_DIR "/Utils.qml"))};
@@ -49,7 +48,6 @@ struct Utils {
 
 TEST_CASE("QML throughput sampling converts units and applies smoothing only to network rates", "[qml-utils]")
 {
-    application();
     Utils utils;
     const qint64 previousTime = QDateTime::currentMSecsSinceEpoch() - 2000;
     const auto network = utils.call("calculateThroughputMbps", 500000, 0, previousTime, 1.0, 500, 0.25).toMap();
@@ -64,7 +62,6 @@ TEST_CASE("QML throughput sampling converts units and applies smoothing only to 
 
 TEST_CASE("QML throughput sampling initializes and handles stalled or reset counters", "[qml-utils]")
 {
-    application();
     Utils utils;
     const auto first = utils.call("calculateThroughputMbps", 1234, 0, 0, 0, 500, 0.3).toMap();
     REQUIRE(first.value("throughputMbps").toDouble() == 0);
@@ -81,7 +78,6 @@ TEST_CASE("QML throughput sampling initializes and handles stalled or reset coun
 
 TEST_CASE("QML transfer estimates distinguish binary disk units from decimal network units", "[qml-utils]")
 {
-    application();
     Utils utils;
     REQUIRE(utils.call("calculateTimeRemainingKBps", 0, 1048576, 1024).toInt() == 1);
     REQUIRE(utils.call("calculateTimeRemainingMbps", 0, 1000000, 8).toInt() == 1);
@@ -96,11 +92,81 @@ TEST_CASE("QML transfer estimates distinguish binary disk units from decimal net
 
 TEST_CASE("QML duration formatting handles rounding across minute and hour boundaries", "[qml-utils]")
 {
-    application();
     Utils utils;
     REQUIRE(utils.call("formatDuration", 59.6).toString() == utils.call("formatDuration", 60).toString());
     REQUIRE(utils.call("formatDuration", 3599.6).toString() == utils.call("formatDuration", 3600).toString());
     REQUIRE(utils.call("formatDuration", -1).toString().isEmpty());
     REQUIRE(utils.call("calculateAverageSpeed", 1048576, 0).toString().isEmpty());
     REQUIRE(utils.call("calculateAverageSpeed", 1048576, 2).toString().contains("0.5"));
+}
+
+TEST_CASE("Expanded branch dropdown stays below its selector and fits available window space", "[qml-controls]")
+{
+    const QString directory = QStringLiteral(TEST_QML_SOURCE_DIR);
+    qmlRegisterSingletonType(QUrl::fromLocalFile(directory + "/Style.qml"), "RpiImager", 1, 0, "Style");
+    qmlRegisterType(QUrl::fromLocalFile(directory + "/qmlcomponents/ImScrollBar.qml"),
+                    "RpiImager", 1, 0, "ImScrollBar");
+    qmlRegisterType(QUrl::fromLocalFile(directory + "/qmlcomponents/ImComboBox.qml"),
+                    "RpiImager", 1, 0, "ImComboBox");
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    component.setData(R"(
+        import QtQuick
+        import QtQuick.Controls
+        import RpiImager 1.0
+        ApplicationWindow {
+            width: 800
+            height: 720
+            visible: true
+            property alias expanded: combo.expandPopupToWindow
+            property alias branches: combo.model
+            property alias selectorContainerY: container.y
+            readonly property real dropdownHeight: combo.popup.height
+            readonly property real dropdownTop: container.y + combo.y + combo.popup.y
+            readonly property real selectorBottom: container.y + combo.y + combo.height
+            readonly property real popupMargin: Style.spacingMedium
+            function openDropdown() { combo.popup.open() }
+            function closeDropdown() { combo.popup.close() }
+            Item {
+                id: container
+                y: 40
+                ImComboBox {
+                id: combo
+                y: 120
+                width: 400
+                imageWriter: null
+                expandPopupToWindow: true
+                model: 40
+                }
+            }
+        }
+    )", QUrl());
+    INFO(component.errorString().toStdString());
+    REQUIRE(component.isReady());
+    std::unique_ptr<QObject> window(component.create());
+    REQUIRE(window);
+    REQUIRE(QMetaObject::invokeMethod(window.get(), "openDropdown"));
+    QCoreApplication::processEvents();
+    const double margin = window->property("popupMargin").toDouble();
+    const double bottom = window->property("selectorBottom").toDouble();
+    REQUIRE(window->property("dropdownHeight").toDouble() == Catch::Approx(720 - bottom - margin));
+    REQUIRE(window->property("dropdownTop").toDouble() == Catch::Approx(bottom));
+    REQUIRE(window->setProperty("height", 480));
+    QCoreApplication::processEvents();
+    REQUIRE(window->property("dropdownHeight").toDouble() == Catch::Approx(480 - bottom - margin));
+    REQUIRE(window->setProperty("branches", 3));
+    REQUIRE(window->property("dropdownHeight").toDouble() == 150);
+    REQUIRE(QMetaObject::invokeMethod(window.get(), "closeDropdown"));
+    REQUIRE(window->setProperty("selectorContainerY", 220));
+    REQUIRE(window->setProperty("branches", 40));
+    REQUIRE(QMetaObject::invokeMethod(window.get(), "openDropdown"));
+    QCoreApplication::processEvents();
+    const double movedBottom = window->property("selectorBottom").toDouble();
+    REQUIRE(window->property("dropdownTop").toDouble() == Catch::Approx(movedBottom));
+    REQUIRE(window->property("dropdownHeight").toDouble() == Catch::Approx(480 - movedBottom - margin));
+    REQUIRE(window->setProperty("expanded", false));
+    QCoreApplication::processEvents();
+    REQUIRE(window->property("dropdownHeight").toDouble() <= 300);
+    REQUIRE(QMetaObject::invokeMethod(window.get(), "closeDropdown"));
+    QCoreApplication::processEvents();
 }

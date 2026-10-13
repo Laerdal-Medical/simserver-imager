@@ -12,6 +12,8 @@
 
 ### Improvements
 
+- Branch filter dropdown uses the available window space below its selector
+  to show more branches at once
 - Expand behavioral regression coverage for build selection, download-only
   saving, pipeline helpers, and QML transfer calculations; separate automated
   application tests from hardware diagnostics and bundled-library tests
@@ -29,6 +31,7 @@
 
 ### Bug Fixes
 
+- Correct reversed mouse-wheel scrolling in dropdown lists
 - Preserve partial cache files for download resume and reject undersized format
   targets before writing filesystem metadata
 - CI build page updates no longer reset the list or interrupt clicks
