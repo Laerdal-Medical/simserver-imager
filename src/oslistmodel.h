@@ -93,6 +93,8 @@ public:
     explicit OSListModel(ImageWriter &);
 
     Q_INVOKABLE bool reload();
+    // Add entries from an updated source list without resetting existing rows.
+    Q_INVOKABLE bool reloadIncremental();
     // Emit dataChanged for all rows without resetting the model
     Q_INVOKABLE void softRefresh();
 
@@ -112,6 +114,9 @@ protected:
     QVariant data(const QModelIndex &index, int role) const override;
 
 private:
+    static OS osFromJsonObject(const QJsonObject &obj);
+    static QString identityForOS(const OS &os);
+
     QVector<OS> _osList;
     ImageWriter &_imageWriter;
 };

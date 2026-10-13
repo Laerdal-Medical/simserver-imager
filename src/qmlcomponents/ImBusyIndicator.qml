@@ -11,6 +11,9 @@ import RpiImager
 BusyIndicator {
     id: control
 
+    property real spinnerSize: 40
+    property real strokeWidth: 4
+
     contentItem: Item {
         implicitWidth: 48
         implicitHeight: 48
@@ -19,15 +22,15 @@ BusyIndicator {
         Item {
             id: spinner
             anchors.centerIn: parent
-            width: 40
-            height: 40
+            width: control.spinnerSize
+            height: control.spinnerSize
 
             // Background circle (track)
             Rectangle {
                 anchors.fill: parent
                 radius: width / 2
                 color: "transparent"
-                border.width: 4
+                border.width: control.strokeWidth
                 border.color: Style.cardBackground
             }
 
@@ -46,10 +49,10 @@ BusyIndicator {
 
                     var centerX = width / 2
                     var centerY = height / 2
-                    var radius = width / 2 - 2
+                    var radius = width / 2 - control.strokeWidth / 2
 
                     ctx.strokeStyle = Style.laerdalBlue
-                    ctx.lineWidth = 4
+                    ctx.lineWidth = control.strokeWidth
                     ctx.lineCap = "round"
 
                     ctx.beginPath()

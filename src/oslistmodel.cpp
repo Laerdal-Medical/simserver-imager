@@ -18,43 +18,83 @@
 #include <QUrl>
 #include <QFileInfo>
 #include <QElapsedTimer>
+#include <QSet>
 #include <cstdint>
+#include <array>
 
 namespace {
 
-    // Extract version tuple from name string (e.g., "SimPad Plus v9.2.0.127" -> {9, 2, 0, 127})
-    // Returns empty list if no version found
-    QList<std::int32_t> extractVersionFromName(const QString &name) {
-        // Match version pattern: vX.Y.Z.B or X.Y.Z.B (with optional 'v' prefix)
-        static QRegularExpression versionRegex(R"(v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?)");
+    struct ParsedVersion {
+        std::array<quint64, 4> numbers{0, 0, 0, 0};
+        QStringList prerelease;
+        bool valid = false;
+    };
+
+    ParsedVersion extractVersionFromName(const QString &name) {
+        static QRegularExpression versionRegex(
+            R"((?:^|[^A-Za-z0-9])v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?![0-9A-Za-z.-]))");
         QRegularExpressionMatch match = versionRegex.match(name);
 
-        if (match.hasMatch()) {
-            QList<std::int32_t> version;
-            version.append(match.captured(1).toInt());  // Major
-            version.append(match.captured(2).toInt());  // Minor
-            version.append(match.captured(3).toInt());  // Patch
-            if (!match.captured(4).isEmpty()) {
-                version.append(match.captured(4).toInt());  // Build
-            } else {
-                version.append(0);
-            }
+        ParsedVersion version;
+        if (!match.hasMatch()) {
             return version;
         }
-        return {};
+
+        for (int i = 0; i < 3; ++i) {
+            bool ok = false;
+            version.numbers[static_cast<size_t>(i)] = match.captured(i + 1).toULongLong(&ok);
+            if (!ok) return ParsedVersion{};
+        }
+        if (!match.captured(4).isEmpty()) {
+            bool ok = false;
+            version.numbers[3] = match.captured(4).toULongLong(&ok);
+            if (!ok) return ParsedVersion{};
+        }
+        if (!match.captured(5).isEmpty()) {
+            version.prerelease = match.captured(5).split(QLatin1Char('.'));
+        }
+        version.valid = true;
+        return version;
     }
 
-    // Compare two version tuples, returns true if a > b (for descending sort)
-    bool isVersionGreater(const QList<std::int32_t> &a, const QList<std::int32_t> &b) {
-        if (a.isEmpty() && b.isEmpty()) return false;
-        if (a.isEmpty()) return false;  // Items without version go last
-        if (b.isEmpty()) return true;   // Items without version go last
-
-        for (std::int32_t i = 0; i < qMin(a.size(), b.size()); ++i) {
-            if (a[i] > b[i]) return true;
-            if (a[i] < b[i]) return false;
+    // Return positive when a has greater version precedence than b.
+    int compareVersions(const ParsedVersion &a, const ParsedVersion &b) {
+        for (size_t i = 0; i < a.numbers.size(); ++i) {
+            if (a.numbers[i] != b.numbers[i]) {
+                return a.numbers[i] > b.numbers[i] ? 1 : -1;
+            }
         }
-        return a.size() > b.size();
+
+        if (a.prerelease.isEmpty() != b.prerelease.isEmpty()) {
+            return a.prerelease.isEmpty() ? 1 : -1;
+        }
+        for (qsizetype i = 0; i < qMin(a.prerelease.size(), b.prerelease.size()); ++i) {
+            const QString &idA = a.prerelease[i];
+            const QString &idB = b.prerelease[i];
+            static const QRegularExpression numericIdentifier(QStringLiteral(R"(^\d+$)"));
+            const bool numericA = numericIdentifier.match(idA).hasMatch();
+            const bool numericB = numericIdentifier.match(idB).hasMatch();
+            if (numericA && numericB) {
+                qsizetype firstNonZeroA = 0;
+                qsizetype firstNonZeroB = 0;
+                while (firstNonZeroA < idA.size() - 1 && idA[firstNonZeroA] == QLatin1Char('0')) ++firstNonZeroA;
+                while (firstNonZeroB < idB.size() - 1 && idB[firstNonZeroB] == QLatin1Char('0')) ++firstNonZeroB;
+                const QString normalizedA = idA.mid(firstNonZeroA);
+                const QString normalizedB = idB.mid(firstNonZeroB);
+                const QString valueA = normalizedA.isEmpty() ? QStringLiteral("0") : normalizedA;
+                const QString valueB = normalizedB.isEmpty() ? QStringLiteral("0") : normalizedB;
+                if (valueA.size() != valueB.size()) return valueA.size() > valueB.size() ? 1 : -1;
+                const int comparison = QString::compare(valueA, valueB, Qt::CaseSensitive);
+                if (comparison != 0) return comparison > 0 ? 1 : -1;
+            } else if (numericA != numericB) {
+                return numericA ? -1 : 1;
+            } else {
+                const int comparison = QString::compare(idA, idB, Qt::CaseSensitive);
+                if (comparison != 0) return comparison > 0 ? 1 : -1;
+            }
+        }
+        if (a.prerelease.size() == b.prerelease.size()) return 0;
+        return a.prerelease.size() > b.prerelease.size() ? 1 : -1;
     }
 
     // Check if an entry is a special item (Erase, Use custom) that should appear at the end
@@ -81,11 +121,8 @@ namespace {
             }
         }
 
-        // Sort regular items into groups: GitHub releases first, then
-        // main-branch CI artifacts, then everything else (feature-branch
-        // artifacts, CDN images). Releases and feature-branch builds are sorted
-        // by version descending; main-branch CI builds are sorted by date
-        // descending (see below).
+        // Sort regular items into groups: GitHub releases first, all CI
+        // artifacts second, then everything else (for example CDN images).
         std::stable_sort(regularItems.begin(), regularItems.end(), [](const QJsonValue &a, const QJsonValue &b) {
             QJsonObject objA = a.toObject();
             QJsonObject objB = b.toObject();
@@ -94,7 +131,7 @@ namespace {
             // "artifact" = CI artifact (CDN images have no source_type).
             auto groupRank = [](const QJsonObject &o) -> std::int32_t {
                 if (o["source_type"].toString() == "release") return 0;
-                if (o["source_type"].toString() == "artifact" && o["branch"].toString() == "main") return 1;
+                if (o["source_type"].toString() == "artifact") return 1;
                 return 2;
             };
 
@@ -102,39 +139,44 @@ namespace {
             std::int32_t rankB = groupRank(objB);
             if (rankA != rankB) return rankA < rankB;
 
-            // Main-branch CI builds are sorted by date (newest first). Their
-            // embedded build numbers come from independent CI runs across
-            // repositories (e.g. simserver-mcbapp, simpad-app-next) and are not
-            // comparable to each other, so the highest number is not the newest
-            // build. The artifact creation date is the reliable ordering key.
+            // Build numbers can come from independent CI runs and are not
+            // comparable across repositories or branches.
             if (rankA == 1) {
                 QString dateA = objA["release_date"].toString();
                 QString dateB = objB["release_date"].toString();
                 if (dateA != dateB) return dateA > dateB;
-                // Fall through to version comparison as a tiebreaker
             }
 
-            // Secondary sort: by version descending
-            QList<std::int32_t> versionA = extractVersionFromName(objA["name"].toString());
-            QList<std::int32_t> versionB = extractVersionFromName(objB["name"].toString());
-
-            // Items without version go last, use release_date as tiebreaker
-            if (versionA.isEmpty() && versionB.isEmpty()) {
-                QString dateA = objA["release_date"].toString();
-                QString dateB = objB["release_date"].toString();
-                return dateA > dateB;
+            const ParsedVersion versionA = extractVersionFromName(objA["name"].toString());
+            const ParsedVersion versionB = extractVersionFromName(objB["name"].toString());
+            if (rankA != 1 && versionA.valid != versionB.valid) {
+                return versionA.valid;
             }
-            if (versionA.isEmpty()) return false;
-            if (versionB.isEmpty()) return true;
+            if (rankA != 1 && versionA.valid) {
+                const int versionComparison = compareVersions(versionA, versionB);
+                if (versionComparison != 0) return versionComparison > 0;
+            }
 
-            // Compare versions
-            if (isVersionGreater(versionA, versionB)) return true;
-            if (isVersionGreater(versionB, versionA)) return false;
-
-            // Same version, sort by release_date descending as tiebreaker
+            // Deterministic tie-breaks avoid depending on asynchronous response order.
             QString dateA = objA["release_date"].toString();
             QString dateB = objB["release_date"].toString();
-            return dateA > dateB;
+            if (dateA != dateB) return dateA > dateB;
+            const QString nameA = objA["name"].toString();
+            const QString nameB = objB["name"].toString();
+            if (nameA != nameB) return nameA < nameB;
+            const QString ownerA = objA["source_owner"].toString();
+            const QString ownerB = objB["source_owner"].toString();
+            if (ownerA != ownerB) return ownerA < ownerB;
+            const QString repoA = objA["source_repo_name"].toString();
+            const QString repoB = objB["source_repo_name"].toString();
+            if (repoA != repoB) return repoA < repoB;
+            const qint64 artifactA = objA["artifact_id"].toVariant().toLongLong();
+            const qint64 artifactB = objB["artifact_id"].toVariant().toLongLong();
+            if (artifactA != artifactB) return artifactA < artifactB;
+            const QString tagA = objA["release_tag"].toString();
+            const QString tagB = objB["release_tag"].toString();
+            if (tagA != tagB) return tagA < tagB;
+            return objA["url"].toString() < objB["url"].toString();
         });
 
         // Rebuild list: regular items first (sorted), then special items at end
@@ -149,10 +191,11 @@ namespace {
         // Log the first item after sorting to verify
         if (!list.isEmpty()) {
             QJsonObject first = list[0].toObject();
-            QList<std::int32_t> firstVersion = extractVersionFromName(first["name"].toString());
-            QString versionStr = firstVersion.isEmpty() ? "no version" :
-                QString("%1.%2.%3.%4").arg(firstVersion[0]).arg(firstVersion[1])
-                    .arg(firstVersion[2]).arg(firstVersion.size() > 3 ? firstVersion[3] : 0);
+            ParsedVersion firstVersion = extractVersionFromName(first["name"].toString());
+            QString versionStr = firstVersion.valid
+                ? QString("%1.%2.%3.%4").arg(firstVersion.numbers[0]).arg(firstVersion.numbers[1])
+                    .arg(firstVersion.numbers[2]).arg(firstVersion.numbers[3])
+                : QStringLiteral("no version");
             qDebug() << "OSListModel: Sorted" << regularItems.size() << "images by version (highest first)."
                      << "First item:" << first["name"].toString()
                      << "(" << versionStr << ")";
@@ -417,6 +460,73 @@ namespace {
 OSListModel::OSListModel(ImageWriter &imageWriter)
     : QAbstractListModel(&imageWriter), _imageWriter(imageWriter) {}
 
+OSListModel::OS OSListModel::osFromJsonObject(const QJsonObject &obj)
+{
+    OS os;
+    os.name = obj["name"].toString();
+    os.description = obj["description"].toString();
+
+    const QJsonArray devicesArray = obj["devices"].toArray();
+    os.devices.reserve(devicesArray.size());
+    for (const auto &device : devicesArray) {
+        os.devices.append(device.toString());
+    }
+
+    const QJsonArray capsArray = obj["capabilities"].toArray();
+    os.capabilities.reserve(capsArray.size());
+    for (const auto &cap : capsArray) {
+        os.capabilities.append(cap.toString());
+    }
+
+    os.extractSize = obj["extract_size"].toDouble();
+    os.imageDownloadSize = obj["image_download_size"].toDouble();
+    os.random = obj["random"].toBool();
+    os.extractSha256 = obj["extract_sha256"].toString();
+
+    const QString sanitizedIcon = sanitizeIconSource(obj["icon"].toString());
+    if (!sanitizedIcon.isEmpty()) {
+        if (sanitizedIcon.startsWith("http://") || sanitizedIcon.startsWith("https://")) {
+            os.icon = QStringLiteral("image://icons/") + sanitizedIcon;
+        } else {
+            os.icon = sanitizedIcon;
+        }
+    }
+
+    os.initFormat = obj["init_format"].toString();
+    os.releaseDate = obj["release_date"].toString();
+    os.url = obj["url"].toString();
+    os.subitemsJson = obj["subitems_json"].toString();
+    os.tooltip = obj["tooltip"].toString();
+    os.website = obj["website"].toString();
+    os.architecture = obj["architecture"].toString();
+    os.enableRPiConnect = obj.value("enable_rpi_connect").toBool(false);
+    os.source = obj["source"].toString();
+    os.sourceType = obj["source_type"].toString();
+    os.branch = obj["branch"].toString();
+    os.sourceOwner = obj["source_owner"].toString();
+    os.sourceRepo = obj["source_repo_name"].toString();
+    os.artifactId = obj["artifact_id"].toVariant().toLongLong();
+    os.releaseAssetId = obj["asset_id"].toVariant().toLongLong();
+    os.releaseTag = obj["release_tag"].toString();
+    if (obj.contains("release_assets")) {
+        os.releaseAssetsJson = QString::fromUtf8(
+            QJsonDocument(obj["release_assets"].toArray()).toJson(QJsonDocument::Compact));
+    }
+    return os;
+}
+
+QString OSListModel::identityForOS(const OS &os)
+{
+    if (os.artifactId > 0) {
+        return QStringLiteral("artifact:%1").arg(os.artifactId);
+    }
+    if (!os.releaseTag.isEmpty()) {
+        return QStringLiteral("release:%1/%2:%3")
+            .arg(os.sourceOwner, os.sourceRepo, os.releaseTag);
+    }
+    return QStringLiteral("%1:%2:%3").arg(os.sourceType, os.name, os.url);
+}
+
 bool OSListModel::reload()
 {
     QElapsedTimer parseTimer;
@@ -449,75 +559,63 @@ bool OSListModel::reload()
     _osList.reserve(list.count());
 
     for (const auto value : list) {
-        const QJsonObject obj = value.toObject();
-        OS os;
-
-        os.name = obj["name"].toString();
-        os.description = obj["description"].toString();
-
-        QJsonArray devicesArray = obj["devices"].toArray();
-        os.devices.reserve(devicesArray.size());
-        for (const auto &device : devicesArray) {
-            os.devices.append(device.toString());
-        }
-
-        QJsonArray capsArray = obj["capabilities"].toArray();
-        os.capabilities.reserve(capsArray.size());
-        for (const auto &cap : capsArray) {
-            os.capabilities.append(cap.toString());
-        }
-
-        os.extractSize = obj["extract_size"].toDouble();
-        os.imageDownloadSize = obj["image_download_size"].toDouble();
-
-        os.random = obj["random"].toBool();
-
-        os.extractSha256 = obj["extract_sha256"].toString();
-        // Icon source: rewrite to image provider to avoid network head-of-line blocking
-        {
-            const QString rawIcon = obj["icon"].toString();
-            const QString sanitized = sanitizeIconSource(rawIcon);
-            if (!sanitized.isEmpty()) {
-                // If already qrc or local relative, keep as-is. For http(s), route via image://icons/
-                if (sanitized.startsWith("http://") || sanitized.startsWith("https://")) {
-                    os.icon = QStringLiteral("image://icons/") + sanitized;
-                } else {
-                    os.icon = sanitized;
-                }
-            }
-        }
-        os.initFormat = obj["init_format"].toString();
-        os.releaseDate = obj["release_date"].toString();
-        os.url = obj["url"].toString();
-        os.subitemsJson = obj["subitems_json"].toString();
-        os.tooltip = obj["tooltip"].toString();
-        os.website = obj["website"].toString();
-        os.architecture = obj["architecture"].toString();
-        os.enableRPiConnect = obj.value("enable_rpi_connect").toBool(false);
-        os.source = obj["source"].toString();
-        os.sourceType = obj["source_type"].toString();
-        os.branch = obj["branch"].toString();
-        os.sourceOwner = obj["source_owner"].toString();
-        os.sourceRepo = obj["source_repo_name"].toString();
-        os.artifactId = obj["artifact_id"].toVariant().toLongLong();
-        os.releaseAssetId = obj["asset_id"].toVariant().toLongLong();
-        os.releaseTag = obj["release_tag"].toString();
-        // Store release_assets as JSON string (will be parsed back in data())
-        if (obj.contains("release_assets")) {
-            os.releaseAssetsJson = QString::fromUtf8(
-                QJsonDocument(obj["release_assets"].toArray()).toJson(QJsonDocument::Compact));
-        }
-
-        _osList.append(os);
+        _osList.append(osFromJsonObject(value.toObject()));
     }
 
     // Mark the first OS as recommended after architecture sorting
     markFirstAsRecommended();
 
     endResetModel();
-    
+
     emit eventOsListParse(static_cast<quint32>(parseTimer.elapsed()), true);
 
+    return true;
+}
+
+bool OSListModel::reloadIncremental()
+{
+    QElapsedTimer parseTimer;
+    parseTimer.start();
+
+    const QJsonObject root = _imageWriter.getFilteredOSlistDocument().object();
+    QJsonArray list = parseOSJson(root);
+    if (list.isEmpty()) {
+        emit eventOsListParse(static_cast<quint32>(parseTimer.elapsed()), true);
+        return true;
+    }
+
+    applyArchitectureSorting(list, _imageWriter.getHWList()->currentArchitecture());
+
+    QVector<OS> desired;
+    desired.reserve(list.size());
+    for (const auto &value : list) {
+        desired.append(osFromJsonObject(value.toObject()));
+    }
+
+    QSet<QString> currentIdentities;
+    for (const OS &os : _osList) {
+        currentIdentities.insert(identityForOS(os));
+    }
+
+    for (int targetRow = 0; targetRow < desired.size(); ++targetRow) {
+        const OS &candidate = desired[targetRow];
+        const QString identity = identityForOS(candidate);
+        if (currentIdentities.contains(identity)) {
+            continue;
+        }
+
+        const int insertRow = qMin(targetRow, static_cast<int>(_osList.size()));
+        beginInsertRows(QModelIndex(), insertRow, insertRow);
+        _osList.insert(insertRow, candidate);
+        endInsertRows();
+        currentIdentities.insert(identity);
+    }
+
+    markFirstAsRecommended();
+    if (!_osList.isEmpty()) {
+        emit dataChanged(index(0), index(_osList.size() - 1), {DescriptionRole});
+    }
+    emit eventOsListParse(static_cast<quint32>(parseTimer.elapsed()), true);
     return true;
 }
 

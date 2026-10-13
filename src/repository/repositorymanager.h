@@ -320,6 +320,7 @@ signals:
 private slots:
     void onCdnListReady(const QJsonArray &list);
     void onGitHubWicFilesReady(const QJsonArray &wicFiles);
+    void onGitHubArtifactFilesBatchReady(const QJsonArray &wicFiles);
     void onGitHubArtifactFilesReady(const QJsonArray &wicFiles);
     void onBranchesReady(const QJsonArray &branches);
     void onBranchFetchError(const QString &message);
@@ -335,6 +336,7 @@ private:
     static QString extractVersion(const QString &text);
     static QString buildDisplayName(const QString &deviceName, const QString &version,
                                     const QString &fallback);
+    bool appendGitHubArtifactEntries(const QJsonArray &wicFiles);
 
     struct GitHubRepoInfo {
         QString owner;

@@ -433,7 +433,11 @@ QJsonArray RepositoryManager::getGitHubOsList() const
         QString dateA = a.toObject()["release_date"].toString();
         QString dateB = b.toObject()["release_date"].toString();
         // ISO 8601 dates can be compared lexicographically
-        return dateA > dateB;  // Descending order (newest first)
+        if (dateA != dateB) return dateA > dateB;  // Descending order (newest first)
+
+        const QByteArray keyA = QJsonDocument(a.toObject()).toJson(QJsonDocument::Compact);
+        const QByteArray keyB = QJsonDocument(b.toObject()).toJson(QJsonDocument::Compact);
+        return keyA < keyB;
     });
 
     QJsonArray sorted;
@@ -455,6 +459,8 @@ void RepositoryManager::setGitHubClient(GitHubClient *client)
     if (_githubClient) {
         connect(_githubClient, &GitHubClient::wicFilesReady,
                 this, &RepositoryManager::onGitHubWicFilesReady);
+        connect(_githubClient, &GitHubClient::artifactWicFilesBatchReady,
+                this, &RepositoryManager::onGitHubArtifactFilesBatchReady);
         connect(_githubClient, &GitHubClient::artifactWicFilesReady,
                 this, &RepositoryManager::onGitHubArtifactFilesReady);
         connect(_githubClient, &GitHubClient::branchesReady,
@@ -688,11 +694,21 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
     checkRefreshComplete();
 }
 
-void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
+bool RepositoryManager::appendGitHubArtifactEntries(const QJsonArray &wicFiles)
 {
-    // Convert artifact WIC files to OS list format and append
+    QSet<qint64> existingArtifactIds;
+    for (const auto &entry : _githubOsList) {
+        const qint64 artifactId = entry.toObject()["artifact_id"].toVariant().toLongLong();
+        if (artifactId > 0) existingArtifactIds.insert(artifactId);
+    }
+
+    bool appended = false;
     for (const auto &wicValue : wicFiles) {
         QJsonObject wic = wicValue.toObject();
+        const qint64 artifactId = wic["artifact_id"].toVariant().toLongLong();
+        if (artifactId <= 0 || existingArtifactIds.contains(artifactId)) continue;
+        existingArtifactIds.insert(artifactId);
+
         QString artifactName = wic["name"].toString();
         QString artifactNameLower = artifactName.toLower();
         bool isVsi = artifactNameLower.endsWith(".vsi");
@@ -710,7 +726,7 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         osEntry["init_format"] = "none";
         osEntry["source"] = "github";
         osEntry["source_type"] = "artifact";
-        osEntry["artifact_id"] = wic["artifact_id"].toVariant().toLongLong();
+        osEntry["artifact_id"] = artifactId;
         osEntry["run_id"] = wic["run_id"].toVariant().toLongLong();
         osEntry["branch"] = wic["branch"].toString();
         osEntry["source_owner"] = wic["owner"].toString();
@@ -722,11 +738,28 @@ void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
         osEntry["icon"] = DeviceDetection::getIconPath(deviceType);
 
         _githubOsList.append(osEntry);
+        appended = true;
     }
 
-    qDebug() << "RepositoryManager: GitHub artifact WIC files added:" << wicFiles.size()
-             << ", pending before decrement:" << _pendingRefreshCount;
+    return appended;
+}
 
+void RepositoryManager::onGitHubArtifactFilesBatchReady(const QJsonArray &wicFiles)
+{
+    if (appendGitHubArtifactEntries(wicFiles)) {
+        qDebug() << "RepositoryManager: Added incremental GitHub artifact batch:"
+                 << wicFiles.size() << "items";
+        emit osListReady();
+    }
+}
+
+void RepositoryManager::onGitHubArtifactFilesReady(const QJsonArray &wicFiles)
+{
+    // The pages have already been added as they arrived. Keep supporting the
+    // completed-result signal for other clients without adding duplicate rows.
+    appendGitHubArtifactEntries(wicFiles);
+    qDebug() << "RepositoryManager: GitHub artifact search complete, pending:"
+             << _pendingRefreshCount;
     _pendingRefreshCount--;
     checkRefreshComplete();
 }

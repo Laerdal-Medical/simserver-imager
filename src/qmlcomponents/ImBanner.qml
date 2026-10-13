@@ -84,12 +84,14 @@ Rectangle {
         anchors.rightMargin: Style.spacingMedium
         anchors.topMargin: Style.spacingSmall
         anchors.bottomMargin: Style.spacingSmall
-        spacing: Style.spacingSmall
+        spacing: root.loading ? Style.spacingMedium : Style.spacingSmall
 
         // Loading spinner (shown when loading is true)
         ImBusyIndicator {
             visible: root.loading
             running: root.loading
+            spinnerSize: 20
+            strokeWidth: 2
             Layout.preferredWidth: 24
             Layout.preferredHeight: 24
         }

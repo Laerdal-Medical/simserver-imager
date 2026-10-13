@@ -1,10 +1,13 @@
 laerdal-simserver-imager (1.0.11) stable; urgency=medium
 
-  * Improve OS list ordering: GitHub releases first, then main-branch CI
-    builds sorted by date (newest first), then feature-branch builds and CDN
-    images by version. Main-branch builds are ordered by date rather than
-    build number because build numbers from different CI pipelines are not
-    comparable
+  * Improve OS list ordering: GitHub releases first, then CI builds on all
+    branches sorted by date (newest first), then CDN images by version;
+    stable versions precede prereleases with deterministic tie-breaking
+  * Load CI builds incrementally from paginated, branch-filtered successful
+    workflow runs while allowing selection during background loading
+  * Fix list resets interrupting clicks and the initial loading overlay
+    hiding builds until all requests finish
+  * Use smaller loading banner spinners with more space before the message
   * Cached CI artifact ZIP files now include the image version in their
     filename (e.g. artifact_<id>_v9.2.0.127.zip) for easier identification
 

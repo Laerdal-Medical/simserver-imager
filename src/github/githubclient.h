@@ -301,6 +301,7 @@ signals:
      * @param wicFiles Array of WIC file information objects from artifacts
      */
     void artifactWicFilesReady(const QJsonArray &wicFiles);
+    void artifactWicFilesBatchReady(const QJsonArray &wicFiles);
 
     /**
      * @brief Emitted when artifact contents have been inspected
@@ -393,30 +394,39 @@ private:
         RequestWicSearch,
         RequestWorkflowRuns,
         RequestWorkflowArtifacts,
-        RequestArtifactWicSearch
+        RequestArtifactWicSearch,
+        RequestArtifactRunWicSearch
     };
 
     QHash<QNetworkReply*, RequestType> _pendingRequests;
     QHash<QNetworkReply*, QPair<QString, QString>> _requestMetadata; // owner/repo
+    QHash<QNetworkReply*, QString> _artifactSearchKeyByReply;
+
+    struct ArtifactRunInfo {
+        QString branch;
+        QString createdAt;
+        qint64 runId = 0;
+    };
+    QHash<QNetworkReply*, ArtifactRunInfo> _artifactRunInfo;
 
     // State for artifact WIC search (requires multiple API calls)
     struct ArtifactSearchState {
         QString owner;
         QString repo;
-        int pendingRuns = 0;
+        QString branch;
+        int pendingWorkflowPages = 0;
+        int pendingArtifactRequests = 0;
+        int nextWorkflowPage = 1;
+        int totalWorkflowPages = 0;
         QJsonArray collectedArtifacts;
     };
-    QHash<QString, ArtifactSearchState> _artifactSearchStates; // key: "owner/repo"
+    QHash<QString, ArtifactSearchState> _artifactSearchStates;
+    quint64 _artifactSearchSequence = 0;
 
-    // Map reply to run info for artifact fetches
-    struct RunInfo {
-        QString owner;
-        QString repo;
-        QString branch;
-        QString createdAt;
-        qint64 runId;
-    };
-    QHash<QNetworkReply*, RunInfo> _artifactRunInfo;
+    void fetchArtifactWorkflowRunsPage(const QString &searchKey, int page);
+    void fetchArtifactRunFiles(const QString &searchKey, const QJsonObject &run);
+    void advanceArtifactSearch(const QString &key);
+    void failArtifactSearch(const QString &key);
 
     // Track ongoing artifact inspection download for cancellation and resume
     bool _inspectionCancelled = false;  // Prevents starting redirect download after cancel

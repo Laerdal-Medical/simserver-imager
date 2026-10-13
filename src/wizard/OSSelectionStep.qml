@@ -263,7 +263,11 @@ WizardStepBase {
         root.rebuildFocusOrder()
     }
 
-    
+    function addNewOSModelRows() {
+        root.osmodel.reloadIncremental()
+    }
+
+
     function initializeListViewFocus(listView) {
         // No-op: Do not auto-select first item to avoid unwanted highlighting on load
     }
@@ -304,10 +308,19 @@ WizardStepBase {
     Connections {
         target: imageWriter
         function onOsListPrepared() {
+            var loadingCiArtifacts = root.isLoadingCIImages
+                    && root.repoManager.selectedSourceType === "github-ci"
+
             // If we were showing offline state and now have data, force full reload
             // (softRefresh only updates existing rows, doesn't add new ones)
-            if (root.osListUnavailable) {
+            if (root.osListUnavailable && !loadingCiArtifacts) {
                 // Still unavailable - no point refreshing
+                return
+            }
+
+            if (loadingCiArtifacts) {
+                root.modelLoaded = true
+                root.addNewOSModelRows()
                 return
             }
 
@@ -428,7 +441,9 @@ WizardStepBase {
 
     // Track whether CI images are being fetched
     readonly property var repoManager: imageWriter.getRepositoryManager()
-    readonly property bool isLoadingCIImages: repoManager ? repoManager.isLoading : false
+    readonly property bool isLoadingCIImages: repoManager
+            ? repoManager.isLoading && repoManager.selectedSourceType === "github-ci"
+            : false
 
     // Content
     content: [
@@ -436,12 +451,11 @@ WizardStepBase {
         anchors.fill: parent
         spacing: 0
 
-        // CI images loading banner - hidden since we use the overlay instead
+        // Show background progress after the first matching builds are available.
         ImLoadingBanner {
             id: loadingBanner
-            active: false
-            text: qsTr("Loading CI images from GitHub...")
-            visible: false
+            active: root.isLoadingCIImages && oslist.count > 0
+            text: qsTr("Loading more CI images from GitHub...")
         }
 
         // CI images status banner (shown after loading completes)
@@ -481,12 +495,12 @@ WizardStepBase {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            // Loading overlay - shown while fetching CI images
+            // Keep the initial loading overlay until the first builds arrive.
             Rectangle {
                 id: loadingOverlay
                 anchors.fill: parent
                 color: Style.backgroundColor
-                visible: root.isLoadingCIImages
+                visible: root.isLoadingCIImages && oslist.count === 0
                 z: 10  // Above the list
 
                 ColumnLayout {
@@ -515,7 +529,8 @@ WizardStepBase {
                 clip: true
                 focus: false  // Don't let SwipeView steal focus from its children
                 activeFocusOnTab: false
-                opacity: root.isLoadingCIImages ? 0.3 : 1.0  // Dim while loading
+                opacity: root.isLoadingCIImages && oslist.count === 0
+                         ? 0.3 : 1.0
 
                 onCurrentIndexChanged: {
                     _focusFirstItemInCurrentView()

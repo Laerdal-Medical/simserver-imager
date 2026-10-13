@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QSettings>
+#include <QUrlQuery>
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -297,26 +298,108 @@ void GitHubClient::fetchWorkflowArtifacts(const QString &owner, const QString &r
 void GitHubClient::searchWicFilesInArtifacts(const QString &owner, const QString &repo,
                                               const QString &branch)
 {
-    // First fetch workflow runs, then we'll get artifacts from successful runs
-    // Use per_page=30 to get more workflow runs (some may not have WIC artifacts)
-    QString urlStr = QString("%1/repos/%2/%3/actions/runs?per_page=30&status=success")
-                         .arg(API_BASE_URL, owner, repo);
-
-    if (!branch.isEmpty()) {
-        urlStr += QString("&branch=%1").arg(branch);
+    const QString repoKey = QString("%1/%2").arg(owner, repo);
+    const QString key = QString("%1#%2").arg(repoKey).arg(++_artifactSearchSequence);
+    for (auto it = _artifactSearchStates.begin(); it != _artifactSearchStates.end();) {
+        if (it->owner == owner && it->repo == repo) {
+            it = _artifactSearchStates.erase(it);
+        } else {
+            ++it;
+        }
     }
 
-    QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
+    ArtifactSearchState state;
+    state.owner = owner;
+    state.repo = repo;
+    state.branch = branch;
+    state.pendingWorkflowPages = 1;
+    _artifactSearchStates.insert(key, state);
+
+    fetchArtifactWorkflowRunsPage(key, 1);
+    qDebug() << "GitHubClient: Searching WIC artifacts in" << owner << "/" << repo;
+}
+
+void GitHubClient::fetchArtifactWorkflowRunsPage(const QString &searchKey, int page)
+{
+    const auto state = _artifactSearchStates.constFind(searchKey);
+    if (state == _artifactSearchStates.cend()) return;
+
+    QUrl url(QString("%1/repos/%2/%3/actions/runs")
+                 .arg(API_BASE_URL, state->owner, state->repo));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("per_page"), QStringLiteral("30"));
+    query.addQueryItem(QStringLiteral("page"), QString::number(page));
+    query.addQueryItem(QStringLiteral("status"), QStringLiteral("success"));
+    if (!state->branch.isEmpty()) {
+        query.addQueryItem(QStringLiteral("branch"), state->branch);
+    }
+    url.setQuery(query);
+
+    QNetworkRequest request = createAuthenticatedRequest(url);
     QNetworkReply *reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestArtifactWicSearch;
-    _requestMetadata[reply] = qMakePair(owner, repo);
+    _requestMetadata[reply] = qMakePair(state->owner, state->repo);
+    _artifactSearchKeyByReply[reply] = searchKey;
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         handleNetworkReply(reply);
     });
+}
 
-    qDebug() << "GitHubClient: Searching WIC artifacts in" << owner << "/" << repo;
+void GitHubClient::fetchArtifactRunFiles(const QString &searchKey, const QJsonObject &run)
+{
+    auto state = _artifactSearchStates.find(searchKey);
+    if (state == _artifactSearchStates.cend()) return;
+
+    const qint64 runId = run["id"].toVariant().toLongLong();
+    if (runId <= 0) return;
+
+    const QString runBranch = run["head_branch"].toString();
+    const QString runCreatedAt = run["created_at"].toString();
+    QUrl url(QString("%1/repos/%2/%3/actions/runs/%4/artifacts")
+                 .arg(API_BASE_URL, state->owner, state->repo, QString::number(runId)));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("per_page"), QStringLiteral("100"));
+    url.setQuery(query);
+
+    QNetworkReply *reply = _networkManager.get(createAuthenticatedRequest(url));
+    _pendingRequests[reply] = RequestArtifactRunWicSearch;
+    _requestMetadata[reply] = qMakePair(state->owner, state->repo);
+    _artifactSearchKeyByReply[reply] = searchKey;
+    _artifactRunInfo[reply] = {runBranch, runCreatedAt, runId};
+    ++state->pendingArtifactRequests;
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleNetworkReply(reply);
+    });
+}
+
+void GitHubClient::advanceArtifactSearch(const QString &key)
+{
+    auto it = _artifactSearchStates.find(key);
+    if (it == _artifactSearchStates.end()
+        || it->pendingWorkflowPages > 0 || it->pendingArtifactRequests > 0) {
+        return;
+    }
+
+    if (it->nextWorkflowPage <= it->totalWorkflowPages) {
+        const int nextPage = it->nextWorkflowPage++;
+        ++it->pendingWorkflowPages;
+        fetchArtifactWorkflowRunsPage(key, nextPage);
+        return;
+    }
+
+    const QJsonArray artifacts = it->collectedArtifacts;
+    _artifactSearchStates.erase(it);
+    emit artifactWicFilesReady(artifacts);
+}
+
+void GitHubClient::failArtifactSearch(const QString &key)
+{
+    if (_artifactSearchStates.remove(key) > 0) {
+        qWarning() << "GitHubClient: Stopping artifact search after request failure:" << key;
+    }
 }
 
 QString GitHubClient::getArtifactDownloadUrl(const QString &owner, const QString &repo, qint64 artifactId)
@@ -942,6 +1025,18 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
 
     RequestType requestType = _pendingRequests.take(reply);
     QPair<QString, QString> metadata = _requestMetadata.take(reply);
+    const QString artifactSearchKey = _artifactSearchKeyByReply.take(reply);
+    const ArtifactRunInfo artifactRunInfo = _artifactRunInfo.take(reply);
+    auto finishFailedArtifactRequest = [this, requestType, artifactSearchKey]() {
+        if ((requestType != RequestArtifactWicSearch
+             && requestType != RequestArtifactRunWicSearch)
+            || artifactSearchKey.isEmpty()
+            || !_artifactSearchStates.contains(artifactSearchKey)) {
+            return false;
+        }
+        failArtifactSearch(artifactSearchKey);
+        return true;
+    };
 
     // Check for rate limiting
     checkRateLimitHeaders(reply);
@@ -954,11 +1049,19 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
             QString rateLimitRemaining = reply->rawHeader("X-RateLimit-Remaining");
             if (rateLimitRemaining == "0") {
                 qint64 resetTime = reply->rawHeader("X-RateLimit-Reset").toLongLong();
+                const bool activeArtifactSearch = finishFailedArtifactRequest();
+                if (requestType == RequestArtifactWicSearch
+                    || requestType == RequestArtifactRunWicSearch) {
+                    if (activeArtifactSearch) emit error(tr("GitHub API rate limit exceeded"));
+                }
                 emit rateLimitExceeded(resetTime);
                 return;
             }
         }
 
+        const bool activeArtifactSearch = finishFailedArtifactRequest();
+        if ((requestType == RequestArtifactWicSearch
+             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) return;
         if (statusCode == 404) {
             emit error(tr("Repository not found or not accessible: %1/%2")
                            .arg(metadata.first, metadata.second));
@@ -972,6 +1075,9 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     QJsonDocument doc = QJsonDocument::fromJson(responseData);
 
     if (doc.isNull()) {
+        const bool activeArtifactSearch = finishFailedArtifactRequest();
+        if ((requestType == RequestArtifactWicSearch
+             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) return;
         emit error(tr("Invalid JSON response from GitHub"));
         return;
     }
@@ -1057,98 +1163,75 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     case RequestWorkflowArtifacts: {
         if (doc.isObject()) {
             QJsonArray artifacts = doc.object()["artifacts"].toArray();
-
-            // Check if this is part of an artifact WIC search
-            RunInfo runInfo = _artifactRunInfo.take(reply);
-            if (!runInfo.owner.isEmpty()) {
-                QString key = QString("%1/%2").arg(runInfo.owner, runInfo.repo);
-                if (_artifactSearchStates.contains(key)) {
-                    ArtifactSearchState &state = _artifactSearchStates[key];
-
-                    // Filter and collect WIC artifacts from this run
-                    QJsonArray wicArtifacts = filterWicArtifacts(artifacts, runInfo.owner,
-                                                                  runInfo.repo, runInfo.branch,
-                                                                  runInfo.createdAt);
-                    for (const auto &artifact : wicArtifacts) {
-                        state.collectedArtifacts.append(artifact);
-                    }
-
-                    state.pendingRuns--;
-                    qDebug() << "GitHubClient: Artifact fetch complete for run" << runInfo.runId
-                             << ", pending:" << state.pendingRuns
-                             << ", collected:" << state.collectedArtifacts.size();
-
-                    // If all runs are done, emit the collected artifacts
-                    if (state.pendingRuns <= 0) {
-                        QJsonArray finalArtifacts = state.collectedArtifacts;
-                        _artifactSearchStates.remove(key);
-                        emit artifactWicFilesReady(finalArtifacts);
-                    }
-                    break;
-                }
-            }
-
-            // Regular artifact fetch (not part of WIC search)
             emit workflowArtifactsReady(artifacts);
+        } else {
+            emit error(tr("Unexpected response format for workflow artifacts"));
         }
         break;
     }
 
     case RequestArtifactWicSearch: {
         if (doc.isObject()) {
-            QJsonArray runs = doc.object()["workflow_runs"].toArray();
-            QString owner = metadata.first;
-            QString repo = metadata.second;
-            QString key = QString("%1/%2").arg(owner, repo);
-
-            if (runs.isEmpty()) {
-                // No runs found, emit empty result
-                qDebug() << "GitHubClient: No workflow runs found for" << key;
-                emit artifactWicFilesReady(QJsonArray());
+            const QJsonObject response = doc.object();
+            const QString key = artifactSearchKey;
+            auto stateIt = _artifactSearchStates.find(key);
+            if (stateIt == _artifactSearchStates.end()) {
                 break;
             }
 
-            // Initialize search state
-            ArtifactSearchState state;
-            state.owner = owner;
-            state.repo = repo;
-            state.pendingRuns = runs.size();
-            _artifactSearchStates[key] = state;
+            const int currentPage = QUrlQuery(reply->url()).queryItemValue(QStringLiteral("page")).toInt();
+            const int totalCount = response["total_count"].toInt();
+            stateIt->totalWorkflowPages = (totalCount + 29) / 30;
+            stateIt->nextWorkflowPage = currentPage + 1;
+            --stateIt->pendingWorkflowPages;
 
-            qDebug() << "GitHubClient: Found" << runs.size() << "workflow runs for" << key
-                     << ", fetching artifacts...";
-
-            // Fetch artifacts for each run
+            const QJsonArray runs = response["workflow_runs"].toArray();
             for (const auto &runValue : runs) {
-                QJsonObject run = runValue.toObject();
-                qint64 runId = run["id"].toVariant().toLongLong();
-                QString headBranch = run["head_branch"].toString();
-                QString createdAt = run["created_at"].toString();
+                fetchArtifactRunFiles(key, runValue.toObject());
+            }
 
-                // Fetch artifacts for this run
-                QString urlStr = QString("%1/repos/%2/%3/actions/runs/%4/artifacts")
-                                     .arg(API_BASE_URL, owner, repo, QString::number(runId));
-
-                QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-                QNetworkReply *artifactReply = _networkManager.get(request);
-
-                _pendingRequests[artifactReply] = RequestWorkflowArtifacts;
-                _requestMetadata[artifactReply] = qMakePair(owner, repo);
-
-                // Store run info for when the artifact response comes back
-                RunInfo info;
-                info.owner = owner;
-                info.repo = repo;
-                info.branch = headBranch;
-                info.createdAt = createdAt;
-                info.runId = runId;
-                _artifactRunInfo[artifactReply] = info;
-
-                connect(artifactReply, &QNetworkReply::finished, this, [this, artifactReply]() {
-                    handleNetworkReply(artifactReply);
-                });
+            qDebug() << "GitHubClient: Processed workflow page" << currentPage << "for" << key
+                     << ", runs:" << runs.size()
+                     << ", artifact requests pending:" << stateIt->pendingArtifactRequests;
+            advanceArtifactSearch(key);
+        } else {
+            const bool activeArtifactSearch = finishFailedArtifactRequest();
+            if (activeArtifactSearch) {
+                emit error(tr("Unexpected response format for workflow runs"));
             }
         }
+        break;
+    }
+
+    case RequestArtifactRunWicSearch: {
+        const QString key = artifactSearchKey;
+        auto stateIt = _artifactSearchStates.find(key);
+        if (stateIt == _artifactSearchStates.end()) {
+            break;
+        }
+
+        if (!doc.isObject()) {
+            failArtifactSearch(key);
+            emit error(tr("Unexpected response format for workflow artifacts"));
+            break;
+        }
+
+        const QJsonArray artifacts = doc.object()["artifacts"].toArray();
+        const QJsonArray wicArtifacts = filterWicArtifacts(
+            artifacts, metadata.first, metadata.second,
+            artifactRunInfo.branch, artifactRunInfo.createdAt);
+        for (const auto &artifact : wicArtifacts) {
+            stateIt->collectedArtifacts.append(artifact);
+        }
+        if (!wicArtifacts.isEmpty()) {
+            emit artifactWicFilesBatchReady(wicArtifacts);
+        }
+
+        --stateIt->pendingArtifactRequests;
+        qDebug() << "GitHubClient: Artifact fetch complete for run" << artifactRunInfo.runId
+                 << ", pending:" << stateIt->pendingArtifactRequests
+                 << ", collected:" << stateIt->collectedArtifacts.size();
+        advanceArtifactSearch(key);
         break;
     }
     }
@@ -1282,11 +1365,14 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
         qint64 artifactId = artifact["id"].toVariant().toLongLong();
         qint64 size = artifact["size_in_bytes"].toVariant().toLongLong();
         bool expired = artifact["expired"].toBool();
+        const QJsonObject workflowRun = artifact["workflow_run"].toObject();
+        const QString artifactBranch = workflowRun["head_branch"].toString(branch);
+        const QString createdAt = artifact["created_at"].toString(runCreatedAt);
 
         qDebug() << "GitHubClient: Checking artifact:" << name << "expired:" << expired << "size:" << size;
 
-        if (expired) {
-            continue;  // Skip expired artifacts
+        if (expired || (!branch.isEmpty() && artifactBranch != branch)) {
+            continue;
         }
 
         // Check if artifact name suggests it contains WIC files
@@ -1316,8 +1402,8 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
             wicFile["name"] = name;
             wicFile["artifact_id"] = artifactId;
             wicFile["size"] = size;
-            wicFile["branch"] = branch;
-            wicFile["created_at"] = runCreatedAt;
+            wicFile["branch"] = artifactBranch;
+            wicFile["created_at"] = createdAt;
             wicFile["owner"] = owner;
             wicFile["repo"] = repo;
             wicFile["download_url"] = getArtifactDownloadUrl(owner, repo, artifactId);
