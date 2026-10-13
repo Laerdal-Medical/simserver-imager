@@ -14,7 +14,7 @@
 #include <QFileInfo>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QUuid>
+#include <QTemporaryDir>
 #include <archive.h>
 #include <archive_entry.h>
 #include <functional>
@@ -42,9 +42,9 @@ bool waitFor(const std::function<bool()> &condition)
 }
 
 struct Files {
-    QString directory = QDir::currentPath() + "/downloadonly-test-" + QUuid::createUuid().toString(QUuid::Id128);
-    Files() { REQUIRE(QDir().mkpath(directory)); }
-    ~Files() { QDir(directory).removeRecursively(); }
+    QTemporaryDir temporary;
+    QString directory = temporary.path();
+    Files() { REQUIRE(temporary.isValid()); }
     QString path(const QString &name) const { return directory + "/" + name; }
     QUrl url(const QString &name) const { return QUrl::fromLocalFile(path(name)); }
     void write(const QString &name, const QByteArray &data) const {
@@ -75,9 +75,26 @@ struct Files {
         archive_write_free(writer);
     }
 };
+
+void serve(QTcpServer &server, const QByteArray &response, QByteArray *request = nullptr)
+{
+    QObject::connect(&server, &QTcpServer::newConnection, &server, [&server, response, request] {
+        auto *socket = server.nextPendingConnection();
+        QObject::connect(socket, &QTcpSocket::readyRead, socket,
+                         [socket, response, request, received = QByteArray(), handled = false]() mutable {
+            received += socket->readAll();
+            if (handled || !received.contains("\r\n\r\n")) return;
+            handled = true;
+            if (request) *request = received;
+            socket->write(response);
+            socket->disconnectFromHost();
+        });
+        QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+    });
+}
 }
 
-TEST_CASE("Save dialog normalizes local paths and rejects unavailable folders", "[downloadonly]")
+TEST_CASE("Local save-path helpers normalize encoded paths and reject unavailable folders", "[downloadonly]")
 {
     application();
     Files files;
@@ -176,6 +193,10 @@ TEST_CASE("Missing ambiguous or broken artifact entries leave existing files unc
         source["entry"] = "image.wic";
         source["match_basename"] = true;
     }
+    SECTION("Duplicate exact entry") {
+        files.zip({{"image.wic", "first"}, {"image.wic", "second"}});
+        source["entry"] = "image.wic";
+    }
     SECTION("Broken ZIP") { files.write("artifact.zip", "not a ZIP"); }
     transfer.start(source, files.url("saved.wic"), {}, true);
     REQUIRE(waitFor([&] { return !transfer.busy(); }));
@@ -213,6 +234,8 @@ TEST_CASE("Cancelling a network download cleans partial files and preserves the 
     QVariantMap source{{"url", QString("http://127.0.0.1:%1/image.spu").arg(server.serverPort())}};
     transfer.start(source, files.url("saved.spu"), {}, true);
     REQUIRE(waitFor([&] { return sent; }));
+    transfer.start({{"url", "file:///does-not-exist.spu"}}, files.url("second.spu"), {}, false);
+    REQUIRE(transfer.busy());
     transfer.cancel();
     REQUIRE(waitFor([&] { return !transfer.busy(); }));
     REQUIRE(transfer.savedFile().isEmpty());
@@ -221,6 +244,13 @@ TEST_CASE("Cancelling a network download cleans partial files and preserves the 
     else REQUIRE_FALSE(QFileInfo::exists(files.path("saved.spu")));
     REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == (hadDestination ? 1 : 0));
     if (socket) socket->abort();
+    files.write("source.spu", "retry");
+    transfer.start({{"url", files.url("source.spu").toString()}}, files.url("saved.spu"), {}, true);
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE(transfer.error().isEmpty());
+    REQUIRE(transfer.savedFile() == files.url("saved.spu"));
+    REQUIRE(files.read("saved.spu") == "retry");
+    REQUIRE_FALSE(QFileInfo::exists(files.path("second.spu")));
 }
 
 TEST_CASE("A destination created during download is not silently overwritten", "[downloadonly]")
@@ -271,15 +301,7 @@ TEST_CASE("Network downloads save original bytes and surface HTTP and truncation
         response = "HTTP/1.1 200 OK\r\nContent-Length: 800\r\nConnection: close\r\n\r\noriginal";
         expectError = true;
     }
-    QObject::connect(&server, &QTcpServer::newConnection, &server, [&] {
-        auto *socket = server.nextPendingConnection();
-        QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, response] {
-            socket->readAll();
-            socket->write(response);
-            socket->disconnectFromHost();
-        });
-        QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
-    });
+    serve(server, response);
     DownloadOnly transfer;
     QVariantMap source{{"url", QString("http://127.0.0.1:%1/image.vsi").arg(server.serverPort())}};
     transfer.start(source, files.url("saved.vsi"), {}, true);
@@ -287,6 +309,158 @@ TEST_CASE("Network downloads save original bytes and surface HTTP and truncation
     REQUIRE(transfer.error().isEmpty() == !expectError);
     REQUIRE(files.read("saved.vsi") == (expectError ? "existing" : "original"));
     REQUIRE(transfer.savedFile().isEmpty() == expectError);
+    REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == 1);
+}
+
+TEST_CASE("Download only follows redirects without sending credentials to non-GitHub hosts", "[downloadonly]")
+{
+    application();
+    Files files;
+    QTcpServer redirect, content;
+    REQUIRE(redirect.listen(QHostAddress::LocalHost));
+    REQUIRE(content.listen(QHostAddress::LocalHost));
+    QByteArray redirectRequest, contentRequest;
+    const QString target = QString("http://127.0.0.1:%1/payload.spu").arg(content.serverPort());
+    serve(redirect, "HTTP/1.1 302 Found\r\nLocation: " + target.toUtf8()
+          + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", &redirectRequest);
+    serve(content, "HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\npayload", &contentRequest);
+    DownloadOnly transfer;
+    transfer.start({{"url", QString("http://127.0.0.1:%1/image.spu").arg(redirect.serverPort())}},
+                   files.url("saved.spu"), "test-token-not-a-real-credential", false);
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE(transfer.error().isEmpty());
+    REQUIRE(files.read("saved.spu") == "payload");
+    REQUIRE(redirectRequest.startsWith("GET /image.spu "));
+    REQUIRE(contentRequest.startsWith("GET /payload.spu "));
+    REQUIRE_FALSE(redirectRequest.toLower().contains("authorization:"));
+    REQUIRE_FALSE(contentRequest.toLower().contains("authorization:"));
+}
+
+TEST_CASE("Uncached artifact downloads extract the selected image and remove scratch ZIPs", "[downloadonly]")
+{
+    application();
+    Files files;
+    files.zip({{"nested/image.wic", "selected"}, {"other.wic", "not selected"}});
+    const QByteArray zip = files.read("artifact.zip");
+    REQUIRE(QFile::remove(files.path("artifact.zip")));
+    files.write("saved.wic", "existing");
+    QTcpServer server;
+    REQUIRE(server.listen(QHostAddress::LocalHost));
+    serve(server, "HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(zip.size())
+          + "\r\nConnection: close\r\n\r\n" + zip);
+    QVariantMap source{{"artifact_id", 42}, {"entry", "image.wic"}, {"match_basename", true},
+                       {"url", QString("http://127.0.0.1:%1/artifact.zip").arg(server.serverPort())}};
+    bool succeeds = true;
+    SECTION("Unique basename") {}
+    SECTION("Missing selection") { source.remove("entry"); succeeds = false; }
+    SECTION("Missing archive entry") { source["entry"] = "missing.wic"; succeeds = false; }
+    DownloadOnly transfer;
+    transfer.start(source, files.url("saved.wic"), {}, true);
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE(transfer.error().isEmpty() == succeeds);
+    REQUIRE(files.read("saved.wic") == (succeeds ? "selected" : "existing"));
+    REQUIRE(transfer.savedFile().isEmpty() != succeeds);
+    REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == 1);
+}
+
+TEST_CASE("Download only rejects invalid destinations and can recover on the same controller", "[downloadonly]")
+{
+    application();
+    Files files;
+    files.write("source.wic", "original");
+    QUrl destination;
+    SECTION("Remote destination") { destination = QUrl("https://example.invalid/saved.wic"); }
+    SECTION("Relative destination") { destination = QUrl("saved.wic"); }
+    SECTION("Unavailable parent folder") { destination = files.url("missing/saved.wic"); }
+    SECTION("Empty destination") {}
+    DownloadOnly transfer;
+    const QVariantMap source{{"url", files.url("source.wic").toString()}};
+    transfer.start(source, destination, {}, false);
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE_FALSE(transfer.error().isEmpty());
+    REQUIRE(transfer.savedFile().isEmpty());
+    REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == 1);
+    transfer.start(source, files.url("saved.wic"), {}, false);
+    REQUIRE(transfer.error().isEmpty());
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE(transfer.error().isEmpty());
+    REQUIRE(transfer.savedFile() == files.url("saved.wic"));
+    REQUIRE(files.read("saved.wic") == "original");
+}
+
+TEST_CASE("Invalid download sources leave no successful result or partial output", "[downloadonly]")
+{
+    application();
+    Files files;
+    files.write("saved.wic", "existing");
+    QVariantMap source;
+    SECTION("Empty source") {}
+    SECTION("Unsupported protocol") { source["url"] = "ftp://example.invalid/image.wic"; }
+    SECTION("Missing local image") { source["url"] = files.url("missing.wic").toString(); }
+    SECTION("Missing cached ZIP") {
+        source["zip_path"] = files.path("missing.zip");
+        source["entry"] = "image.wic";
+    }
+    DownloadOnly transfer;
+    transfer.start(source, files.url("saved.wic"), {}, true);
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE_FALSE(transfer.error().isEmpty());
+    REQUIRE(transfer.savedFile().isEmpty());
+    REQUIRE(files.read("saved.wic") == "existing");
+    REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == 1);
+}
+
+TEST_CASE("Download only refuses archive links instead of exporting their targets", "[downloadonly]")
+{
+    application();
+    Files files;
+    files.write("saved.wic", "existing");
+    archive *writer = archive_write_new();
+    REQUIRE(archive_write_set_format_zip(writer) == ARCHIVE_OK);
+    REQUIRE(archive_write_open_filename(writer, QFile::encodeName(files.path("artifact.zip")).constData()) == ARCHIVE_OK);
+    archive_entry *entry = archive_entry_new();
+    archive_entry_set_pathname(entry, "image.wic");
+    archive_entry_set_filetype(entry, AE_IFLNK);
+    archive_entry_set_symlink(entry, "other.wic");
+    archive_entry_set_perm(entry, 0777);
+    REQUIRE(archive_write_header(writer, entry) == ARCHIVE_OK);
+    archive_entry_free(entry);
+    REQUIRE(archive_write_close(writer) == ARCHIVE_OK);
+    archive_write_free(writer);
+    DownloadOnly transfer;
+    transfer.start({{"zip_path", files.path("artifact.zip")}, {"entry", "image.wic"}},
+                   files.url("saved.wic"), {}, true);
+    REQUIRE(waitFor([&] { return !transfer.busy(); }));
+    REQUIRE_FALSE(transfer.error().isEmpty());
+    REQUIRE(transfer.savedFile().isEmpty());
+    REQUIRE(files.read("saved.wic") == "existing");
+    REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == 2);
+}
+
+TEST_CASE("Destroying an active download controller cancels and cleans up its worker", "[downloadonly]")
+{
+    application();
+    Files files;
+    files.write("saved.spu", "existing");
+    QTcpServer server;
+    REQUIRE(server.listen(QHostAddress::LocalHost));
+    bool started = false;
+    QObject::connect(&server, &QTcpServer::newConnection, &server, [&] {
+        auto *socket = server.nextPendingConnection();
+        QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, &started] {
+            socket->readAll();
+            socket->write("HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\npartial");
+            started = true;
+        });
+    });
+    {
+        DownloadOnly transfer;
+        transfer.start({{"url", QString("http://127.0.0.1:%1/image.spu").arg(server.serverPort())}},
+                       files.url("saved.spu"), {}, true);
+        REQUIRE(waitFor([&] { return started; }));
+    }
+    QCoreApplication::processEvents();
+    REQUIRE(files.read("saved.spu") == "existing");
     REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == 1);
 }
 

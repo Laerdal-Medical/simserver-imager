@@ -4,7 +4,6 @@
  */
 
 #include "oslistmodel.h"
-#include "imagewriter.h"
 
 #include <QJsonObject>
 #include <QJsonDocument>
@@ -457,8 +456,8 @@ namespace {
     }
 }
 
-OSListModel::OSListModel(ImageWriter &imageWriter)
-    : QAbstractListModel(&imageWriter), _imageWriter(imageWriter) {}
+OSListModel::OSListModel(Source source, QObject *parent)
+    : QAbstractListModel(parent), _source(std::move(source)) {}
 
 OSListModel::OS OSListModel::osFromJsonObject(const QJsonObject &obj)
 {
@@ -532,7 +531,7 @@ bool OSListModel::reload()
     QElapsedTimer parseTimer;
     parseTimer.start();
 
-    QJsonDocument doc = _imageWriter.getFilteredOSlistDocument();
+    QJsonDocument doc = _source.filteredOsList();
     QJsonObject root = doc.object();
 
     QJsonArray list = parseOSJson(root);
@@ -549,7 +548,7 @@ bool OSListModel::reload()
     }
 
     // Get the preferred architecture from the currently selected device
-    QString preferredArchitecture = _imageWriter.getHWList()->currentArchitecture();
+    QString preferredArchitecture = _source.preferredArchitecture();
     
     // Apply architecture-based sorting if device has a preference
     applyArchitectureSorting(list, preferredArchitecture);
@@ -577,14 +576,14 @@ bool OSListModel::reloadIncremental()
     QElapsedTimer parseTimer;
     parseTimer.start();
 
-    const QJsonObject root = _imageWriter.getFilteredOSlistDocument().object();
+    const QJsonObject root = _source.filteredOsList().object();
     QJsonArray list = parseOSJson(root);
     if (list.isEmpty()) {
         emit eventOsListParse(static_cast<quint32>(parseTimer.elapsed()), true);
         return true;
     }
 
-    applyArchitectureSorting(list, _imageWriter.getHWList()->currentArchitecture());
+    applyArchitectureSorting(list, _source.preferredArchitecture());
 
     QVector<OS> desired;
     desired.reserve(list.size());

@@ -125,6 +125,19 @@ void ImageWriter::startDownloadOnly(const QVariantMap &source, const QUrl &desti
     _downloadOnly->start(downloadSource, destination, _githubClient ? _githubClient->authToken() : QString(), overwrite);
 }
 
+OSListModel::OSListModel(ImageWriter &imageWriter)
+    : OSListModel(Source{
+          [&imageWriter] { return imageWriter.getFilteredOSlistDocument(); },
+          [&imageWriter] { return imageWriter.getHWList()->currentArchitecture(); }},
+          &imageWriter) {}
+
+HWListModel::HWListModel(ImageWriter &imageWriter)
+    : HWListModel(Actions{
+          [&imageWriter](const QJsonArray &tags, bool inclusive) { imageWriter.setHWFilterList(tags, inclusive); },
+          [&imageWriter](const QJsonArray &caps) { imageWriter.setHWCapabilitiesList(caps); },
+          [&imageWriter] { imageWriter.setSrc({}); }},
+          &imageWriter) {}
+
 ImageWriter::ImageWriter(QObject *parent)
     : QObject(parent),
       _cacheManager(nullptr),

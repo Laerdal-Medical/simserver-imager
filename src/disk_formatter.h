@@ -172,6 +172,7 @@ class DiskFormatter {
  private:
   static constexpr std::uint32_t kSectorSize = 512;
   static constexpr std::uint32_t kPartitionStartSector = 8192;  // 4MB offset
+  static constexpr std::uint32_t kMinimumPartitionSectors = 128;
   static constexpr std::uint8_t kFat32PartitionType = 0x0C;    // FAT32 LBA
 
   std::unique_ptr<FileOperations> file_ops_;

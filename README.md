@@ -139,6 +139,35 @@ cmake -B build -S src \
 cmake --build build --parallel
 ```
 
+## Tests
+
+Enable the Catch2 tests when configuring your build:
+
+```sh
+cmake -B build -S src -DBUILD_TESTING=ON \
+    -DQt6_ROOT=~/Qt/6.8.2/gcc_64
+cmake --build build --parallel
+ctest --test-dir build -L unit --output-on-failure --no-tests=error
+```
+
+The `unit` label selects the application's automated tests, not bundled-library
+tests or hardware diagnostics. Tests use temporary files and loopback HTTP
+servers; they do not require GitHub access or a physical storage device.
+QML calculation tests run with Qt's offscreen platform in GUI-enabled builds.
+For multi-configuration builds, add `-C Release` to the CTest command.
+
+Coverage includes generated customization scripts, download-only file saving,
+build selection models, ring-buffer and archive-entry streaming, cache-file
+completion, and the formatter's on-disk layout. Wizard navigation, native
+dialogs, OAuth flows, and real-device write/verify/eject behavior still require
+integration or platform testing; the unit suite is not a substitute for those.
+
+The FAT partition executable is a manual hardware diagnostic, not an automated
+unit test. It is excluded from CTest and has no default device. Run it only on
+disposable media: selecting `[.fat-hardware]` requires
+`FAT_TEST_PARTITION_DEVICE` and `FAT_TEST_ALLOW_WRITES=1`, and can create or
+delete files on that partition.
+
 ## Tooling
 
 ### CDN Upload Script

@@ -12,6 +12,9 @@
 
 ### Improvements
 
+- Expand behavioral regression coverage for build selection, download-only
+  saving, pipeline helpers, and QML transfer calculations; separate automated
+  application tests from hardware diagnostics and bundled-library tests
 - Configure all five standard Laerdal GitHub build repositories by default,
   including existing installations, while preserving saved repository settings
 - Image list ordering improved: GitHub releases are shown first, then CI
@@ -26,5 +29,7 @@
 
 ### Bug Fixes
 
+- Preserve partial cache files for download resume and reject undersized format
+  targets before writing filesystem metadata
 - CI build page updates no longer reset the list or interrupt clicks
 - Initial loading overlay disappears as soon as matching builds arrive

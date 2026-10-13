@@ -11,6 +11,7 @@
 #include <QQmlEngine>
 #endif
 #include <QJsonArray>
+#include <functional>
 
 class ImageWriter;
 
@@ -52,7 +53,16 @@ public:
         }
     };
 
+    // Side effects of selecting a device; injectable so the model can be used without ImageWriter.
+    struct Actions {
+        std::function<void(const QJsonArray &tags, bool inclusive)> setFilter;
+        std::function<void(const QJsonArray &capabilities)> setCapabilities;
+        std::function<void()> clearSelectedImage;
+    };
+
+    // Production adapter (defined alongside ImageWriter).
     explicit HWListModel(ImageWriter &);
+    explicit HWListModel(Actions actions, QObject *parent = nullptr);
 
     Q_INVOKABLE bool reload();
 
@@ -77,7 +87,7 @@ protected:
 
 private:
     QVector<HardwareDevice> _hwDevices;
-    ImageWriter &_imageWriter;
+    Actions _actions;
     int _currentIndex = -1;
     QString _lastSelectedDeviceName;  // Track actual device to detect changes
 };

@@ -293,8 +293,7 @@ void AsyncCacheWriter::finishPartial()
              << _bytesWritten << "bytes written," << (_bytesQueued - _bytesWritten)
              << "bytes still in queue";
 
-    // Signal thread to stop (but we won't delete the file)
-    _shouldStop = true;
+    // Finish after draining queued chunks, without triggering cancellation cleanup.
     _finishing = true;
 
     // Wake the thread so it can process remaining data and exit
@@ -306,6 +305,12 @@ void AsyncCacheWriter::finishPartial()
     if (!threadStopped) {
         qDebug() << "AsyncCacheWriter: Thread still running after 5s, waiting longer...";
         threadStopped = wait(5000);
+    }
+
+    if (!threadStopped) {
+        qWarning() << "AsyncCacheWriter: Could not finish partial cache write; cancelling writer";
+        cancel();
+        return;
     }
 
     // Flush and close without deleting
@@ -375,7 +380,7 @@ void AsyncCacheWriter::run()
         }
     }
     
-    // If cancelled or error, clean up
+    // Partial completion drains the queue but keeps its file for resume.
     if (_shouldStop || _hasError) {
         cleanup();
     }
@@ -416,4 +421,3 @@ qint64 AsyncCacheWriter::queueMemoryUsage() const
     }
     return total;
 }
-

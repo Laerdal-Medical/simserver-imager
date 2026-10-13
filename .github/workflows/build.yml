@@ -83,10 +83,14 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DCMAKE_INSTALL_PREFIX=/usr \
+            -DBUILD_TESTING=ON \
             -DQt6_ROOT="${QT_ROOT_DIR}"
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Run unit tests
+        run: ctest --test-dir build -L unit --no-tests=error --output-on-failure
 
       - name: Create AppImage
         run: |

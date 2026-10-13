@@ -10,7 +10,7 @@ set(ZLIB_BUILD_SHARED
 set(ZLIB_BUILD_STATIC
     ON
     CACHE BOOL "" FORCE)
-set(ZLIB_BUILD_TESTS
+set(ZLIB_BUILD_TESTING
     OFF
     CACHE BOOL "" FORCE)
 set(SKIP_INSTALL_ALL
@@ -29,7 +29,7 @@ endif()
 unset(ZLIB_BUILD_EXAMPLES)
 unset(ZLIB_BUILD_SHARED)
 unset(ZLIB_BUILD_STATIC)
-unset(ZLIB_BUILD_TESTS)
+unset(ZLIB_BUILD_TESTING)
 unset(SKIP_INSTALL_ALL)
 # Set zlib variables that libarchive's CMake will use
 set(ZLIB_USE_STATIC_LIBS

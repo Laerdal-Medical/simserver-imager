@@ -130,6 +130,11 @@ Result<void> DiskFormatter::FormatDrive(const std::string& device_path,
     return Result<void>(ConvertError(error));
   }
 
+  if (device_size_bytes / kSectorSize <
+      kPartitionStartSector + kMinimumPartitionSectors) {
+    return Result<void>(FormatError::kInsufficientSpace);
+  }
+
   // Write MBR
   if (auto result = WriteMbr(device_size_bytes); !result) {
     return result;
@@ -146,7 +151,11 @@ Result<void> DiskFormatter::FormatDrive(const std::string& device_path,
 Result<void> DiskFormatter::FormatFile(
     const std::string& file_path,
     std::uint64_t file_size_bytes) {
-  
+  if (file_size_bytes / kSectorSize <
+      kPartitionStartSector + kMinimumPartitionSectors) {
+    return Result<void>(FormatError::kInsufficientSpace);
+  }
+
   // Create and open the file with the specified size
   FileError error = file_ops_->CreateTestFile(file_path, file_size_bytes);
   if (error != FileError::kSuccess) {

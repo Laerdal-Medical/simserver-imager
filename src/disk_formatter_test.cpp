@@ -3,285 +3,168 @@
  * Copyright (C) 2025 Raspberry Pi Ltd
  */
 
+#include <catch2/catch_test_macros.hpp>
+
 #include "disk_formatter.h"
 
-#include <iostream>
+#include <array>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <array>
-#include <cstdlib>
-#include <cassert>
-#include <cstring>
+#include <stdexcept>
+#include <string>
 
 namespace fs = std::filesystem;
 using namespace rpi_imager;
 
-class DiskFormatterTest {
+namespace {
+
+constexpr std::uint64_t kImageSize = 64ULL * 1024 * 1024;
+constexpr std::uint32_t kSectorSize = 512;
+constexpr std::uint32_t kPartitionStart = 8192;
+
+class TemporaryImage {
  public:
-  static bool RunAllTests() {
-    std::cout << "Running DiskFormatter tests...\n";
-    
-    bool all_passed = true;
-    all_passed &= TestBasicFormatting();
-    all_passed &= TestMbrStructure();
-    all_passed &= TestFat32Structure();
-    all_passed &= TestSystemToolValidation();
-    
-    if (all_passed) {
-      std::cout << "All tests passed!\n";
-    } else {
-      std::cout << "Some tests failed!\n";
+  TemporaryImage() {
+    const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto base = fs::temp_directory_path() /
+                      ("simserver-imager-disk-formatter-" + std::to_string(nonce));
+    for (unsigned attempt = 0; attempt < 100; ++attempt) {
+      directory_ = base.string() + "-" + std::to_string(attempt);
+      if (fs::create_directory(directory_)) {
+        path_ = directory_ / "image.img";
+        return;
+      }
     }
-    
-    return all_passed;
+    throw std::runtime_error("Unable to create a unique temporary image directory");
   }
+
+  ~TemporaryImage() {
+    std::error_code error;
+    fs::remove(path_, error);
+    fs::remove(directory_, error);
+  }
+
+  const fs::path& path() const { return path_; }
 
  private:
-  static bool TestBasicFormatting() {
-    std::cout << "Testing basic formatting...\n";
-    
-    const std::string test_file = "/tmp/test_disk.img";
-    const std::uint64_t disk_size = 64 * 1024 * 1024;  // 64MB
-    
-    // Clean up any existing test file
-    fs::remove(test_file);
-    
-    DiskFormatter formatter;
-    auto result = formatter.FormatFile(test_file, disk_size);
-    
-    if (!result) {
-      std::cout << "❌ Failed to format file\n";
-      return false;
-    }
-    
-    // Check file was created with correct size
-    if (!fs::exists(test_file)) {
-      std::cout << "❌ Test file was not created\n";
-      return false;
-    }
-    
-    if (fs::file_size(test_file) != disk_size) {
-      std::cout << "❌ Test file has incorrect size\n";
-      return false;
-    }
-    
-    std::cout << "✅ Basic formatting test passed\n";
-    return true;
-  }
-  
-  static bool TestMbrStructure() {
-    std::cout << "Testing MBR structure...\n";
-    
-    const std::string test_file = "/tmp/test_mbr.img";
-    const std::uint64_t disk_size = 64 * 1024 * 1024;  // 64MB
-    
-    fs::remove(test_file);
-    
-    DiskFormatter formatter;
-    auto result = formatter.FormatFile(test_file, disk_size);
-    
-    if (!result) {
-      std::cout << "❌ Failed to format file\n";
-      return false;
-    }
-    
-    // Read and validate MBR
-    std::ifstream file(test_file, std::ios::binary);
-    if (!file) {
-      std::cout << "❌ Cannot open test file for reading\n";
-      return false;
-    }
-    
-    std::array<std::uint8_t, 512> mbr{};
-    file.read(reinterpret_cast<char*>(mbr.data()), 512);
-    
-    // Check MBR signature
-    if (mbr[510] != 0x55 || mbr[511] != 0xAA) {
-      std::cout << "❌ Invalid MBR signature\n";
-      return false;
-    }
-    
-    // Check partition entry (starts at offset 446)
-    const auto* partition = reinterpret_cast<const MbrPartitionEntry*>(mbr.data() + 446);
-    
-    if (partition->status != 0x80) {
-      std::cout << "❌ Partition not marked as bootable\n";
-      return false;
-    }
-    
-    if (partition->partition_type != 0x0C) {  // FAT32 LBA
-      std::cout << "❌ Wrong partition type: " << static_cast<int>(partition->partition_type) << "\n";
-      return false;
-    }
-    
-    std::uint32_t first_lba = partition->first_lba;
-    if (first_lba != 8192) {  // Should start at 4MB
-      std::cout << "❌ Wrong partition start sector: " << first_lba << "\n";
-      return false;
-    }
-    
-    std::cout << "✅ MBR structure test passed\n";
-    return true;
-  }
-  
-  static bool TestFat32Structure() {
-    std::cout << "Testing FAT32 structure...\n";
-    
-    const std::string test_file = "/tmp/test_fat32.img";
-    const std::uint64_t disk_size = 64 * 1024 * 1024;  // 64MB
-    
-    fs::remove(test_file);
-    
-    DiskFormatter formatter;
-    auto result = formatter.FormatFile(test_file, disk_size);
-    
-    if (!result) {
-      std::cout << "❌ Failed to format file\n";
-      return false;
-    }
-    
-    // Read FAT32 boot sector (at partition start: sector 8192)
-    std::ifstream file(test_file, std::ios::binary);
-    if (!file) {
-      std::cout << "❌ Cannot open test file for reading\n";
-      return false;
-    }
-    
-    file.seekg(8192 * 512);  // Seek to partition start
-    std::array<std::uint8_t, 512> boot_sector{};
-    file.read(reinterpret_cast<char*>(boot_sector.data()), 512);
-    
-    const auto* fat32_boot = reinterpret_cast<const Fat32BootSector*>(boot_sector.data());
-    
-    // Check boot signature (stored in little-endian)
-    std::uint16_t signature = fat32_boot->signature;
-    if (signature != 0xAA55) {  // Little-endian: 0x55 0xAA
-      std::cout << "❌ Invalid FAT32 boot signature: 0x" << std::hex << signature << std::dec << "\n";
-      return false;
-    }
-    
-    // Check bytes per sector (stored in little-endian)
-    std::uint16_t bytes_per_sector = fat32_boot->bytes_per_sector;
-    if (bytes_per_sector != 512) {
-      std::cout << "❌ Wrong bytes per sector: " << bytes_per_sector << "\n";
-      return false;
-    }
-    
-    // Check filesystem type
-    std::string fs_type(fat32_boot->fs_type.data(), 8);
-    if (fs_type.substr(0, 5) != "FAT32") {
-      std::cout << "❌ Wrong filesystem type: " << fs_type << "\n";
-      return false;
-    }
-    
-    // Check jump instruction
-    if (fat32_boot->jump_instruction[0] != 0xEB) {
-      std::cout << "❌ Invalid jump instruction\n";
-      return false;
-    }
-    
-    std::cout << "✅ FAT32 structure test passed\n";
-    return true;
-  }
-  
-  static bool TestSystemToolValidation() {
-    std::cout << "Testing with system tools...\n";
-    
-    const std::string test_file = "/tmp/test_system.img";
-    const std::uint64_t disk_size = 64 * 1024 * 1024;  // 64MB
-    
-    fs::remove(test_file);
-    
-    DiskFormatter formatter;
-    auto result = formatter.FormatFile(test_file, disk_size);
-    
-    if (!result) {
-      std::cout << "❌ Failed to format file\n";
-      return false;
-    }
-    
-    bool all_passed = true;
-    
-    // Test with fdisk to check partition table
-    std::string fdisk_cmd = "fdisk -l " + test_file + " 2>/dev/null";
-    if (std::system(fdisk_cmd.c_str()) != 0) {
-      std::cout << "⚠️  fdisk validation failed (tool may not be available)\n";
-    } else {
-      std::cout << "✅ fdisk validation passed\n";
-    }
-    
-    // Test with file command to detect filesystem
-    std::string file_cmd = "file " + test_file + " 2>/dev/null | grep -q 'DOS/MBR boot sector'";
-    if (std::system(file_cmd.c_str()) != 0) {
-      std::cout << "⚠️  file command validation failed\n";
-    } else {
-      std::cout << "✅ file command validation passed\n";
-    }
-    
-    // Try to mount the filesystem (requires loop device support)
-    std::string mkdir_cmd = "mkdir -p /tmp/test_mount 2>/dev/null";
-    std::system(mkdir_cmd.c_str());
-    
-    // Set up loop device and mount
-    std::string loop_cmd = "sudo losetup -f --show " + test_file + " 2>/dev/null";
-    FILE* loop_pipe = popen(loop_cmd.c_str(), "r");
-    if (loop_pipe) {
-      char loop_device[256] = {};
-      if (fgets(loop_device, sizeof(loop_device), loop_pipe)) {
-        // Remove newline
-        loop_device[strcspn(loop_device, "\n")] = 0;
-        
-        // Mount the first partition
-        std::string mount_cmd = "sudo mount " + std::string(loop_device) + "p1 /tmp/test_mount 2>/dev/null";
-        if (std::system(mount_cmd.c_str()) == 0) {
-          std::cout << "✅ Mount test passed\n";
-          
-          // Test creating a file
-          std::string touch_cmd = "sudo touch /tmp/test_mount/test.txt 2>/dev/null";
-          if (std::system(touch_cmd.c_str()) == 0) {
-            std::cout << "✅ File creation test passed\n";
-            std::system("sudo rm /tmp/test_mount/test.txt 2>/dev/null");
-          } else {
-            std::cout << "⚠️  File creation test failed\n";
-          }
-          
-          // Unmount
-          std::system("sudo umount /tmp/test_mount 2>/dev/null");
-        } else {
-          std::cout << "⚠️  Mount test failed (may require sudo privileges)\n";
-        }
-        
-        // Detach loop device
-        std::string detach_cmd = "sudo losetup -d " + std::string(loop_device) + " 2>/dev/null";
-        std::system(detach_cmd.c_str());
-      }
-      pclose(loop_pipe);
-    } else {
-      std::cout << "⚠️  Loop device test skipped (requires sudo)\n";
-    }
-    
-    // Clean up
-    std::system("rmdir /tmp/test_mount 2>/dev/null");
-    
-    // Verify filesystem with fsck.fat if available
-    std::string fsck_cmd = "fsck.fat -v " + test_file + " 2>/dev/null";
-    if (std::system(fsck_cmd.c_str()) == 0) {
-      std::cout << "✅ fsck.fat validation passed\n";
-    } else {
-      std::cout << "⚠️  fsck.fat validation skipped (tool may not be available)\n";
-    }
-    
-    std::cout << "✅ System tool validation completed\n";
-    return all_passed;
-  }
+  fs::path directory_;
+  fs::path path_;
 };
 
-int main() {
-  try {
-    bool success = DiskFormatterTest::RunAllTests();
-    return success ? 0 : 1;
-  } catch (const std::exception& e) {
-    std::cerr << "Test failed with exception: " << e.what() << "\n";
-    return 1;
+std::array<std::uint8_t, kSectorSize> readSector(const fs::path& path,
+                                                 std::uint64_t sector) {
+  std::ifstream image(path, std::ios::binary);
+  if (!image) {
+    throw std::runtime_error("Unable to open formatted image");
   }
-} 
+
+  std::array<std::uint8_t, kSectorSize> data{};
+  image.seekg(static_cast<std::streamoff>(sector * kSectorSize));
+  image.read(reinterpret_cast<char*>(data.data()), data.size());
+  if (!image || image.gcount() != static_cast<std::streamsize>(data.size())) {
+    throw std::runtime_error("Unable to read complete image sector");
+  }
+  return data;
+}
+
+std::uint32_t readLittleEndian(const std::uint8_t* data, std::size_t offset,
+                               std::size_t length) {
+  std::uint32_t result = 0;
+  for (std::size_t i = 0; i < length; ++i) {
+    result |= static_cast<std::uint32_t>(data[offset + i]) << (i * 8);
+  }
+  return result;
+}
+
+}  // namespace
+
+TEST_CASE("DiskFormatter creates an image of the requested size", "[disk-formatter]") {
+  TemporaryImage image;
+  DiskFormatter formatter;
+
+  const auto result = formatter.FormatFile(image.path().string(), kImageSize);
+
+  REQUIRE(result.has_value());
+  REQUIRE(fs::exists(image.path()));
+  CHECK(fs::file_size(image.path()) == kImageSize);
+}
+
+TEST_CASE("DiskFormatter writes a valid MBR and FAT32 volume", "[disk-formatter]") {
+  TemporaryImage image;
+  DiskFormatter formatter;
+
+  const auto result = formatter.FormatFile(image.path().string(), kImageSize);
+  REQUIRE(result.has_value());
+
+  const auto mbr = readSector(image.path(), 0);
+  CHECK(mbr[510] == 0x55);
+  CHECK(mbr[511] == 0xAA);
+  CHECK(mbr[446] == 0x80);
+  CHECK(mbr[450] == 0x0C);
+  CHECK(readLittleEndian(mbr.data(), 454, 4) == kPartitionStart);
+  CHECK(readLittleEndian(mbr.data(), 458, 4) ==
+        kImageSize / kSectorSize - kPartitionStart);
+
+  const auto boot = readSector(image.path(), kPartitionStart);
+  CHECK(boot[510] == 0x55);
+  CHECK(boot[511] == 0xAA);
+  CHECK(readLittleEndian(boot.data(), 11, 2) == kSectorSize);
+  CHECK(boot[13] == 2);
+  CHECK(readLittleEndian(boot.data(), 14, 2) == 32);
+  CHECK(boot[16] == 2);
+  CHECK(readLittleEndian(boot.data(), 28, 4) == kPartitionStart);
+  CHECK(readLittleEndian(boot.data(), 32, 4) ==
+        kImageSize / kSectorSize - kPartitionStart);
+  CHECK(readLittleEndian(boot.data(), 36, 4) > 0);
+  CHECK(readLittleEndian(boot.data(), 44, 4) == 2);
+  CHECK(readLittleEndian(boot.data(), 48, 2) == 1);
+  CHECK(readLittleEndian(boot.data(), 50, 2) == 6);
+  CHECK(std::string(reinterpret_cast<const char*>(boot.data() + 71), 11) ==
+        "BOOT       ");
+  CHECK(std::string(reinterpret_cast<const char*>(boot.data() + 82), 8) ==
+        "FAT32   ");
+
+  const auto fs_info = readSector(image.path(), kPartitionStart + 1);
+  CHECK(readLittleEndian(fs_info.data(), 0, 4) == 0x41615252);
+  CHECK(readLittleEndian(fs_info.data(), 484, 4) == 0x61417272);
+  CHECK(readLittleEndian(fs_info.data(), 508, 4) == 0xAA550000);
+  CHECK(readSector(image.path(), kPartitionStart + 6) == boot);
+
+  const auto sectors_per_fat = readLittleEndian(boot.data(), 36, 4);
+  const auto first_fat_sector = kPartitionStart + 32;
+  const auto fat = readSector(image.path(), first_fat_sector);
+  CHECK(readLittleEndian(fat.data(), 0, 4) == 0x0FFFFFF8);
+  CHECK(readLittleEndian(fat.data(), 4, 4) == 0x0FFFFFFF);
+  CHECK(readLittleEndian(fat.data(), 8, 4) == 0x0FFFFFFF);
+  CHECK(readSector(image.path(), first_fat_sector + sectors_per_fat) == fat);
+}
+
+TEST_CASE("DiskFormatter reports failure when the output cannot be created",
+          "[disk-formatter][errors]") {
+  TemporaryImage image;
+  const auto missing_directory = image.path().string() + ".missing";
+  DiskFormatter formatter;
+
+  const auto result =
+      formatter.FormatFile(missing_directory + "/image.img", kImageSize);
+
+  REQUIRE_FALSE(result);
+  CHECK(result.error() == FormatError::kFileOpenError);
+  CHECK_FALSE(fs::exists(missing_directory));
+}
+
+TEST_CASE("DiskFormatter rejects undersized images before creating them",
+          "[disk-formatter][errors]") {
+  TemporaryImage image;
+  DiskFormatter formatter;
+  constexpr std::uint64_t tooSmall =
+      (static_cast<std::uint64_t>(kPartitionStart) + 127) * kSectorSize;
+
+  const auto result = formatter.FormatFile(image.path().string(), tooSmall);
+
+  REQUIRE_FALSE(result);
+  CHECK(result.error() == FormatError::kInsufficientSpace);
+  CHECK_FALSE(fs::exists(image.path()));
+}

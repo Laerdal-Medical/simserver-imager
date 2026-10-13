@@ -7,6 +7,8 @@
 #define OSLISTMODEL_H
 
 #include <QAbstractItemModel>
+#include <QJsonDocument>
+#include <functional>
 #ifndef CLI_ONLY_BUILD
 #include <QQmlEngine>
 #endif
@@ -90,7 +92,15 @@ public:
         bool enableRPiConnect = false;
     };
 
+    // Inputs the model needs from its owner; injectable so the model can be used without ImageWriter.
+    struct Source {
+        std::function<QJsonDocument()> filteredOsList;
+        std::function<QString()> preferredArchitecture;
+    };
+
+    // Production adapter (defined alongside ImageWriter).
     explicit OSListModel(ImageWriter &);
+    explicit OSListModel(Source source, QObject *parent = nullptr);
 
     Q_INVOKABLE bool reload();
     // Add entries from an updated source list without resetting existing rows.
@@ -118,7 +128,7 @@ private:
     static QString identityForOS(const OS &os);
 
     QVector<OS> _osList;
-    ImageWriter &_imageWriter;
+    Source _source;
 };
 
 #endif

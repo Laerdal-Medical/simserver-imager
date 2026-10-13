@@ -4,7 +4,6 @@
  */
 
 #include "hwlistmodel.h"
-#include "imagewriter.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -101,8 +100,8 @@ static QJsonArray getLaerdalDevices()
     return devices;
 }
 
-HWListModel::HWListModel(ImageWriter &imageWriter)
-    : QAbstractListModel(&imageWriter), _imageWriter(imageWriter) {}
+HWListModel::HWListModel(Actions actions, QObject *parent)
+    : QAbstractListModel(parent), _actions(std::move(actions)) {}
 
 bool HWListModel::reload()
 {
@@ -269,12 +268,12 @@ void HWListModel::setCurrentIndex(int index) {
     // Only clear image source if the device actually changed (not just re-selecting same device)
     bool deviceChanged = (_lastSelectedDeviceName != device.name);
     
-    _imageWriter.setHWFilterList(device.tags, device.isInclusive());
-    _imageWriter.setHWCapabilitiesList(device.capabilities);
+    if (_actions.setFilter) _actions.setFilter(device.tags, device.isInclusive());
+    if (_actions.setCapabilities) _actions.setCapabilities(device.capabilities);
     
     if (deviceChanged) {
         qDebug() << "Hardware device changed from" << _lastSelectedDeviceName << "to" << device.name << "- clearing image selection";
-        _imageWriter.setSrc({});
+        if (_actions.clearSelectedImage) _actions.clearSelectedImage();
         _lastSelectedDeviceName = device.name;
     } else {
         qDebug() << "Hardware device re-selected (" << device.name << ") - preserving image selection";
