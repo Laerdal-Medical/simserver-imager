@@ -1,4 +1,4 @@
-laerdal-simserver-imager (1.0.11) stable; urgency=medium
+laerdal-simserver-imager (1.0.12) stable; urgency=medium
 
   * Expand the branch filter dropdown to use window space below its selector
   * Correct reversed mouse-wheel scrolling in dropdown lists
@@ -7,20 +7,32 @@ laerdal-simserver-imager (1.0.11) stable; urgency=medium
   * Preserve partial download caches and reject undersized format targets
   * Add Download only for selected CDN images, GitHub release assets and
     CI artifact image files, preserving original formats without drive writes
+    (GitHub issue #1)
   * Show download progress/errors, support safe cancellation and confirmed
     atomic replacement, and open the containing folder after completion
   * Add Open cache folder to App Options, separate from persistent downloads
 
   * Configure the five standard Laerdal GitHub build repositories by default
-    and extend repository suggestions, preserving saved settings
+    and extend repository suggestions, preserving saved settings (issue #4)
   * Improve OS list ordering: GitHub releases first, then CI builds on all
     branches sorted by date (newest first), then CDN images by version;
     stable versions precede prereleases with deterministic tie-breaking
+    (GitHub issue #3)
   * Load CI builds incrementally from paginated, branch-filtered successful
     workflow runs while allowing selection during background loading
   * Fix list resets interrupting clicks and the initial loading overlay
     hiding builds until all requests finish
   * Use smaller loading banner spinners with more space before the message
+
+ -- Laerdal Medical <support@laerdal.com>  Tue, 13 Oct 2026 14:45:00 +0000
+
+laerdal-simserver-imager (1.0.11) stable; urgency=medium
+
+  * Improve OS list ordering: GitHub releases first, then main-branch CI
+    builds sorted by date (newest first), then feature-branch builds and CDN
+    images by version. Main-branch builds are ordered by date rather than
+    build number because build numbers from different CI pipelines are not
+    comparable
   * Cached CI artifact ZIP files now include the image version in their
     filename (e.g. artifact_<id>_v9.2.0.127.zip) for easier identification
 

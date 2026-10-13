@@ -7,7 +7,7 @@
 - Download selected images without selecting or writing a storage device.
   Save CDN images, authenticated GitHub release assets, or the selected file
   from CI artifacts in their original format, with progress, cancellation,
-  overwrite confirmation, and an Open containing folder action
+  overwrite confirmation, and an Open containing folder action (#1)
 - Open the application cache folder from App Options → Cache
 
 ### Improvements
@@ -18,16 +18,14 @@
   saving, pipeline helpers, and QML transfer calculations; separate automated
   application tests from hardware diagnostics and bundled-library tests
 - Configure all five standard Laerdal GitHub build repositories by default,
-  including existing installations, while preserving saved repository settings
+  including existing installations, while preserving saved repository settings (#4)
 - Image list ordering improved: GitHub releases are shown first, then CI
   builds on all branches sorted by date (newest first), then CDN images by
   version. Stable versions sort ahead of prereleases, and equal versions and
-  dates use deterministic ordering
+  dates use deterministic ordering (#3)
 - CI builds load incrementally from paginated, branch-filtered successful
   workflow runs, allowing selection while older builds continue loading
 - Loading banners use a smaller spinner with more space before the message
-- Cached CI artifact ZIP files now include the image version in their filename
-  (e.g. `artifact_2847561039_v9.2.0.127.zip`) for easier identification
 
 ### Bug Fixes
 
@@ -36,3 +34,5 @@
   targets before writing filesystem metadata
 - CI build page updates no longer reset the list or interrupt clicks
 - Initial loading overlay disappears as soon as matching builds arrive
+
+**Full changelog:** https://github.com/Laerdal-Medical/simserver-imager/compare/v1.0.11...v1.0.12
