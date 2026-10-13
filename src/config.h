@@ -16,7 +16,7 @@
 #define GITHUB_CLIENT_ID                  "Ov23liyr8vkrcTajVFjP"
 
 /* Default GitHub repositories for WIC files (JSON array) */
-#define DEFAULT_GITHUB_REPOS              "[\"LaerdalMedical/simpad-top-plus\",\"LaerdalMedical/simserver-mcbapp\",\"LaerdalMedical/simpad-app-next\",\"LaerdalMedical/simserver-shared-libs\"]"
+#define DEFAULT_GITHUB_REPOS              R"([{"owner":"Laerdal-Medical","repo":"simpad-app-next","defaultBranch":"main"},{"owner":"Laerdal-Medical","repo":"simserver-mcbapp","defaultBranch":"main"},{"owner":"Laerdal-Medical","repo":"simserver-shared-libs","defaultBranch":"main"},{"owner":"Laerdal-Medical","repo":"simpad-plus-top","defaultBranch":"main"},{"owner":"Laerdal-Medical","repo":"simpad-meta-simpad-next","defaultBranch":"main"}])"
 
 /* Custom repository manifest file extension (without leading dot) */
 #define MANIFEST_EXTENSION                "laerdal-imager-manifest"

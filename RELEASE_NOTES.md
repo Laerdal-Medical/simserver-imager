@@ -6,6 +6,8 @@
 
 ### Improvements
 
+- Configure all five standard Laerdal GitHub build repositories by default,
+  including existing installations, while preserving saved repository settings
 - Image list ordering improved: GitHub releases are shown first, then CI
   builds on all branches sorted by date (newest first), then CDN images by
   version. Stable versions sort ahead of prereleases, and equal versions and

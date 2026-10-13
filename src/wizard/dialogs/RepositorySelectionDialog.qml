@@ -403,7 +403,8 @@ MessageDialog {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Style.buttonHeightStandard
                     editable: true
-                    model: ["simpad-plus-top", "simserver-mcbapp", "simpad-app-next"]
+                    model: ["simpad-app-next", "simserver-mcbapp", "simserver-shared-libs",
+                            "simpad-plus-top", "simpad-meta-simpad-next"]
                     currentIndex: -1
                     onActivated: function(index) {
                         root.newRepoName = model[index]

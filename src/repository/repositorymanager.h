@@ -369,6 +369,7 @@ private:
     static constexpr const char* SETTINGS_GITHUB_REPOS = "laerdal/github_repos";
     static constexpr const char* SETTINGS_REPO_BRANCHES = "laerdal/repo_branches";
     static constexpr const char* SETTINGS_REPO_ENABLED = "laerdal/repo_enabled";
+    static constexpr const char* SETTINGS_DEFAULT_REPOS_CONFIGURED = "laerdal/default_repos_configured";
     static constexpr const char* SETTINGS_SOURCE_TYPE = "laerdal/source_type";
     static constexpr const char* SETTINGS_ARTIFACT_BRANCH_FILTER = "laerdal/artifact_branch_filter";
 };

@@ -1,5 +1,7 @@
 laerdal-simserver-imager (1.0.11) stable; urgency=medium
 
+  * Configure the five standard Laerdal GitHub build repositories by default
+    and extend repository suggestions, preserving saved settings
   * Improve OS list ordering: GitHub releases first, then CI builds on all
     branches sorted by date (newest first), then CDN images by version;
     stable versions precede prereleases with deterministic tie-breaking

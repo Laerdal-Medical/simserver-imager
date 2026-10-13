@@ -13,6 +13,7 @@
 #include <QSet>
 #include <QTimer>
 #include <QRegularExpression>
+#include <algorithm>
 
 RepositoryManager::RepositoryManager(QObject *parent)
     : QObject(parent)
@@ -478,10 +479,27 @@ void RepositoryManager::loadSettings()
     int envInt = _settings.value(SETTINGS_ENVIRONMENT, static_cast<int>(Production)).toInt();
     _environment = static_cast<Environment>(envInt);
 
+    const QVector<GitHubRepoInfo> defaultRepos = _githubRepos;
+    const bool configureDefaults = !_settings.value(SETTINGS_DEFAULT_REPOS_CONFIGURED, false).toBool();
+
     // Load repos from JSON
     QString reposJson = _settings.value(SETTINGS_GITHUB_REPOS).toString();
     if (!reposJson.isEmpty()) {
         loadReposFromJson(reposJson);
+    }
+
+    // Seed defaults once, preserving custom repositories and later removals.
+    if (configureDefaults) {
+        for (const auto &defaultRepo : defaultRepos) {
+            const bool exists = std::any_of(_githubRepos.cbegin(), _githubRepos.cend(),
+                [&defaultRepo](const GitHubRepoInfo &repo) {
+                    return repo.owner.compare(defaultRepo.owner, Qt::CaseInsensitive) == 0
+                        && repo.repo.compare(defaultRepo.repo, Qt::CaseInsensitive) == 0;
+                });
+            if (!exists) {
+                _githubRepos.append(defaultRepo);
+            }
+        }
     }
 
     // Load enabled states
@@ -528,6 +546,12 @@ void RepositoryManager::loadSettings()
         _settings.setValue(SETTINGS_ARTIFACT_BRANCH_FILTER, "");
         _settings.sync();
     }
+
+    if (configureDefaults) {
+        _settings.setValue(SETTINGS_DEFAULT_REPOS_CONFIGURED, true);
+        saveSettings();
+    }
+    emit reposChanged();
 
     qDebug() << "RepositoryManager: Loaded settings, environment:"
              << environmentName(_environment)
