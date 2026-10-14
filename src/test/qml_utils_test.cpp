@@ -15,6 +15,8 @@
 
 int main(int argc, char *argv[])
 {
+    // Catch2 discovery runs outside CTest and must also work without a display.
+    qputenv("QT_QPA_PLATFORM", "offscreen");
     QGuiApplication application(argc, argv);
     return Catch::Session().run(argc, argv);
 }
