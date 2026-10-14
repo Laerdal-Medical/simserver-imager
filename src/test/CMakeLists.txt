@@ -164,6 +164,13 @@ set_target_properties(fat_partition_test PROPERTIES AUTOMOC ON)
 target_link_libraries(fat_partition_test PRIVATE Catch2::Catch2WithMain
                                                  Qt6::Core)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND LIBURING_FOUND)
+  target_link_libraries(disk_formatter_test PRIVATE ${LIBURING_LIBRARIES})
+  target_link_libraries(fat_partition_test PRIVATE ${LIBURING_LIBRARIES})
+  target_link_directories(disk_formatter_test PRIVATE ${LIBURING_LIBRARY_DIRS})
+  target_link_directories(fat_partition_test PRIVATE ${LIBURING_LIBRARY_DIRS})
+endif()
+
 # Link platform-specific libraries
 if(APPLE)
   target_link_libraries(
