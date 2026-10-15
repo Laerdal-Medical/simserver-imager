@@ -1,10 +1,10 @@
-laerdal-simserver-imager (1.0.13) UNRELEASED; urgency=medium
+laerdal-simserver-imager (1.0.12.b) stable; urgency=medium
 
   * Respect Qt's direction-adjusted wheel deltas in dropdown popups instead
     of applying an extra inversion based on platform scroll settings
   * Cover mouse and trackpad scrolling with popup wheel-event regressions
 
- -- Laerdal Medical <support@laerdal.com>  Thu, 15 Oct 2026 15:36:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Thu, 15 Oct 2026 15:37:00 +0000
 
 laerdal-simserver-imager (1.0.12.a) stable; urgency=medium
 
