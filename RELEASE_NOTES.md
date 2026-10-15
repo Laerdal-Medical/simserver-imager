@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Open cache and download folders through the native Windows shell instead of
+  launching a terminal
 - Keep Download only visible in the artifact contents view and select the first
   file by default, preserving the previous selection when navigating back
 

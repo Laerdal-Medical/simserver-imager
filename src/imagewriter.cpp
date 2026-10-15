@@ -90,6 +90,7 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <shellapi.h>
 #include <QProcessEnvironment>
 #endif
 
@@ -4616,12 +4617,17 @@ bool ImageWriter::launchUrl(const QUrl &url, bool allowQtFallback)
         qDebug() << "Started open";
     }
 #elif defined(Q_OS_WIN)
-    // Use start on Windows
-    success = PlatformQuirks::launchDetached("cmd", QStringList() << "/c" << "start" << url.toString());
+    // Pass local paths directly to the shell, without cmd.exe quoting rules.
+    const QString target = url.isLocalFile()
+        ? QDir::toNativeSeparators(url.toLocalFile())
+        : url.toString(QUrl::FullyEncoded);
+    const auto result = reinterpret_cast<INT_PTR>(
+        ShellExecuteW(nullptr, L"open", reinterpret_cast<LPCWSTR>(target.utf16()),
+                      nullptr, nullptr, SW_SHOWNORMAL));
+    success = result > 32;
     if (!success) {
-        qWarning() << "Failed to start cmd /c start process";
-    } else {
-        qDebug() << "Started cmd /c start";
+        qWarning() << "Failed to open URL with Windows shell:" << target
+                   << "error:" << result;
     }
 #endif
 

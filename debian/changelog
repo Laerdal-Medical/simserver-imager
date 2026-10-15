@@ -1,5 +1,6 @@
 laerdal-simserver-imager (1.0.13) UNRELEASED; urgency=medium
 
+  * Open cache and download folders through the Windows shell, not a terminal
   * Keep Download only visible in the artifact contents view
   * Select the first artifact file by default and preserve the previous
     selection when returning from storage selection

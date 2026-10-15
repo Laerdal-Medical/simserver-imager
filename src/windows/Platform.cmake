@@ -58,7 +58,7 @@ endif()
 
 set(DEPENDENCIES ${CMAKE_BINARY_DIR}/laerdal-simserver-imager.rc
                  wlanapi_delayed.lib)
-set(EXTRALIBS setupapi ${CMAKE_BINARY_DIR}/wlanapi_delayed.lib Bcrypt.dll ole32
+set(EXTRALIBS setupapi shell32 ${CMAKE_BINARY_DIR}/wlanapi_delayed.lib Bcrypt.dll ole32
               oleaut32 wbemuuid)
 
 # ---- Relay exe ----
