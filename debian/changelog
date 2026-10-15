@@ -1,11 +1,11 @@
-laerdal-simserver-imager (1.0.13) UNRELEASED; urgency=medium
+laerdal-simserver-imager (1.0.12.a) stable; urgency=medium
 
   * Open cache and download folders through the Windows shell, not a terminal
   * Keep Download only visible in the artifact contents view
   * Select the first artifact file by default and preserve the previous
     selection when returning from storage selection
 
- -- Laerdal Medical <support@laerdal.com>  Thu, 15 Oct 2026 11:30:00 +0000
+ -- Laerdal Medical <support@laerdal.com>  Thu, 15 Oct 2026 12:08:00 +0000
 
 laerdal-simserver-imager (1.0.12) stable; urgency=medium
 
