@@ -1,5 +1,10 @@
 # Release Notes
 
+## Unreleased
+
+- Keep Download only visible in the artifact contents view and select the first
+  file by default, preserving the previous selection when navigating back
+
 ## What's New in {{VERSION}}
 
 ### New Features

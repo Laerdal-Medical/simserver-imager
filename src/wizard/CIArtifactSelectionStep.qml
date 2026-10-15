@@ -26,8 +26,10 @@ WizardStepBase {
     showNextButton: true
     nextButtonEnabled: !root.isDownloading && root.selectedFileIndex >= 0  // Can advance if file selected and not downloading
     backButtonEnabled: true  // Always enabled - cancels download if in progress
-    showDownloadButton: !root.isDownloading && root.selectedFileIndex >= 0
-    downloadButtonEnabled: !root.imageWriter.downloadOnly.busy
+    showDownloadButton: true
+    downloadButtonEnabled: !root.isDownloading && root.selectedFileIndex >= 0
+                           && root.selectedFileIndex < root.imageFiles.length
+                           && !root.imageWriter.downloadOnly.busy
     onDownloadClicked: {
         var file = root.imageFiles[root.selectedFileIndex]
         downloadDialog.choose({
@@ -66,6 +68,7 @@ WizardStepBase {
     }
 
     onImageFilesChanged: {
+        root.selectedFileIndex = imageFiles.length > 0 ? 0 : -1
         console.log("CIArtifactSelectionStep: imageFiles changed, length:", imageFiles.length)
         if (!isDownloading && imageFiles.length > 0) {
             console.log("CIArtifactSelectionStep: Showing Phase 2 (file selection)")
@@ -83,6 +86,7 @@ WizardStepBase {
     // File selection state
     property var imageFiles: []
     property int selectedFileIndex: -1
+    onSelectedFileIndexChanged: fileListView.currentIndex = root.selectedFileIndex
     property var artifactId: 0
     property string artifactNameForFiles: ""
     property string owner: ""
@@ -299,7 +303,9 @@ WizardStepBase {
             root.branch = root.wizardContainer.cachedArtifactBranch
             root.zipPath = root.wizardContainer.cachedArtifactZipPath
             root.artifactName = root.wizardContainer.cachedArtifactName
-            root.selectedFileIndex = root.wizardContainer.cachedSelectedFileIndex
+            var cachedIndex = root.wizardContainer.cachedSelectedFileIndex
+            root.selectedFileIndex = cachedIndex >= 0 && cachedIndex < root.imageFiles.length
+                                     ? cachedIndex : 0
 
             // Ensure download state is fully cleared (defensive)
             root.isDownloading = false
@@ -357,11 +363,6 @@ WizardStepBase {
             // Clear pending release
             root.wizardContainer.pendingReleaseInspection = null
 
-            // If only one asset matches, auto-select and proceed
-            if (filteredAssets.length === 1) {
-                console.log("CIArtifactSelectionStep: Only one matching asset, auto-selecting")
-                root.selectedFileIndex = 0
-            }
             return
         }
 
@@ -474,10 +475,6 @@ WizardStepBase {
                 root.wizardContainer.cachedArtifactRepo = repo
                 root.wizardContainer.cachedArtifactBranch = branch
                 root.wizardContainer.cachedArtifactZipPath = zipPath
-                if (root.imageFiles.length === 1) {
-                    root.selectedFileIndex = 0
-                    fileListView.currentIndex = 0
-                }
                 console.log("CIArtifactSelectionStep: Cached artifact state for back navigation")
 
                 // Subtitle will update to "Select an image file..."
