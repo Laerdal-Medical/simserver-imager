@@ -550,11 +550,7 @@ ComboBox {
                         dy = notches * root.itemHeight * root.wheelScrollItems
                     }
                     
-                    // Handle OS scroll direction preference (natural vs traditional)
-                    if (PlatformHelper.isScrollInverted(event.inverted)) {
-                        dy = -dy
-                    }
-                    
+                    // Qt's deltas already include the system's scroll direction.
                     // Calculate new position with bounds checking
                     var newY = dropdownList.contentY - dy
                     var maxY = Math.max(0, dropdownList.contentHeight - dropdownList.height)

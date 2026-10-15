@@ -1,5 +1,10 @@
 # Release Notes
 
+## Unreleased
+
+- Respect the system scroll direction in dropdown popups without applying
+  an extra inversion or consulting Windows touchpad settings for mouse input
+
 ## What's New in {{VERSION}}
 
 ### Bug Fixes

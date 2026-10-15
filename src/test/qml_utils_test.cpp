@@ -6,11 +6,15 @@
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_approx.hpp>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QJSValue>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QQuickWindow>
+#include <QThread>
 #include <QVariant>
+#include <QWheelEvent>
 #include <memory>
 
 int main(int argc, char *argv[])
@@ -127,6 +131,7 @@ TEST_CASE("Expanded branch dropdown stays below its selector and fits available 
             readonly property real dropdownTop: container.y + combo.y + combo.popup.y
             readonly property real selectorBottom: container.y + combo.y + combo.height
             readonly property real popupMargin: Style.spacingMedium
+            readonly property real scrollPosition: combo.popup.contentItem.contentY
             function openDropdown() { combo.popup.open() }
             function closeDropdown() { combo.popup.close() }
             Item {
@@ -153,6 +158,32 @@ TEST_CASE("Expanded branch dropdown stays below its selector and fits available 
     const double bottom = window->property("selectorBottom").toDouble();
     REQUIRE(window->property("dropdownHeight").toDouble() == Catch::Approx(720 - bottom - margin));
     REQUIRE(window->property("dropdownTop").toDouble() == Catch::Approx(bottom));
+
+    auto *quickWindow = qobject_cast<QQuickWindow *>(window.get());
+    REQUIRE(quickWindow);
+    const QPointF wheelPosition(100, bottom + 100);
+    auto scroll = [&](QPoint pixels, QPoint angle, bool inverted, double expected) {
+        QWheelEvent event(wheelPosition, quickWindow->mapToGlobal(wheelPosition.toPoint()),
+                          pixels, angle, Qt::NoButton, Qt::NoModifier,
+                          Qt::NoScrollPhase, inverted);
+        QCoreApplication::sendEvent(quickWindow, &event);
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < 1000
+               && qAbs(window->property("scrollPosition").toDouble() - expected) > 0.1) {
+            QCoreApplication::processEvents();
+            QThread::msleep(5);
+        }
+        REQUIRE(window->property("scrollPosition").toDouble() == Catch::Approx(expected).margin(0.1));
+    };
+    // The inverted flag describes the supplied delta, not another inversion to apply.
+    scroll(QPoint(0, -60), {}, false, 60);
+    scroll(QPoint(0, -60), {}, true, 120);
+    scroll(QPoint(0, 60), {}, true, 60);
+    scroll(QPoint(0, 60), {}, false, 0);
+    scroll({}, QPoint(0, -120), false, 120);
+    scroll({}, QPoint(0, 120), true, 0);
+
     REQUIRE(window->setProperty("height", 480));
     QCoreApplication::processEvents();
     REQUIRE(window->property("dropdownHeight").toDouble() == Catch::Approx(480 - bottom - margin));

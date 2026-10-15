@@ -41,7 +41,7 @@ catch_discover_tests(customization_generator_test PROPERTIES LABELS "unit")
 if(NOT BUILD_CLI_ONLY)
   add_executable(qml_utils_test qml_utils_test.cpp)
   target_link_libraries(qml_utils_test PRIVATE Catch2::Catch2
-                        Qt6::Core Qt6::Qml Qt6::Gui)
+                        Qt6::Core Qt6::Qml Qt6::Gui Qt6::Quick)
   target_compile_definitions(
     qml_utils_test PRIVATE TEST_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/..")
   target_compile_features(qml_utils_test PRIVATE cxx_std_20)
