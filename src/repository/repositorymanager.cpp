@@ -656,11 +656,16 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
         // Determine compatible devices and icon from assets
         QSet<QString> deviceSet;
         QString icon = DeviceDetection::getIconPath(DeviceDetection::DeviceType::Unknown);
+        QStringList assetVersions;
 
         for (const auto &assetValue : assets) {
             QJsonObject asset = assetValue.toObject();
             QString assetName = asset["name"].toString();
             bool isVsi = assetName.toLower().endsWith(".vsi");
+
+            const QString assetVersion = extractVersion(assetName);
+            if (!assetVersion.isEmpty() && assetVersion != version && !assetVersions.contains(assetVersion))
+                assetVersions.append(assetVersion);
 
             auto type = DeviceDetection::detectFromFilename(assetName);
             if (type != DeviceDetection::DeviceType::Unknown) {
@@ -693,7 +698,12 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
 
         QJsonObject osEntry;
         osEntry["name"] = buildDisplayName(deviceName, version, releaseName);
-        osEntry["description"] = QString("%1/%2 - Release: %3").arg(owner, repo, releaseName);
+        QString description = QString("%1/%2 - Release: %3").arg(owner, repo, releaseName);
+        if (!assetVersions.isEmpty()) {
+            assetVersions.sort();
+            description.prepend(QStringLiteral("[%1]\n").arg(assetVersions.join(QStringLiteral(", "))));
+        }
+        osEntry["description"] = description;
         osEntry["release_date"] = release["published_at"].toString();
         osEntry["icon"] = icon;
         osEntry["init_format"] = "none";

@@ -1,5 +1,6 @@
 laerdal-simserver-imager (1.0.12.b) stable; urgency=medium
 
+  * Show full image asset versions in brackets below GitHub release titles
   * Load newly selected release assets instead of restoring stale artifact
     contents after back navigation
   * Respect Qt's direction-adjusted wheel deltas in dropdown popups instead

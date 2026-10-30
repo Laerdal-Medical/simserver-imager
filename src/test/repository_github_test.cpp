@@ -315,6 +315,44 @@ TEST_CASE("RepositoryManager converts release groups into device-tagged OS entri
     REQUIRE(generic["icon"].toString().endsWith("use_custom.png"));
 }
 
+TEST_CASE("RepositoryManager shows full asset versions below release selection names", "[repository][releases]")
+{
+    IsolatedSettings iso;
+    RepositoryManager mgr;
+    GitHubClient client;
+    mgr.setGitHubClient(&client);
+
+    QString expectedBuildLine;
+    QJsonArray assets;
+    SECTION("Repeated build versions are displayed once") {
+        assets = {asset("simpad-plus-9.2.0.127.wic.xz"),
+                  asset("simpad-plus-9.2.0.127.spu")};
+        expectedBuildLine = "[9.2.0.127]\n";
+    }
+    SECTION("Distinct build versions are all displayed") {
+        assets = {asset("simpad-plus-9.2.0.128.wic.xz"),
+                  asset("simpad-plus-9.2.0.127.spu")};
+        expectedBuildLine = "[9.2.0.127, 9.2.0.128]\n";
+    }
+    SECTION("Versions already in the title are not duplicated") {
+        assets = {asset("simpad-plus-9.2.0.wic.xz")};
+    }
+    SECTION("Unversioned assets leave the title unchanged") {
+        assets = {asset("factory-image.wic.xz")};
+    }
+
+    emit client.wicFilesReady(QJsonArray{releaseGroup("v9.2.0", "SimPad Plus 9.2.0", assets)});
+    mgr.setGitHubClient(nullptr);
+    mgr.setSelectedSourceType("github-releases");
+    const QJsonArray list = mgr.getMergedOsList();
+    REQUIRE(list.size() == 1);
+    REQUIRE(list[0].toObject()["name"].toString() == "SimPad Plus v9.2.0");
+    REQUIRE(list[0].toObject()["description"].toString()
+            == expectedBuildLine + "Laerdal-Medical/simpad - Release: SimPad Plus 9.2.0");
+    REQUIRE(list[0].toObject()["release_tag"].toString() == "v9.2.0");
+    REQUIRE(list[0].toObject()["release_assets"].toArray() == assets);
+}
+
 TEST_CASE("RepositoryManager de-duplicates CI artifacts across incremental batches", "[repository][artifacts]")
 {
     IsolatedSettings iso;

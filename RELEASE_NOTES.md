@@ -2,6 +2,10 @@
 
 ## What's New in {{VERSION}}
 
+### Improvements
+
+- Show full image build versions in brackets below the GitHub release title
+
 ### Bug Fixes
 
 - Show the newly selected release's files instead of restoring stale artifact
