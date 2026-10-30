@@ -1,5 +1,7 @@
 laerdal-simserver-imager (1.0.12.b) stable; urgency=medium
 
+  * Load newly selected release assets instead of restoring stale artifact
+    contents after back navigation
   * Respect Qt's direction-adjusted wheel deltas in dropdown popups instead
     of applying an extra inversion based on platform scroll settings
   * Cover mouse and trackpad scrolling with popup wheel-event regressions

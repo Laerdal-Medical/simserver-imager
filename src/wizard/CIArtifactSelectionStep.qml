@@ -282,14 +282,17 @@ WizardStepBase {
 
         var hasCache = root.wizardContainer.cachedArtifactFiles.length > 0
         var hasPending = root.wizardContainer.pendingArtifactInspection !== null
+        var hasPendingRelease = root.wizardContainer.pendingReleaseInspection !== null
         var idsMatch = hasPending && (root.wizardContainer.cachedArtifactId === root.wizardContainer.pendingArtifactInspection.artifact_id)
 
         // Restore cache if:
         // - We have cache AND no pending (going back from Storage)
         // - We have cache AND pending matches (same artifact selected again)
-        var shouldRestoreCache = hasCache && (!hasPending || idsMatch)
+        // A newly selected release must be loaded even though release assets use artifactId = 0.
+        var shouldRestoreCache = hasCache && !hasPendingRelease && (!hasPending || idsMatch)
 
-        console.log("  hasCache:", hasCache, "hasPending:", hasPending, "idsMatch:", idsMatch, "shouldRestoreCache:", shouldRestoreCache)
+        console.log("  hasCache:", hasCache, "hasPending:", hasPending, "hasPendingRelease:", hasPendingRelease,
+                    "idsMatch:", idsMatch, "shouldRestoreCache:", shouldRestoreCache)
 
         if (shouldRestoreCache) {
             console.log("CIArtifactSelectionStep: Cache validation PASSED - restoring cached artifact state with", root.wizardContainer.cachedArtifactFiles.length, "files")
@@ -326,8 +329,6 @@ WizardStepBase {
         }
 
         // Check for pending release inspection (release assets are already available)
-        var hasPendingRelease = root.wizardContainer.pendingReleaseInspection !== null
-
         if (hasPendingRelease) {
             console.log("CIArtifactSelectionStep: Loading release assets (no download needed)")
             var release = root.wizardContainer.pendingReleaseInspection
