@@ -1,10 +1,16 @@
+laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
+
+  * Show shared SimPad sysinfo SPU assets for both i.MX6 and i.MX8 devices
+  * Consistently use braces for conditional bodies throughout first-party code
+  * Expand contributor architecture guidance and document the release process
+
+ -- Laerdal Medical <support@laerdal.com>  Tue, 03 Nov 2026 13:14:40 +0100
+
 laerdal-simserver-imager (1.0.12.c) stable; urgency=medium
 
   * Show full image asset versions in brackets below GitHub release titles
   * Load newly selected release assets instead of restoring stale artifact
     contents after back navigation
-  * Show shared SimPad sysinfo SPU assets for both i.MX6 and i.MX8 devices
-  * Consistently use braces for conditional bodies throughout first-party code
 
  -- Laerdal Medical <support@laerdal.com>  Fri, 30 Oct 2026 13:15:00 +0000
 
