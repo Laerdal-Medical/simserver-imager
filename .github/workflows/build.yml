@@ -233,20 +233,20 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build -S src \
+            -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DQt6_ROOT="${QT_ROOT_DIR}" \
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --parallel "$(sysctl -n hw.logicalcpu)"
 
       - name: Create DMG
         run: |
           cd build
           APP_BUNDLE="laerdal-simserver-imager.app"
 
-          # macdeployqt is already run by CMake post-build, but run again to be safe
-          macdeployqt "${APP_BUNDLE}" -qmldir=../src
+          # CMake has already deployed Qt and pruned unused plugins.
 
           # Ad-hoc sign the app bundle (required for Gatekeeper on macOS)
           # This allows the app to run without a paid Apple Developer certificate

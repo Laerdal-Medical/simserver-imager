@@ -4,6 +4,8 @@
 
 ### Improvements
 
+- Use Ninja with CPU-limited parallelism for macOS CI builds and avoid
+  deploying Qt twice before packaging
 - Consistently use braces for conditional bodies throughout first-party code
 - Expand contributor architecture guidance and document the release process
 

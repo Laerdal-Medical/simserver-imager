@@ -119,6 +119,11 @@ first; targets and CTest registration are in `src/test/CMakeLists.txt`.
 - `qml_utils_test`: QML helpers and UI regressions; runs offscreen.
 - `customization_generator_test`, `disk_formatter_test`: their respective logic.
 
+macOS CI uses Ninja with an explicit logical-CPU parallelism limit. Qt
+deployment and plugin pruning belong to `src/mac/PlatformPackaging.cmake`;
+the workflow signs that prepared bundle and creates the DMG without deploying
+Qt again.
+
 Never run real-media FAT tests casually: `fat_partition_test` is deliberately
 excluded from CTest and requires explicit disposable-device/write opt-ins.
 For QML edits, use the installed Qt's `qmllint` with project import paths;
