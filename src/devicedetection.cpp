@@ -31,6 +31,12 @@ DeviceType detectFromFilename(const QString &filename)
     if (lower.contains("cancpu"))
         return DeviceType::CANCPU;
 
+    // SimPad sysinfo is shared by both platforms, not a device-specific update.
+    if (lower.contains("simpad-sysinfo") || lower.contains("simpad_sysinfo"))
+    {
+        return DeviceType::Unknown;
+    }
+
     // SimPad Plus 2 / imx8 (check before SimPad Plus to avoid "simpad" matching first)
     if (lower.contains("imx8") || lower.contains("simpad-plus2")
         || lower.contains("simpad_plus2") || lower.contains("simpad plus 2")

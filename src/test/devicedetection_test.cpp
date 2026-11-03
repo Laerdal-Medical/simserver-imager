@@ -39,6 +39,8 @@ TEST_CASE("detectFromFilename resolves the most specific device first", "[device
         {"simpadplus2.wic", DeviceType::SimPadPlus2},
         {"simpad2.wic", DeviceType::SimPadPlus2},
         {"image-imx8.wic", DeviceType::SimPadPlus2},
+        {"simpad-sysinfo.spu", DeviceType::Unknown},
+        {"SIMPAD_SYSINFO.SPU", DeviceType::Unknown},
         {"simpad-plus-9.3.0.wic", DeviceType::SimPadPlus},
         {"simpad_plus.wic", DeviceType::SimPadPlus},
         {"SimPad Plus.wic", DeviceType::SimPadPlus},
@@ -97,6 +99,9 @@ TEST_CASE("isFileCompatibleWithDevice gates builds by device tag", "[devicedetec
     // Generic files are shown for every device.
     for (const char *tag : {"imx6", "imx8", "linkbox", "simman3g-64", "", "unknown"})
         REQUIRE(isFileCompatibleWithDevice("rootfs.wic", tag));
+
+    REQUIRE(isFileCompatibleWithDevice("simpad-sysinfo.spu", "imx6"));
+    REQUIRE(isFileCompatibleWithDevice("simpad-sysinfo.spu", "imx8"));
 
     // SimPad Plus images also run on the i.MX6 peripherals, but not on i.MX8 ones.
     REQUIRE(isFileCompatibleWithDevice("simpad-plus-9.3.0.wic", "imx6"));
