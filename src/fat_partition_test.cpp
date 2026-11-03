@@ -253,7 +253,9 @@ TEST_CASE("DeviceWrapperFatPartition file reading", "[.fat-hardware]") {
         // Test reading first few files
         int tested = 0;
         for (const QString& filename : files) {
-            if (tested >= 3) break;
+            if (tested >= 3) {
+                break;
+            }
             
             INFO("Reading file: " << filename.toStdString());
             QByteArray content = fat->readFile(filename);
@@ -274,7 +276,9 @@ TEST_CASE("DeviceWrapperFatPartition file reading", "[.fat-hardware]") {
         for (const QString& file : allFiles) {
             if (file.contains("/")) {
                 subdirFiles.append(file);
-                if (subdirFiles.size() >= 5) break;
+                if (subdirFiles.size() >= 5) {
+                    break;
+                }
             }
         }
         
@@ -300,7 +304,9 @@ TEST_CASE("DeviceWrapperFatPartition fileExists", "[.fat-hardware]") {
         // Test a few existing files
         int tested = 0;
         for (const QString& filename : allFiles) {
-            if (tested >= 5) break;
+            if (tested >= 5) {
+                break;
+            }
             
             INFO("Checking existence of: " << filename.toStdString());
             CHECK(fat->fileExists(filename));

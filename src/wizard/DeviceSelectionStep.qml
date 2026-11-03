@@ -35,7 +35,9 @@ WizardStepBase {
 
     Component.onCompleted: {
         // Initial load only
-        if (!modelLoaded) onOsListPreparedHandler()
+        if (!modelLoaded) {
+            onOsListPreparedHandler()
+        }
         
         // Register the ListView for keyboard navigation
         root.registerFocusGroup("device_list", function(){

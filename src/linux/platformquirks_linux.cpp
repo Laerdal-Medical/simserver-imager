@@ -61,7 +61,9 @@ namespace {
             int ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
             
             if (ret < 0) {
-                if (errno == EINTR) continue;
+                if (errno == EINTR) {
+                    continue;
+                }
                 break;
             }
             
@@ -70,12 +72,16 @@ namespace {
                 break;
             }
             
-            if (ret == 0) continue;  // Timeout
+            if (ret == 0) {
+                continue;  // Timeout
+            }
             
             if (FD_ISSET(g_netlinkSocket, &readfds)) {
                 ssize_t len = recvmsg(g_netlinkSocket, &msg, 0);
                 if (len < 0) {
-                    if (errno == EINTR) continue;
+                    if (errno == EINTR) {
+                        continue;
+                    }
                     break;
                 }
                 
@@ -84,8 +90,12 @@ namespace {
                      NLMSG_OK(nh, len);
                      nh = NLMSG_NEXT(nh, len)) {
                     
-                    if (nh->nlmsg_type == NLMSG_DONE) break;
-                    if (nh->nlmsg_type == NLMSG_ERROR) continue;
+                    if (nh->nlmsg_type == NLMSG_DONE) {
+                        break;
+                    }
+                    if (nh->nlmsg_type == NLMSG_ERROR) {
+                        continue;
+                    }
                     
                     // We're interested in link up/down events
                     if (nh->nlmsg_type == RTM_NEWLINK || nh->nlmsg_type == RTM_DELLINK) {
@@ -97,7 +107,9 @@ namespace {
                         struct ifinfomsg* ifi = (struct ifinfomsg*)NLMSG_DATA(nh);
                         
                         // Skip loopback interface
-                        if (ifi->ifi_type == ARPHRD_LOOPBACK) continue;
+                        if (ifi->ifi_type == ARPHRD_LOOPBACK) {
+                            continue;
+                        }
                         
                         bool linkUp = (ifi->ifi_flags & IFF_UP) && (ifi->ifi_flags & IFF_RUNNING);
                         fprintf(stderr, "Network link change detected: interface %d, up=%d\n", 
@@ -279,7 +291,9 @@ bool hasNetworkConnectivity() {
     if (sysNet.exists()) {
         QStringList interfaces = sysNet.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
         for (const QString &iface : interfaces) {
-            if (iface == "lo") continue; // Skip loopback
+            if (iface == "lo") {
+                continue; // Skip loopback
+            }
             
             // Check if interface is up
             QFile operstate(QString("/sys/class/net/%1/operstate").arg(iface));

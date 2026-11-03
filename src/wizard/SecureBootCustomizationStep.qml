@@ -216,8 +216,9 @@ WizardStepBase {
         root.registerFocusGroup("secureboot_controller", function(){ 
             var items = [rsaKeyButton.focusItem, secureBootEnablePill.focusItem]
             // Include help link if visible
-            if (secureBootEnablePill.helpLinkItem && secureBootEnablePill.helpLinkItem.visible)
+            if (secureBootEnablePill.helpLinkItem && secureBootEnablePill.helpLinkItem.visible) {
                 items.push(secureBootEnablePill.helpLinkItem)
+            }
             return items
         }, 0)
         

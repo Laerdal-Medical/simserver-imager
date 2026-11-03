@@ -53,7 +53,9 @@ void LocalFileExtractThread::_cancelExtract()
 {
     _cancelled = true;
     if (_inputfile.isOpen())
+    {
         _inputfile.close();
+    }
 }
 
 void LocalFileExtractThread::run()
@@ -61,7 +63,9 @@ void LocalFileExtractThread::run()
     _allocateBuffers();
 
     if (isImage() && !_openAndPrepareDevice())
+    {
         return;
+    }
 
     emit preparationStatusUpdate(tr("Opening image file..."));
     _timer.start();
@@ -84,20 +88,30 @@ void LocalFileExtractThread::run()
     }
     
     if (isImage() && canUseArchive)
+    {
         extractImageRun();  // Use libarchive for compressed/archive files
+    }
     else if (isImage() && !canUseArchive)
+    {
         extractRawImageRun();  // Direct copy for raw disk images
+    }
     else
+    {
         extractMultiFileRun();
+    }
 
     if (_cancelled)
+    {
         _closeFiles();
+    }
 }
 
 ssize_t LocalFileExtractThread::_on_read(struct archive *, const void **buff)
 {
     if (_cancelled)
+    {
         return -1;
+    }
 
     *buff = _inputBuf;
     ssize_t len = _inputfile.read(_inputBuf, _inputBufSize);
@@ -138,7 +152,9 @@ void LocalFileExtractThread::extractRawImageRun()
         if (len <= 0)
         {
             if (len < 0)
+            {
                 _onDownloadError(tr("Error reading from image file"));
+            }
             break;
         }
         

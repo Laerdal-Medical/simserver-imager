@@ -81,8 +81,9 @@ WizardStepBase {
                         onActivated: function(index) {
                             if (index >= 0 && index < _internalLanguages.length) {
                                 var internalName = _internalLanguages[index]
-                                if (internalName && internalName.length > 0)
+                                if (internalName && internalName.length > 0) {
                                     imageWriter.changeLanguage(internalName)
+                                }
                             }
                         }
                     }

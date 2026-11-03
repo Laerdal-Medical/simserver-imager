@@ -83,9 +83,15 @@ void serve(QTcpServer &server, const QByteArray &response, QByteArray *request =
         QObject::connect(socket, &QTcpSocket::readyRead, socket,
                          [socket, response, request, received = QByteArray(), handled = false]() mutable {
             received += socket->readAll();
-            if (handled || !received.contains("\r\n\r\n")) return;
+            if (handled || !received.contains("\r\n\r\n"))
+            {
+                return;
+            }
             handled = true;
-            if (request) *request = received;
+            if (request)
+            {
+                *request = received;
+            }
             socket->write(response);
             socket->disconnectFromHost();
         });
@@ -240,10 +246,19 @@ TEST_CASE("Cancelling a network download cleans partial files and preserves the 
     REQUIRE(waitFor([&] { return !transfer.busy(); }));
     REQUIRE(transfer.savedFile().isEmpty());
     REQUIRE(transfer.error().isEmpty());
-    if (hadDestination) REQUIRE(files.read("saved.spu") == "existing");
-    else REQUIRE_FALSE(QFileInfo::exists(files.path("saved.spu")));
+    if (hadDestination)
+    {
+        REQUIRE(files.read("saved.spu") == "existing");
+    }
+    else
+    {
+        REQUIRE_FALSE(QFileInfo::exists(files.path("saved.spu")));
+    }
     REQUIRE(QDir(files.directory).entryList(QDir::Files | QDir::Hidden).size() == (hadDestination ? 1 : 0));
-    if (socket) socket->abort();
+    if (socket)
+    {
+        socket->abort();
+    }
     files.write("source.spu", "retry");
     transfer.start({{"url", files.url("source.spu").toString()}}, files.url("saved.spu"), {}, true);
     REQUIRE(waitFor([&] { return !transfer.busy(); }));

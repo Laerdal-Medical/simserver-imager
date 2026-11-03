@@ -52,14 +52,20 @@ WizardStepBase {
         
         var tzToSet = settings.timezone || imageWriter.getTimezone()
         var tzIndex = comboTimezone.find(tzToSet)
-        if (tzIndex !== -1) comboTimezone.currentIndex = tzIndex
-        else comboTimezone.editText = tzToSet
+        if (tzIndex !== -1) {
+            comboTimezone.currentIndex = tzIndex
+        } else {
+            comboTimezone.editText = tzToSet
+        }
 
         var defaultKeyboard = (tzToSet === "Europe/London") ? "gb" : "us"
         var kbToSet = settings.keyboard || defaultKeyboard
         var kbIndex = comboKeyboard.find(kbToSet)
-        if (kbIndex !== -1) comboKeyboard.currentIndex = kbIndex
-        else comboKeyboard.editText = kbToSet
+        if (kbIndex !== -1) {
+            comboKeyboard.currentIndex = kbIndex
+        } else {
+            comboKeyboard.editText = kbToSet
+        }
 
         // Register focus group for locale controls in proper tab order
         // Labels are automatically skipped when screen reader is not active (via activeFocusOnTab)
@@ -70,26 +76,38 @@ WizardStepBase {
     
     // Auto-fill function when capital city is selected
     function onCapitalCityChanged() {
-        if (comboCapitalCity.currentIndex === -1) return
+        if (comboCapitalCity.currentIndex === -1) {
+            return
+        }
         
         var selectedCity = comboCapitalCity.currentText || comboCapitalCity.editText
-        if (!selectedCity || selectedCity.length === 0) return
+        if (!selectedCity || selectedCity.length === 0) {
+            return
+        }
         
         var localeData = imageWriter.getLocaleDataForCapital(selectedCity)
-        if (!localeData || Object.keys(localeData).length === 0) return
+        if (!localeData || Object.keys(localeData).length === 0) {
+            return
+        }
         
         // Auto-fill timezone if user hasn't manually changed it
         if (!userChangedTimezone && localeData.timezone) {
             var tzIndex = comboTimezone.find(localeData.timezone)
-            if (tzIndex !== -1) comboTimezone.currentIndex = tzIndex
-            else comboTimezone.editText = localeData.timezone
+            if (tzIndex !== -1) {
+                comboTimezone.currentIndex = tzIndex
+            } else {
+                comboTimezone.editText = localeData.timezone
+            }
         }
         
         // Auto-fill keyboard if user hasn't manually changed it
         if (!userChangedKeyboard && localeData.keyboard) {
             var kbIndex = comboKeyboard.find(localeData.keyboard)
-            if (kbIndex !== -1) comboKeyboard.currentIndex = kbIndex
-            else comboKeyboard.editText = localeData.keyboard
+            if (kbIndex !== -1) {
+                comboKeyboard.currentIndex = kbIndex
+            } else {
+                comboKeyboard.editText = localeData.keyboard
+            }
         }
         
         // Save the recommended WiFi country for later

@@ -449,7 +449,9 @@ int MacOSFileOperations::GetLastErrorCode() const {
 // ============= Async I/O Implementation (using GCD) =============
 
 bool MacOSFileOperations::SetAsyncQueueDepth(int depth) {
-  if (depth < 1) depth = 1;
+  if (depth < 1) {
+    depth = 1;
+  }
   
   // Clean up existing async resources if changing depth
   if (async_queue_ != nullptr && depth != async_queue_depth_) {
@@ -472,20 +474,26 @@ bool MacOSFileOperations::SetAsyncQueueDepth(int depth) {
 FileError MacOSFileOperations::AsyncWriteSequential(const std::uint8_t* data, std::size_t size, 
                                                      AsyncWriteCallback callback) {
   if (fd_ < 0) {
-    if (callback) callback(FileError::kOpenError, 0);
+    if (callback) {
+      callback(FileError::kOpenError, 0);
+    }
     return FileError::kOpenError;
   }
   
   // Check for cancellation
   if (cancelled_.load()) {
-    if (callback) callback(FileError::kCancelled, 0);
+    if (callback) {
+      callback(FileError::kCancelled, 0);
+    }
     return FileError::kCancelled;
   }
   
   // If async not enabled (queue_depth == 1), fall back to sync
   if (async_queue_depth_ <= 1 || async_queue_ == nullptr) {
     FileError result = WriteSequential(data, size);
-    if (callback) callback(result, result == FileError::kSuccess ? size : 0);
+    if (callback) {
+      callback(result, result == FileError::kSuccess ? size : 0);
+    }
     return result;
   }
   
@@ -495,7 +503,9 @@ FileError MacOSFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
   while (dispatch_semaphore_wait(queue_semaphore_, timeout) != 0) {
     // Timeout - check for cancellation
     if (cancelled_.load()) {
-      if (callback) callback(FileError::kCancelled, 0);
+      if (callback) {
+        callback(FileError::kCancelled, 0);
+      }
       return FileError::kCancelled;
     }
     timeout = dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC);
@@ -504,14 +514,18 @@ FileError MacOSFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
   // Check for cancellation after acquiring slot
   if (cancelled_.load()) {
     dispatch_semaphore_signal(queue_semaphore_);
-    if (callback) callback(FileError::kCancelled, 0);
+    if (callback) {
+      callback(FileError::kCancelled, 0);
+    }
     return FileError::kCancelled;
   }
   
   // Check for previous errors
   if (first_async_error_.load() != FileError::kSuccess) {
     dispatch_semaphore_signal(queue_semaphore_);
-    if (callback) callback(first_async_error_.load(), 0);
+    if (callback) {
+      callback(first_async_error_.load(), 0);
+    }
     return first_async_error_.load();
   }
   

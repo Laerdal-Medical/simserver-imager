@@ -31,7 +31,9 @@ DeviceWrapperFatPartition::DeviceWrapperFatPartition(DeviceWrapper *dw, quint64 
     read((char *) &bpb, sizeof(bpb));
 
     if (bpb.fat16.Signature[0] != 0x55 || bpb.fat16.Signature[1] != 0xAA)
+    {
         throw std::runtime_error("Partition does not have a FAT file system");
+    }
 
     /* Determine FAT type as per p. 14 https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf */
     _bytesPerSector = bpb.fat16.BPB_BytsPerSec;
@@ -39,14 +41,22 @@ DeviceWrapperFatPartition::DeviceWrapperFatPartition(DeviceWrapper *dw, quint64 
     _fat16_rootDirSectors = ((bpb.fat16.BPB_RootEntCnt * 32) + (_bytesPerSector - 1)) / _bytesPerSector;
 
     if (bpb.fat16.BPB_FATSz16)
+    {
         _fatSize = bpb.fat16.BPB_FATSz16;
+    }
     else
+    {
         _fatSize = bpb.fat32.BPB_FATSz32;
+    }
 
     if (bpb.fat16.BPB_TotSec16)
+    {
         totalSectors = bpb.fat16.BPB_TotSec16;
+    }
     else
+    {
         totalSectors = bpb.fat32.BPB_TotSec32;
+    }
 
     dataSectors = totalSectors - (bpb.fat16.BPB_RsvdSecCnt + (bpb.fat16.BPB_NumFATs * _fatSize) + _fat16_rootDirSectors);
     countOfClusters = dataSectors / bpb.fat16.BPB_SecPerClus;
@@ -55,20 +65,34 @@ DeviceWrapperFatPartition::DeviceWrapperFatPartition(DeviceWrapper *dw, quint64 
     _fat32_firstRootDirCluster = bpb.fat32.BPB_RootClus;
 
     if (!_bytesPerSector)
+    {
         _type = EXFAT;
+    }
     else if (countOfClusters < 4085)
+    {
         _type = FAT12;
+    }
     else if (countOfClusters < 65525)
+    {
         _type = FAT16;
+    }
     else
+    {
         _type = FAT32;
+    }
 
     if (_type == FAT12)
+    {
         throw std::runtime_error("FAT12 file system not supported");
+    }
     if (_type == EXFAT)
+    {
         throw std::runtime_error("exFAT file system not supported");
+    }
     if (_bytesPerSector % 4)
+    {
         throw std::runtime_error("FAT file system: invalid bytes per sector");
+    }
 
     _firstFatStartOffset = bpb.fat16.BPB_RsvdSecCnt * _bytesPerSector;
     for (int i = 0; i < bpb.fat16.BPB_NumFATs; i++)
@@ -140,9 +164,13 @@ uint32_t DeviceWrapperFatPartition::allocateCluster(uint32_t previousCluster)
     if (previousCluster)
     {
         if (_type == FAT16)
+        {
             setFAT16(previousCluster, newCluster);
+        }
         else
+        {
             setFAT32(previousCluster, newCluster);
+        }
     }
 
     return newCluster;
@@ -179,9 +207,13 @@ void DeviceWrapperFatPartition::setFAT32(uint32_t cluster, uint32_t value)
 void DeviceWrapperFatPartition::setFAT(uint32_t cluster, uint32_t value)
 {
     if (_type == FAT16)
+    {
         setFAT16(cluster, value);
+    }
     else
+    {
         setFAT32(cluster, value);
+    }
 }
 
 uint32_t DeviceWrapperFatPartition::getFAT(uint32_t cluster)
@@ -217,7 +249,9 @@ QList<uint32_t> DeviceWrapperFatPartition::getClusterChain(uint32_t firstCluster
         }
 
         if (list.contains(cluster))
+        {
             throw std::runtime_error("Corrupt file system. Circular references in FAT table");
+        }
 
         list.append(cluster);
         cluster = getFAT(cluster);
@@ -409,7 +443,10 @@ QByteArray DeviceWrapperFatPartition::readFile(const QString &filename)
                 // Check for cluster boundary after skipping
                 if (_type == FAT32 && (pos() - _clusterOffset) % _bytesPerCluster == 0) {
                     uint32_t nextCluster = getFAT(_fat32_currentRootDirCluster);
-                    if (nextCluster >= 0xFFFFFF8) break;
+                    if (nextCluster >= 0xFFFFFF8)
+                    {
+                        break;
+                    }
                     if (_currentDirClusters.contains(nextCluster)) {
                         qDebug() << "Circular cluster reference in subdirectory" << dirName;
                         break;
@@ -433,7 +470,10 @@ QByteArray DeviceWrapperFatPartition::readFile(const QString &filename)
                 // Check for cluster boundary after LFN entry
                 if (_type == FAT32 && (pos() - _clusterOffset) % _bytesPerCluster == 0) {
                     uint32_t nextCluster = getFAT(_fat32_currentRootDirCluster);
-                    if (nextCluster >= 0xFFFFFF8) break;
+                    if (nextCluster >= 0xFFFFFF8)
+                    {
+                        break;
+                    }
                     if (_currentDirClusters.contains(nextCluster)) {
                         qDebug() << "Circular cluster reference in subdirectory" << dirName;
                         break;
@@ -476,7 +516,10 @@ QByteArray DeviceWrapperFatPartition::readFile(const QString &filename)
             // Check for cluster boundary after processing regular entry
             if (_type == FAT32 && (pos() - _clusterOffset) % _bytesPerCluster == 0) {
                 uint32_t nextCluster = getFAT(_fat32_currentRootDirCluster);
-                if (nextCluster >= 0xFFFFFF8) break;
+                if (nextCluster >= 0xFFFFFF8)
+                {
+                    break;
+                }
                 if (_currentDirClusters.contains(nextCluster)) {
                     qDebug() << "Circular cluster reference in subdirectory" << dirName;
                     break;
@@ -516,7 +559,9 @@ QByteArray DeviceWrapperFatPartition::readFile(const QString &filename)
 
     uint32_t firstCluster = entry.DIR_FstClusLO;
     if (_type == FAT32)
+    {
         firstCluster |= (entry.DIR_FstClusHI << 16);
+    }
     
     // If file has data but no cluster, something's wrong
     if (firstCluster == 0) {
@@ -536,7 +581,9 @@ QByteArray DeviceWrapperFatPartition::readFile(const QString &filename)
 
         pos += _bytesPerCluster;
         if (pos >= len)
+        {
             break;
+        }
     }
 
     return result;
@@ -569,7 +616,9 @@ QStringList DeviceWrapperFatPartition::listAllFiles()
             {
                 // Truncate long filename at null char
                 if (longFilename.indexOf(QChar::Null) >= 0)
+                {
                     longFilename.truncate(longFilename.indexOf(QChar::Null));
+                }
                 
                 // Get short filename as fallback
                 QString shortName;
@@ -660,7 +709,9 @@ void DeviceWrapperFatPartition::listFilesInDirectory(const QString &dirPath, uin
             if (entry.DIR_Name[0] != 0xE5) { // Not deleted
                 // Truncate long filename at null char
                 if (longFilename.indexOf(QChar::Null) >= 0)
+                {
                     longFilename.truncate(longFilename.indexOf(QChar::Null));
+                }
                 
                 // Get short filename as fallback
                 QString shortName;
@@ -778,7 +829,9 @@ QStringList DeviceWrapperFatPartition::listAllFilesRecursive()
             } else {
                 if (entry.DIR_Name[0] != 0xE5) {
                     if (longFilename.indexOf(QChar::Null) >= 0)
+                    {
                         longFilename.truncate(longFilename.indexOf(QChar::Null));
+                    }
                     
                     QString shortName;
                     for (int i = 0; i < 11 && entry.DIR_Name[i] != ' '; i++) {
@@ -860,10 +913,14 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
         getDirEntry(fileNameOnly, &entry, true);
         firstCluster = entry.DIR_FstClusLO;
         if (_type == FAT32)
+        {
             firstCluster |= (entry.DIR_FstClusHI << 16);
+        }
 
         if (firstCluster)
+        {
             clusterList = getClusterChain(firstCluster);
+        }
 
         if (clusterList.length() < clustersNeeded)
         {
@@ -872,7 +929,9 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
             int extraClustersNeeded = clustersNeeded - clusterList.length();
 
             if (!clusterList.isEmpty())
+            {
                 lastCluster = clusterList.last();
+            }
 
             for (int i = 0; i < extraClustersNeeded; i++)
             {
@@ -904,9 +963,13 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
             if (!clusterList.isEmpty())
             {
                 if (_type == FAT16)
+                {
                     setFAT16(clusterList.last(), 0xFFFF);
+                }
                 else
+                {
                     setFAT32(clusterList.last(), 0xFFFFFFF);
+                }
             }
         }
 
@@ -920,7 +983,9 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
 
             pos += _bytesPerCluster;
             if (pos >= contents.length())
+            {
                 break;
+            }
         }
 
         if (clustersNeeded && contents.length() % _bytesPerCluster)
@@ -936,9 +1001,13 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
 
         /* Update directory entry */
         if (clusterList.isEmpty())
+        {
             firstCluster = (_type == FAT16 ? 0xFFFF : 0xFFFFFFF);
+        }
         else
+        {
             firstCluster = clusterList.first();
+        }
 
         entry.DIR_FstClusLO = (firstCluster & 0xFFFF);
         entry.DIR_FstClusHI = (firstCluster >> 16);
@@ -963,12 +1032,16 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
     qDebug() << "writeFile: getDirEntry returned, entry name:" << QByteArray((char*)entry.DIR_Name, 11).toHex(':');
     firstCluster = entry.DIR_FstClusLO;
     if (_type == FAT32)
+    {
         firstCluster |= (entry.DIR_FstClusHI << 16);
+    }
 
     qDebug() << "writeFile: firstCluster =" << firstCluster;
 
     if (firstCluster)
+    {
         clusterList = getClusterChain(firstCluster);
+    }
 
     if (clusterList.length() < clustersNeeded)
     {
@@ -977,7 +1050,9 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
         int extraClustersNeeded = clustersNeeded - clusterList.length();
 
         if (!clusterList.isEmpty())
+        {
             lastCluster = clusterList.last();
+        }
 
         for (int i = 0; i < extraClustersNeeded; i++)
         {
@@ -1009,9 +1084,13 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
         if (!clusterList.isEmpty())
         {
             if (_type == FAT16)
+            {
                 setFAT16(clusterList.last(), 0xFFFF);
+            }
             else
+            {
                 setFAT32(clusterList.last(), 0xFFFFFFF);
+            }
         }
     }
 
@@ -1025,7 +1104,9 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
 
         pos += _bytesPerCluster;
         if (pos >= contents.length())
+        {
             break;
+        }
     }
 
     if (clustersNeeded && contents.length() % _bytesPerCluster)
@@ -1041,9 +1122,13 @@ void DeviceWrapperFatPartition::writeFile(const QString &filename, const QByteAr
 
     /* Update directory entry */
     if (clusterList.isEmpty())
+    {
         firstCluster = (_type == FAT16 ? 0xFFFF : 0xFFFFFFF);
+    }
     else
+    {
         firstCluster = clusterList.first();
+    }
 
     qDebug() << "writeFile: updating directory entry, firstCluster =" << firstCluster << "size =" << contents.length();
     entry.DIR_FstClusLO = (firstCluster & 0xFFFF);
@@ -1063,9 +1148,13 @@ inline QByteArray _dirEntryToShortName(struct dir_entry *entry)
     QByteArray ext = QByteArray((char *) entry->DIR_Name+8, 3).trimmed().toLower();
 
     if (ext.isEmpty())
+    {
         return base;
+    }
     else
+    {
         return base+"."+ext;
+    }
 }
 
 bool DeviceWrapperFatPartition::getDirEntry(const QString &longFilename, struct dir_entry *entry, bool createIfNotExist)
@@ -1075,7 +1164,9 @@ bool DeviceWrapperFatPartition::getDirEntry(const QString &longFilename, struct 
     bool haveLfnChecksum = false;
 
     if (longFilename.isEmpty())
+    {
         throw std::runtime_error("Filename cannot not be empty");
+    }
 
     openDir();
     while (readDir(entry))
@@ -1101,7 +1192,9 @@ bool DeviceWrapperFatPartition::getDirEntry(const QString &longFilename, struct 
             if (entry->DIR_Name[0] != 0xE5)
             {
                 if (filenameRead.indexOf(QChar::Null))
+                {
                     filenameRead.truncate(filenameRead.indexOf(QChar::Null));
+                }
 
                 //qDebug() << "Long filename:" << filenameRead << "DIR_Name:" << QByteArray((char *) entry->DIR_Name, sizeof(entry->DIR_Name)) << "Short:" << _dirEntryToShortName(entry);
 
@@ -1310,7 +1403,9 @@ void DeviceWrapperFatPartition::writeDirEntryAtCurrentPos(struct dir_entry *dirE
             }
 
             if (_currentDirClusters.contains(nextCluster))
+            {
                 throw std::runtime_error("Circular cluster references in FAT32 directory detected");
+            }
             _currentDirClusters.append(nextCluster);
 
             _fat32_currentRootDirCluster = nextCluster;
@@ -1375,7 +1470,9 @@ bool DeviceWrapperFatPartition::readDir(struct dir_entry *result)
             }
 
             if (_currentDirClusters.contains(nextCluster))
+            {
                 throw std::runtime_error("Circular cluster references in FAT32 directory detected");
+            }
             _currentDirClusters.append(nextCluster);
             _fat32_currentRootDirCluster = nextCluster;
             seekCluster(_fat32_currentRootDirCluster);
@@ -1394,7 +1491,9 @@ void DeviceWrapperFatPartition::updateFSinfo(int deltaClusters, uint32_t nextFre
     struct FSInfo fsinfo;
 
     if (!_fat32_fsinfoSector)
+    {
         return;
+    }
 
     seek(_fat32_fsinfoSector * _bytesPerSector);
     read((char *) &fsinfo, sizeof(fsinfo));

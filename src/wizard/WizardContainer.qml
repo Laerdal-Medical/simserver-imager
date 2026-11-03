@@ -464,9 +464,13 @@ Item {
                         border.width: 0
                         radius: 0
                         property bool isClickable: (function(){
-                            if (root.isWriting) return false
+                            if (root.isWriting) {
+                                return false
+                            }
                             // If customization not supported, do not allow navigating back to customization group
-                            if (!root.customizationSupported && stepItem.index === 3) return false
+                            if (!root.customizationSupported && stepItem.index === 3) {
+                                return false
+                            }
                             
                             // Get the step index for this sidebar item
                             var targetStep = root.getWizardStepFromSidebarIndex(stepItem.index)
@@ -558,16 +562,26 @@ Item {
                                         
                                         // Map current step to display index by finding which label matches
                                         var labels = root.getCustomizationSubstepLabels()
-                                        if (subItem.index >= labels.length) return false
+                                        if (subItem.index >= labels.length) {
+                                            return false
+                                        }
                                         
                                         var currentStepLabel = ""
-                                        if (root.currentStep === root.stepHostnameCustomization) currentStepLabel = qsTr("Hostname")
-                                        else if (root.currentStep === root.stepLocaleCustomization) currentStepLabel = qsTr("Localisation")
-                                        else if (root.currentStep === root.stepUserCustomization) currentStepLabel = qsTr("User")
-                                        else if (root.currentStep === root.stepWifiCustomization) currentStepLabel = qsTr("Wi‑Fi")
-                                        else if (root.currentStep === root.stepRemoteAccess) currentStepLabel = qsTr("Remote access")
-                                        else if (root.currentStep === root.stepPiConnectCustomization) currentStepLabel = qsTr("Remote Connect")
-                                        else if (root.currentStep === root.stepIfAndFeatures) currentStepLabel = qsTr("Interfaces & Features")
+                                        if (root.currentStep === root.stepHostnameCustomization) {
+                                            currentStepLabel = qsTr("Hostname")
+                                        } else if (root.currentStep === root.stepLocaleCustomization) {
+                                            currentStepLabel = qsTr("Localisation")
+                                        } else if (root.currentStep === root.stepUserCustomization) {
+                                            currentStepLabel = qsTr("User")
+                                        } else if (root.currentStep === root.stepWifiCustomization) {
+                                            currentStepLabel = qsTr("Wi‑Fi")
+                                        } else if (root.currentStep === root.stepRemoteAccess) {
+                                            currentStepLabel = qsTr("Remote access")
+                                        } else if (root.currentStep === root.stepPiConnectCustomization) {
+                                            currentStepLabel = qsTr("Remote Connect")
+                                        } else if (root.currentStep === root.stepIfAndFeatures) {
+                                            currentStepLabel = qsTr("Interfaces & Features")
+                                        }
                                         
                                         return labels[subItem.index] === currentStepLabel
                                     }
@@ -596,18 +610,28 @@ Item {
                                         onClicked: {
                                             // Map display index to actual step index based on available labels
                                             var labels = root.getCustomizationSubstepLabels()
-                                            if (subItem.index >= labels.length) return
+                                            if (subItem.index >= labels.length) {
+                                                return
+                                            }
                                             
                                             var stepLabel = labels[subItem.index]
                                             var target = root.firstCustomizationStep // default to hostname
                                             
-                                            if (stepLabel === qsTr("Hostname")) target = root.stepHostnameCustomization
-                                            else if (stepLabel === qsTr("Localisation")) target = root.stepLocaleCustomization
-                                            else if (stepLabel === qsTr("User")) target = root.stepUserCustomization
-                                            else if (stepLabel === qsTr("Wi‑Fi")) target = root.stepWifiCustomization
-                                            else if (stepLabel === qsTr("Remote access")) target = root.stepRemoteAccess
-                                            else if (stepLabel === qsTr("Remote Connect")) target = root.stepPiConnectCustomization
-                                            else if (stepLabel === qsTr("Interfaces & Features")) target = root.stepIfAndFeatures
+                                            if (stepLabel === qsTr("Hostname")) {
+                                                target = root.stepHostnameCustomization
+                                            } else if (stepLabel === qsTr("Localisation")) {
+                                                target = root.stepLocaleCustomization
+                                            } else if (stepLabel === qsTr("User")) {
+                                                target = root.stepUserCustomization
+                                            } else if (stepLabel === qsTr("Wi‑Fi")) {
+                                                target = root.stepWifiCustomization
+                                            } else if (stepLabel === qsTr("Remote access")) {
+                                                target = root.stepRemoteAccess
+                                            } else if (stepLabel === qsTr("Remote Connect")) {
+                                                target = root.stepPiConnectCustomization
+                                            } else if (stepLabel === qsTr("Interfaces & Features")) {
+                                                target = root.stepIfAndFeatures
+                                            }
                                             
                                             // Allow navigation to permissible steps or backward navigation within customization
                                             if (root.currentStep !== target && (root.isStepPermissible(target) || target < root.currentStep)) {
@@ -853,7 +877,9 @@ Item {
     // Check if "Erase" device is selected (for format card as FAT32)
     function isEraseSelected() {
         var hwModel = root.imageWriter.getHWList()
-        if (!hwModel || hwModel.currentIndex < 0) return false
+        if (!hwModel || hwModel.currentIndex < 0) {
+            return false
+        }
         var currentName = hwModel.currentName
         return currentName === qsTr("Erase")
     }
@@ -872,7 +898,9 @@ Item {
     // Check if "Use custom" device is selected (for local WIC file selection)
     function isUseCustomSelected() {
         var hwModel = root.imageWriter.getHWList()
-        if (!hwModel || hwModel.currentIndex < 0) return false
+        if (!hwModel || hwModel.currentIndex < 0) {
+            return false
+        }
         var currentName = hwModel.currentName
         return currentName === qsTr("Use custom")
     }
@@ -1356,7 +1384,9 @@ Item {
         cancelText: qsTr("Cancel")
         cancelAccessibleDescription: qsTr("Keep your current repository settings")
         confirmText: {
-            if (!allowAccept) return qsTr("Please wait…")
+            if (!allowAccept) {
+                return qsTr("Please wait…")
+            }
             return isLocalFile ? qsTr("Open") : qsTr("Switch repository")
         }
         confirmAccessibleDescription: isLocalFile
@@ -1565,7 +1595,9 @@ Item {
         // Mark the current step as permissible for future navigation
         markStepPermissible(currentStep)
         
-        if (!sidebarScroll) return
+        if (!sidebarScroll) {
+            return
+        }
         if (currentStep >= firstCustomizationStep && currentStep <= getLastCustomizationStep()) {
             var idx = currentStep - firstCustomizationStep
             var mainRowH = Style.sidebarItemHeight + Style.spacingXSmall
@@ -1573,9 +1605,13 @@ Item {
             var subRowH = subRectH + Style.spacingXXSmall
             var baseY = sidebarHeader.y + sidebarHeader.implicitHeight + Style.spacingSmall + mainRowH * (3 + 1) + Style.spacingXXSmall
             var target = baseY + idx * subRowH - (sidebarScroll.height/2 - subRectH/2)
-            if (target < 0) target = 0
+            if (target < 0) {
+                target = 0
+            }
             var maxY = sidebarScroll.contentHeight - sidebarScroll.height
-            if (target > maxY) target = Math.max(0, maxY)
+            if (target > maxY) {
+                target = Math.max(0, maxY)
+            }
             sidebarScroll.contentY = target
         } else {
             // Center main group item
@@ -1583,9 +1619,13 @@ Item {
             var mainRowH = Style.sidebarItemHeight + Style.spacingXSmall
             // account for header and its bottom margin
             var target2 = sidebarHeader.y + sidebarHeader.implicitHeight + Style.spacingSmall + sidebarIdx * mainRowH - (sidebarScroll.height/2 - Style.sidebarItemHeight/2)
-            if (target2 < 0) target2 = 0
+            if (target2 < 0) {
+                target2 = 0
+            }
             var maxY2 = sidebarScroll.contentHeight - sidebarScroll.height
-            if (target2 > maxY2) target2 = Math.max(0, maxY2)
+            if (target2 > maxY2) {
+                target2 = Math.max(0, maxY2)
+            }
             sidebarScroll.contentY = target2
         }
     }

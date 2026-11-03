@@ -74,7 +74,9 @@ public:
      * @param size The minimum size of the buffer in bytes
      */
     explicit AlignedBuffer(std::size_t size) : size_(size), data_(nullptr), alignment_(0) {
-        if (size == 0) return;
+        if (size == 0) {
+            return;
+        }
         
         // Query the system for the required alignment
         alignment_ = GetDirectIOAlignment();

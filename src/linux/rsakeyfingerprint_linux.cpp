@@ -81,7 +81,9 @@ QString getRsaKeyFingerprint(const QString &keyPath)
     QString fingerprint;
     for (int i = 0; i < 16 && i < hash.size(); i++) {
         fingerprint += QString("%1").arg(static_cast<unsigned char>(hash[i]), 2, 16, QChar('0'));
-        if (i == 7) fingerprint += ":"; // Add separator in middle
+        if (i == 7) {
+            fingerprint += ":"; // Add separator in middle
+        }
     }
 
     return fingerprint.toUpper();

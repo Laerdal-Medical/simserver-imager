@@ -394,7 +394,9 @@ void Cli::onPreparationStatusUpdate(QVariant msg)
 void Cli::_printProgress(const QByteArray &msg, QVariant now, QVariant total)
 {
     if (_quiet)
+    {
         return;
+    }
 
     float n = now.toFloat();
     float t = total.toFloat();

@@ -101,8 +101,9 @@ private:
 
 static QString portalParentHandleForWindow(QWindow *window)
 {
-    if (!window)
+    if (!window) {
         return QString();
+    }
 
     // Platform detection is RUNTIME-based, not compile-time
     // Qt automatically selects the platform when the app starts

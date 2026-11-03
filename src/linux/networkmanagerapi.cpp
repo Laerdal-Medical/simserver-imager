@@ -46,7 +46,9 @@ QByteArray NetworkManagerApi::getSSID()
         {
             ssid = _getSSIDofInterface(interface.name().toLatin1());
             if (!ssid.isEmpty())
+            {
                 break;
+            }
         }
     }
 
@@ -61,7 +63,9 @@ QByteArray NetworkManagerApi::_getSSIDofInterface(const QByteArray &iface)
     int s = ::socket(AF_INET, SOCK_DGRAM, 0);
 
     if (s == -1)
+    {
         return QByteArray();
+    }
 
     strncpy(iw.ifr_ifrn.ifrn_name, iface.data(), sizeof(iw.ifr_ifrn.ifrn_name));
     iw.u.essid.pointer = ssid;
@@ -80,12 +84,16 @@ QByteArray NetworkManagerApi::_getSSIDofInterface(const QByteArray &iface)
     int s = ::socket(AF_INET, SOCK_DGRAM, 0);
 
     if (s == -1)
+    {
         return QByteArray();
+    }
 
     strncpy(ifr.ifr_name, iface.data(), sizeof(ifr.ifr_name));
     ifr.ifr_data = &nwid;
     if (::ioctl(s, SIOCG80211NWID, &ifr) == 0)
+    {
         ssid = QByteArray(nwid.i_nwid, nwid.i_len);
+    }
     ::close(s);
     return ssid;
 }
@@ -113,24 +121,36 @@ QByteArray NetworkManagerApi::getPSK()
     {
         QString activeConnectionPath = activeConnection.path();
         if (activeConnectionPath.isEmpty())
+        {
             continue;
+        }
         QDBusInterface ac("org.freedesktop.NetworkManager", activeConnectionPath,
                           "org.freedesktop.NetworkManager.Connection.Active", QDBusConnection::systemBus());
         if (!ac.isValid())
+        {
             continue;
+        }
         QString settingsPath = ac.property("Connection").value<QDBusObjectPath>().path();
         if (settingsPath.isEmpty())
+        {
             continue;
+        }
         QDBusInterface settings("org.freedesktop.NetworkManager", settingsPath,
                           "org.freedesktop.NetworkManager.Settings.Connection", QDBusConnection::systemBus());
         if (!settings.isValid())
+        {
             continue;
+        }
         QDBusReply<VariantMapMap> reply = settings.call("GetSecrets", "802-11-wireless-security");
         if (!reply.isValid())
+        {
             continue;
+        }
         QVariantMap secrets = reply.value().value("802-11-wireless-security");
         if (secrets.contains("psk"))
+        {
             return secrets.value("psk").toByteArray();
+        }
     }
 #endif
 
@@ -153,7 +173,9 @@ WlanCredentials *WlanCredentials::_instance = NULL;
 WlanCredentials *WlanCredentials::instance()
 {
     if (!_instance)
+    {
         _instance = new NetworkManagerApi();
+    }
 
     return _instance;
 }

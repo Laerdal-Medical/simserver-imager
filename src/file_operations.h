@@ -181,7 +181,9 @@ class FileOperations {
                                           AsyncWriteCallback callback = nullptr) {
     // Default implementation: fall back to sync write
     FileError result = WriteSequential(data, size);
-    if (callback) callback(result, result == FileError::kSuccess ? size : 0);
+    if (callback) {
+      callback(result, result == FileError::kSuccess ? size : 0);
+    }
     return result;
   }
   

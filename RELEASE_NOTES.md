@@ -5,6 +5,7 @@
 ### Improvements
 
 - Show full image build versions in brackets below the GitHub release title
+- Consistently use braces for conditional bodies throughout first-party code
 
 ### Bug Fixes
 

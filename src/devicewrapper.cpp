@@ -31,18 +31,24 @@ void DeviceWrapper::_seekToBlock(quint64 blockNr)
 void DeviceWrapper::sync()
 {
     if (!_dirty)
+    {
         return;
+    }
 
     const auto blockNrs = _blockcache.keys();
     for (auto blockNr : blockNrs)
     {
         if (blockNr == 0)
+        {
             continue; /* Save writing first block with MBR for last */
+        }
 
         auto block = _blockcache.value(blockNr);
 
         if (!block->dirty)
+        {
             continue;
+        }
 
         _seekToBlock(blockNr);
         auto result = _file_ops->WriteSequential(reinterpret_cast<const std::uint8_t*>(block->block), 4096);
@@ -74,7 +80,9 @@ void DeviceWrapper::sync()
 void DeviceWrapper::_readIntoBlockCacheIfNeeded(quint64 offset, quint64 size)
 {
     if (!size)
+    {
         return;
+    }
 
     quint64 firstBlock = offset/4096;
     quint64 lastBlock = (offset+size)/4096;
@@ -99,7 +107,9 @@ void DeviceWrapper::_readIntoBlockCacheIfNeeded(quint64 offset, quint64 size)
 void DeviceWrapper::pread(char *buf, quint64 size, quint64 offset)
 {
     if (!size)
+    {
         return;
+    }
 
     _readIntoBlockCacheIfNeeded(offset, size);
     quint64 firstBlock = offset / 4096;
@@ -120,7 +130,9 @@ void DeviceWrapper::pread(char *buf, quint64 size, quint64 offset)
 void DeviceWrapper::pwrite(const char *buf, quint64 size, quint64 offset)
 {
     if (!size)
+    {
         return;
+    }
 
     quint64 firstBlock = offset / 4096;
     quint64 offsetInBlock = offset % 4096;
@@ -156,7 +168,9 @@ void DeviceWrapper::pwrite(const char *buf, quint64 size, quint64 offset)
 DeviceWrapperFatPartition *DeviceWrapper::fatPartition(int nr)
 {
     if (nr > 4 || nr < 1)
+    {
         throw std::runtime_error("Only basic partitions 1-4 supported");
+    }
 
     /* GPT table handling */
     struct gpt_header gpt;
@@ -167,7 +181,9 @@ DeviceWrapperFatPartition *DeviceWrapper::fatPartition(int nr)
     {
         qDebug() << "Using GPT partition table";
         if (nr > gpt.NumberOfPartitionEntries)
+        {
             throw std::runtime_error("Partition does not exist");
+        }
 
         pread((char *) &gptpart, sizeof(gptpart), gpt.PartitionEntryLBA*512 + gpt.SizeOfPartitionEntry*(nr-1));
 
@@ -179,10 +195,14 @@ DeviceWrapperFatPartition *DeviceWrapper::fatPartition(int nr)
     pread((char *) &mbr, sizeof(mbr), 0);
 
     if (mbr.signature[0] != 0x55 || mbr.signature[1] != 0xAA)
+    {
         throw std::runtime_error("MBR does not have valid signature");
+    }
 
     if (!mbr.part[nr-1].starting_sector || !mbr.part[nr-1].nr_of_sectors)
+    {
         throw std::runtime_error("Partition does not exist");
+    }
 
     return new DeviceWrapperFatPartition(this, mbr.part[nr-1].starting_sector*512, mbr.part[nr-1].nr_of_sectors*512, this);
 }

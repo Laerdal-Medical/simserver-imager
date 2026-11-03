@@ -245,8 +245,9 @@ public:
     Q_INVOKABLE QString getLastImageFolder() {
         QSettings settings;
         QString path = settings.value("lastpath").toString();
-        if (path.isEmpty())
+        if (path.isEmpty()) {
             path = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        }
         return path;
     }
 

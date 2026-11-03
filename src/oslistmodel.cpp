@@ -42,12 +42,16 @@ namespace {
         for (int i = 0; i < 3; ++i) {
             bool ok = false;
             version.numbers[static_cast<size_t>(i)] = match.captured(i + 1).toULongLong(&ok);
-            if (!ok) return ParsedVersion{};
+            if (!ok) {
+                return ParsedVersion{};
+            }
         }
         if (!match.captured(4).isEmpty()) {
             bool ok = false;
             version.numbers[3] = match.captured(4).toULongLong(&ok);
-            if (!ok) return ParsedVersion{};
+            if (!ok) {
+                return ParsedVersion{};
+            }
         }
         if (!match.captured(5).isEmpty()) {
             version.prerelease = match.captured(5).split(QLatin1Char('.'));
@@ -82,17 +86,25 @@ namespace {
                 const QString normalizedB = idB.mid(firstNonZeroB);
                 const QString valueA = normalizedA.isEmpty() ? QStringLiteral("0") : normalizedA;
                 const QString valueB = normalizedB.isEmpty() ? QStringLiteral("0") : normalizedB;
-                if (valueA.size() != valueB.size()) return valueA.size() > valueB.size() ? 1 : -1;
+                if (valueA.size() != valueB.size()) {
+                    return valueA.size() > valueB.size() ? 1 : -1;
+                }
                 const int comparison = QString::compare(valueA, valueB, Qt::CaseSensitive);
-                if (comparison != 0) return comparison > 0 ? 1 : -1;
+                if (comparison != 0) {
+                    return comparison > 0 ? 1 : -1;
+                }
             } else if (numericA != numericB) {
                 return numericA ? -1 : 1;
             } else {
                 const int comparison = QString::compare(idA, idB, Qt::CaseSensitive);
-                if (comparison != 0) return comparison > 0 ? 1 : -1;
+                if (comparison != 0) {
+                    return comparison > 0 ? 1 : -1;
+                }
             }
         }
-        if (a.prerelease.size() == b.prerelease.size()) return 0;
+        if (a.prerelease.size() == b.prerelease.size()) {
+            return 0;
+        }
         return a.prerelease.size() > b.prerelease.size() ? 1 : -1;
     }
 
@@ -105,7 +117,9 @@ namespace {
     // Sort OS list by version (highest first)
     // Special entries (Erase, Use custom) are moved to the end
     void sortByVersionDescending(QJsonArray &list) {
-        if (list.size() <= 1) return;
+        if (list.size() <= 1) {
+            return;
+        }
 
         // Separate regular items from special items
         QList<QJsonValue> regularItems;
@@ -129,21 +143,29 @@ namespace {
             // Group ordering. source_type: "release" = GitHub release,
             // "artifact" = CI artifact (CDN images have no source_type).
             auto groupRank = [](const QJsonObject &o) -> std::int32_t {
-                if (o["source_type"].toString() == "release") return 0;
-                if (o["source_type"].toString() == "artifact") return 1;
+                if (o["source_type"].toString() == "release") {
+                    return 0;
+                }
+                if (o["source_type"].toString() == "artifact") {
+                    return 1;
+                }
                 return 2;
             };
 
             std::int32_t rankA = groupRank(objA);
             std::int32_t rankB = groupRank(objB);
-            if (rankA != rankB) return rankA < rankB;
+            if (rankA != rankB) {
+                return rankA < rankB;
+            }
 
             // Build numbers can come from independent CI runs and are not
             // comparable across repositories or branches.
             if (rankA == 1) {
                 QString dateA = objA["release_date"].toString();
                 QString dateB = objB["release_date"].toString();
-                if (dateA != dateB) return dateA > dateB;
+                if (dateA != dateB) {
+                    return dateA > dateB;
+                }
             }
 
             const ParsedVersion versionA = extractVersionFromName(objA["name"].toString());
@@ -153,28 +175,42 @@ namespace {
             }
             if (rankA != 1 && versionA.valid) {
                 const int versionComparison = compareVersions(versionA, versionB);
-                if (versionComparison != 0) return versionComparison > 0;
+                if (versionComparison != 0) {
+                    return versionComparison > 0;
+                }
             }
 
             // Deterministic tie-breaks avoid depending on asynchronous response order.
             QString dateA = objA["release_date"].toString();
             QString dateB = objB["release_date"].toString();
-            if (dateA != dateB) return dateA > dateB;
+            if (dateA != dateB) {
+                return dateA > dateB;
+            }
             const QString nameA = objA["name"].toString();
             const QString nameB = objB["name"].toString();
-            if (nameA != nameB) return nameA < nameB;
+            if (nameA != nameB) {
+                return nameA < nameB;
+            }
             const QString ownerA = objA["source_owner"].toString();
             const QString ownerB = objB["source_owner"].toString();
-            if (ownerA != ownerB) return ownerA < ownerB;
+            if (ownerA != ownerB) {
+                return ownerA < ownerB;
+            }
             const QString repoA = objA["source_repo_name"].toString();
             const QString repoB = objB["source_repo_name"].toString();
-            if (repoA != repoB) return repoA < repoB;
+            if (repoA != repoB) {
+                return repoA < repoB;
+            }
             const qint64 artifactA = objA["artifact_id"].toVariant().toLongLong();
             const qint64 artifactB = objB["artifact_id"].toVariant().toLongLong();
-            if (artifactA != artifactB) return artifactA < artifactB;
+            if (artifactA != artifactB) {
+                return artifactA < artifactB;
+            }
             const QString tagA = objA["release_tag"].toString();
             const QString tagB = objB["release_tag"].toString();
-            if (tagA != tagB) return tagA < tagB;
+            if (tagA != tagB) {
+                return tagA < tagB;
+            }
             return objA["url"].toString() < objB["url"].toString();
         });
 
@@ -409,7 +445,9 @@ namespace {
     // Sanitize icon source: allow known-good forms and drop malformed URLs to avoid runtime fetch errors
     static QString sanitizeIconSource(const QString &raw)
     {
-        if (raw.isEmpty()) return QString();
+        if (raw.isEmpty()) {
+            return QString();
+        }
 
         // Common local relative path used by repository JSON
         if (raw.startsWith("icons/")) {
@@ -620,7 +658,9 @@ bool OSListModel::reloadIncremental()
 
 void OSListModel::softRefresh()
 {
-    if (_osList.isEmpty()) return;
+    if (_osList.isEmpty()) {
+        return;
+    }
     const QModelIndex first = index(0);
     const QModelIndex last = index(_osList.size() - 1);
     emit dataChanged(first, last);
@@ -666,8 +706,9 @@ QHash<int, QByteArray> OSListModel::roleNames() const
 QVariantMap OSListModel::getOsEntry(int index) const
 {
     QVariantMap result;
-    if (index < 0 || index >= _osList.size())
+    if (index < 0 || index >= _osList.size()) {
         return result;
+    }
 
     const OS &os = _osList[index];
     result["name"] = os.name;
@@ -707,8 +748,9 @@ QVariantMap OSListModel::getOsEntry(int index) const
 
 QVariant OSListModel::data(const QModelIndex &index, int role) const {
     const int row = index.row();
-    if (row < 0 || row >= _osList.size())
+    if (row < 0 || row >= _osList.size()) {
         return {};
+    }
 
     const OS &os = _osList[row];
 

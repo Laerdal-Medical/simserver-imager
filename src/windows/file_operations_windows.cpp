@@ -30,7 +30,9 @@ WindowsFileOperations::WindowsFileOperations()
 
 bool WindowsFileOperations::IsPhysicalDrivePath(const std::string& path) {
   // Check for physical drive paths like \\.\PHYSICALDRIVE0 (case-insensitive)
-  if (path.length() < 17) return false;  // Minimum: \\.\PHYSICALDRIVE0
+  if (path.length() < 17) {
+    return false;  // Minimum: \\.\PHYSICALDRIVE0
+  }
   
   std::string prefix = path.substr(0, 17);
   // Convert to uppercase for comparison
@@ -115,10 +117,14 @@ void WindowsFileOperations::ProcessCompletions(bool wait) {
     
     if (overlapped == nullptr) {
       // Timeout or error with no overlapped
-      if (!wait || cancelled_.load()) break;
+      if (!wait || cancelled_.load()) {
+        break;
+      }
       // If we already processed at least one, don't keep blocking - return
       // so caller can queue more work. Only block if we haven't processed any.
-      if (processed_at_least_one) break;
+      if (processed_at_least_one) {
+        break;
+      }
       continue;  // Keep waiting for the first completion
     }
     
@@ -991,7 +997,9 @@ int WindowsFileOperations::GetLastErrorCode() const {
 // ============= Async I/O Implementation (using IOCP) =============
 
 bool WindowsFileOperations::SetAsyncQueueDepth(int depth) {
-  if (depth < 1) depth = 1;
+  if (depth < 1) {
+    depth = 1;
+  }
   
   async_queue_depth_ = depth;
   
@@ -1012,13 +1020,17 @@ bool WindowsFileOperations::SetAsyncQueueDepth(int depth) {
 FileError WindowsFileOperations::AsyncWriteSequential(const std::uint8_t* data, std::size_t size, 
                                                        AsyncWriteCallback callback) {
   if (handle_ == INVALID_HANDLE_VALUE) {
-    if (callback) callback(FileError::kOpenError, 0);
+    if (callback) {
+      callback(FileError::kOpenError, 0);
+    }
     return FileError::kOpenError;
   }
   
   // Check for cancellation
   if (cancelled_.load()) {
-    if (callback) callback(FileError::kCancelled, 0);
+    if (callback) {
+      callback(FileError::kCancelled, 0);
+    }
     return FileError::kCancelled;
   }
   
@@ -1026,13 +1038,17 @@ FileError WindowsFileOperations::AsyncWriteSequential(const std::uint8_t* data, 
   if (async_queue_depth_ <= 1 || iocp_ == INVALID_HANDLE_VALUE) {
     FileError result = WriteSequential(data, size);
     // Note: WriteSequential already updates async_write_offset_
-    if (callback) callback(result, result == FileError::kSuccess ? size : 0);
+    if (callback) {
+      callback(result, result == FileError::kSuccess ? size : 0);
+    }
     return result;
   }
   
   // Check for previous errors
   if (first_async_error_ != FileError::kSuccess) {
-    if (callback) callback(first_async_error_, 0);
+    if (callback) {
+      callback(first_async_error_, 0);
+    }
     return first_async_error_;
   }
   
@@ -1042,7 +1058,9 @@ FileError WindowsFileOperations::AsyncWriteSequential(const std::uint8_t* data, 
   // If queue is full, wait for completions (checking for cancellation)
   while (pending_writes_.load() >= async_queue_depth_) {
     if (cancelled_.load()) {
-      if (callback) callback(FileError::kCancelled, 0);
+      if (callback) {
+        callback(FileError::kCancelled, 0);
+      }
       return FileError::kCancelled;
     }
     ProcessCompletions(true);
@@ -1098,7 +1116,9 @@ FileError WindowsFileOperations::AsyncWriteSequential(const std::uint8_t* data, 
       oss << "Async WriteFile failed, error: " << error;
       Log(oss.str());
       
-      if (callback) callback(FileError::kWriteError, 0);
+      if (callback) {
+        callback(FileError::kWriteError, 0);
+      }
       return FileError::kWriteError;
     }
     // ERROR_IO_PENDING is expected - the operation is in progress

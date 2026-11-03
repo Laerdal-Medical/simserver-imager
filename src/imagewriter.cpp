@@ -118,10 +118,11 @@ void ImageWriter::startDownloadOnly(const QVariantMap &source, const QUrl &desti
         const QString repo = source.value("repo").toString();
         const qint64 artifactId = source.value("artifact_id").toLongLong();
         const qint64 assetId = source.value("asset_id").toLongLong();
-        if (artifactId > 0)
+        if (artifactId > 0) {
             downloadSource["url"] = _githubClient->getArtifactDownloadUrl(owner, repo, artifactId);
-        else if (assetId > 0)
+        } else if (assetId > 0) {
             downloadSource["url"] = _githubClient->getAssetDownloadUrl(owner, repo, assetId);
+        }
     }
     _downloadOnly->start(downloadSource, destination, _githubClient ? _githubClient->authToken() : QString(), overwrite);
 }
@@ -219,8 +220,9 @@ ImageWriter::ImageWriter(QObject *parent)
         connect(&_networkchecktimer, SIGNAL(timeout()), SLOT(pollNetwork()));
         _networkchecktimer.start(100);
         changeKeyboard(detectPiKeyboard());
-        if (_currentKeyboard.isEmpty())
+        if (_currentKeyboard.isEmpty()) {
             _currentKeyboard = "us";
+        }
             _currentLang = "English";
 
         {
@@ -315,8 +317,9 @@ ImageWriter::ImageWriter(QObject *parent)
     QLocale currentLocale;
     QStringList localeComponents = currentLocale.name().split('_');
     QString currentlangcode;
-    if (!localeComponents.isEmpty())
+    if (!localeComponents.isEmpty()) {
         currentlangcode = localeComponents.first();
+    }
 
     for (const QString &tf : transFiles)
     {
@@ -787,20 +790,23 @@ void ImageWriter::startWrite()
         // Check all conditions and provide comprehensive error messages
         QStringList missingItems;
 
-        if (_src.isEmpty())
+        if (_src.isEmpty()) {
             missingItems.append(tr("image"));
-        if (_dst.isEmpty())
+        }
+        if (_dst.isEmpty()) {
             missingItems.append(tr("storage device"));
-        else if (!_selectedDeviceValid)
+        } else if (!_selectedDeviceValid) {
             missingItems.append(tr("valid storage device (device no longer available)"));
+        }
 
         QString reason;
         if (!missingItems.isEmpty())
         {
-            if (missingItems.size() == 1)
+            if (missingItems.size() == 1) {
                 reason = tr("No %1 selected.").arg(missingItems.first());
-            else
+            } else {
                 reason = tr("No %1 selected.").arg(missingItems.join(tr(" or ")));
+            }
         }
         else
         {
@@ -837,7 +843,9 @@ void ImageWriter::startWrite()
         // Defer to let QML render the indeterminate progress animation
         QTimer::singleShot(100, this, [this]() {
             // Re-enter startWrite but now as a normal remote URL with artifact streaming
-            if (_writeState == WriteState::Cancelled || _writeState == WriteState::Failed) return;
+            if (_writeState == WriteState::Cancelled || _writeState == WriteState::Failed) {
+                return;
+            }
 
             QByteArray urlstr = _src.toString(_src.FullyEncoded).toLatin1();
             QString writeDevicePath = _dst;
@@ -901,8 +909,9 @@ void ImageWriter::startWrite()
                         this, &ImageWriter::writeProgress, Qt::QueuedConnection);
                 connect(downloadThread, &DownloadExtractThread::verifyProgressChanged,
                         this, [this](quint64, quint64){
-                            if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded)
+                            if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded) {
                                 setWriteState(WriteState::Verifying);
+                            }
                         });
             }
 
@@ -1097,14 +1106,15 @@ void ImageWriter::startWrite()
 
     if (!_extrLen && _src.isLocalFile())
     {
-        if (!compressed)
+        if (!compressed) {
             _extrLen = _downloadLen;
-        else if (lowercaseurl.endsWith(".vsi"))
+        } else if (lowercaseurl.endsWith(".vsi")) {
             _parseVsiFile();
-        else if (lowercaseurl.endsWith(".xz"))
+        } else if (lowercaseurl.endsWith(".xz")) {
             _parseXZFile();
-        else
+        } else {
             _parseCompressedFile();
+        }
     }
 
     if (_devLen && _extrLen > _devLen)
@@ -1355,8 +1365,9 @@ void ImageWriter::startWrite()
         // Also transition state to Verifying when verify progress first arrives
         connect(downloadThread, &DownloadExtractThread::verifyProgressChanged,
                 this, [this](quint64 /*now*/, quint64 /*total*/){
-                    if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded)
+                    if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded) {
                         setWriteState(WriteState::Verifying);
+                    }
                 });
         
         // Capture ring buffer stall events for time-series correlation
@@ -1807,8 +1818,12 @@ QString ImageWriter::srcFileName()
 quint64 ImageWriter::getSelectedSourceSize()
 {
     // If we know uncompressed length, prefer that; else return download length
-    if (_extrLen > 0) return _extrLen;
-    if (_downloadLen > 0) return _downloadLen;
+    if (_extrLen > 0) {
+        return _extrLen;
+    }
+    if (_downloadLen > 0) {
+        return _downloadLen;
+    }
     return 0;
 }
 
@@ -1994,7 +2009,9 @@ void ImageWriter::setHWCapabilitiesList(const QJsonArray &json) {
 
 static inline void pushLower(QStringList &dst, const QString &s) {
     const QString t = s.trimmed().toLower();
-    if (!t.isEmpty()) dst.push_back(t);
+    if (!t.isEmpty()) {
+        dst.push_back(t);
+    }
 }
 
 void ImageWriter::setSWCapabilitiesList(const QString &json) {
@@ -2032,14 +2049,18 @@ bool ImageWriter::checkHWAndSWCapability(const QString &cap, const QString &diff
 bool ImageWriter::checkHWCapability(const QString &cap) {
     const auto needle = cap.trimmed().toLower();
     for (const auto &v : _hwCapabilities)
-        if (v.toString().toLower() == needle) return true;
+        if (v.toString().toLower() == needle) {
+            return true;
+        }
     return false;
 }
 
 bool ImageWriter::checkSWCapability(const QString &cap) {
     const auto needle = cap.trimmed().toLower();
     for (const auto &v : _swCapabilities)
-        if (v.toString().toLower() == needle) return true;
+        if (v.toString().toLower() == needle) {
+            return true;
+        }
     return false;
 }
 
@@ -2065,8 +2086,9 @@ namespace {
             QString deviceName = DeviceDetection::getDisplayName(deviceType);
             if (deviceName.isEmpty()) {
                 deviceName = simpadType;
-                if (!deviceName.isEmpty())
+                if (!deviceName.isEmpty()) {
                     deviceName[0] = deviceName[0].toUpper();
+                }
             }
 
             QJsonObject osEntry;
@@ -2434,7 +2456,9 @@ void ImageWriter::scheduleOsListRefresh()
     }
 
     // Constrain jitter to non-negative
-    if (jitterMinutes < 0) jitterMinutes = 0;
+    if (jitterMinutes < 0) {
+        jitterMinutes = 0;
+    }
 
     // Compute randomized delay with second-level granularity
     // Base is in minutes; jitter is in minutes but applied as seconds
@@ -2445,7 +2469,9 @@ void ImageWriter::scheduleOsListRefresh()
 
     // Cap to a reasonable max to avoid overflow (e.g., ~30 days)
     const qint64 maxMs = static_cast<qint64>(30) * 24 * 60 * 60 * 1000;
-    if (msec > maxMs) msec = maxMs;
+    if (msec > maxMs) {
+        msec = maxMs;
+    }
 
     _osListRefreshTimer.start(msec);
     qDebug() << "Scheduled OS list refresh in" << (msec/1000) << "seconds (base" << (baseMs/1000) << "+ jitter" << extraSeconds << ")";
@@ -2494,8 +2520,9 @@ void ImageWriter::startProgressPolling()
     // Prevent system suspend and display sleep during imaging
     try
     {
-        if (_suspendInhibitor == nullptr)
+        if (_suspendInhibitor == nullptr) {
             _suspendInhibitor = CreateSuspendInhibitor();
+        }
     }
     catch (...)
     {
@@ -2517,8 +2544,9 @@ void ImageWriter::stopProgressPolling()
 
 void ImageWriter::setWriteState(WriteState state)
 {
-    if (_writeState == state)
+    if (_writeState == state) {
         return;
+    }
     
     WriteState oldState = _writeState;
     _writeState = state;
@@ -2561,8 +2589,9 @@ void ImageWriter::setWriteState(WriteState state)
 void ImageWriter::setVerifyEnabled(bool verify)
 {
     _verifyEnabled = verify;
-    if (_thread)
+    if (_thread) {
         _thread->setVerifyEnabled(verify);
+    }
 }
 
 /* Relay events from download thread to QML */
@@ -2642,8 +2671,9 @@ void ImageWriter::openFileDialog(const QString &title, const QString &filter)
     // extremely slow on macOS with iCloud-synced directories or network volumes.
     // The native file dialog handles invalid/missing paths gracefully by falling back
     // to its default location.
-    if (path.isEmpty())
+    if (path.isEmpty()) {
         path = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    }
 
     // Use native file dialog with modal behavior to main window
     QString filename = NativeFileDialog::getOpenFileName(tr("Select image"),
@@ -2714,8 +2744,9 @@ void ImageWriter::_parseCompressedFile()
         }
     }
 
-    if (numFiles > 1)
+    if (numFiles > 1) {
         _multipleFilesInZip = true;
+    }
 
     qDebug() << "Parsed .zip file containing" << numFiles << "files, uncompressed size:" << _extrLen;
 }
@@ -3012,26 +3043,30 @@ bool ImageWriter::hasWindowDecorations() const
 {
 #ifndef CLI_ONLY_BUILD
     // Embedded mode never has decorations
-    if (isEmbeddedMode())
+    if (isEmbeddedMode()) {
         return false;
+    }
 
     // Check platform - some don't support decorations at all
     QString platform = QGuiApplication::platformName().toLower();
     if (platform == "linuxfb" || platform == "eglfs" ||
-        platform == "minimal" || platform == "offscreen")
+        platform == "minimal" || platform == "offscreen") {
         return false;
+    }
 
     // Check if main window exists and has been shown
     if (_mainWindow) {
         // Check for explicit frameless hint
-        if (_mainWindow->flags() & Qt::FramelessWindowHint)
+        if (_mainWindow->flags() & Qt::FramelessWindowHint) {
             return false;
+        }
 
         // Check frame margins - if top margin is 0, WM isn't providing decorations
         // (tiling WMs like i3/sway, WM rules to hide title bars, etc.)
         QMargins margins = _mainWindow->frameMargins();
-        if (margins.top() == 0)
+        if (margins.top() == 0) {
             return false;
+        }
     }
 
     return true;
@@ -3048,8 +3083,9 @@ bool ImageWriter::mountUsbSourceMedia()
     QDir dir("/sys/class/block");
     const QStringList list = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
-    if (!dir.exists("/media"))
+    if (!dir.exists("/media")) {
         dir.mkdir("/media");
+    }
 
     for (const QString &devname : list)
     {
@@ -3066,10 +3102,11 @@ bool ImageWriter::mountUsbSourceMedia()
             dir.mkdir(mntdir);
             QStringList args = { "-o", "ro", QString("/dev/")+devname, mntdir };
 
-            if ( QProcess::execute("mount", args) == 0 )
+            if ( QProcess::execute("mount", args) == 0 ) {
                 devices++;
-            else
+            } else {
                 dir.rmdir(mntdir);
+            }
         }
     }
 #endif
@@ -3222,8 +3259,9 @@ QStringList ImageWriter::getCountryList()
 QStringList ImageWriter::getKeymapLayoutList()
 {
     QFile f(":/keymap-layouts.txt");
-    if (!f.open(QFile::ReadOnly | QFile::Text))
+    if (!f.open(QFile::ReadOnly | QFile::Text)) {
         return {};
+    }
 
     QStringList list = QString::fromUtf8(f.readAll())
                            .split('\n', Qt::SkipEmptyParts);
@@ -3243,8 +3281,9 @@ QStringList ImageWriter::getCapitalCitiesList()
         {
             QString line = in.readLine().trimmed();
             // Skip empty lines and comments
-            if (line.isEmpty() || line.startsWith('#'))
+            if (line.isEmpty() || line.startsWith('#')) {
                 continue;
+            }
             
             // Parse: CityName|CountryName|CountryCode|Timezone|Language|KeyboardLayout
             QStringList parts = line.split('|');
@@ -3268,8 +3307,9 @@ QVariantMap ImageWriter::getLocaleDataForCapital(const QString &capitalCity)
     QVariantMap result;
     QFile f(":/capital-cities.txt");
     
-    if (!f.open(QFile::ReadOnly | QFile::Text))
+    if (!f.open(QFile::ReadOnly | QFile::Text)) {
         return result;
+    }
     
     // Extract just the city name from "City (Country)" format
     QString cityNameOnly = capitalCity;
@@ -3284,8 +3324,9 @@ QVariantMap ImageWriter::getLocaleDataForCapital(const QString &capitalCity)
     {
         QString line = in.readLine().trimmed();
         // Skip empty lines and comments
-        if (line.isEmpty() || line.startsWith('#'))
+        if (line.isEmpty() || line.startsWith('#')) {
             continue;
+        }
         
         // Parse: CityName|CountryName|CountryCode|Timezone|Language|KeyboardLayout
         QStringList parts = line.split('|');
@@ -3418,14 +3459,15 @@ void ImageWriter::keychainPermissionResponse(bool granted)
 bool ImageWriter::getBoolSetting(const QString &key)
 {
     /* Some keys have defaults */
-    if (key == "telemetry")
+    if (key == "telemetry") {
         return _settings.value(key, TELEMETRY_ENABLED_DEFAULT).toBool();
-    else if (key == "eject")
+    } else if (key == "eject") {
         return _settings.value(key, true).toBool();
-    else if (key == "check_version")
+    } else if (key == "check_version") {
         return _settings.value(key, CHECK_VERSION_DEFAULT).toBool();
-    else
+    } else {
         return _settings.value(key).toBool();
+    }
 }
 
 QString ImageWriter::getStringSetting(const QString &key)
@@ -3746,7 +3788,9 @@ QVariantMap ImageWriter::getSavedCustomisationSettings()
 
         for (const QString &line : lines) {
             const QString trimmed = line.trimmed();
-            if (trimmed.isEmpty()) continue;
+            if (trimmed.isEmpty()) {
+                continue;
+            }
             const QByteArray hash = QCryptographicHash::hash(trimmed.toUtf8(), QCryptographicHash::Sha256);
             bool already = false;
             for (const QByteArray &h : seenHashes) { if (h == hash) { already = true; break; } }
@@ -3807,8 +3851,9 @@ QString ImageWriter::getCurrentKeyboard()
 
 void ImageWriter::changeLanguage(const QString &newLanguageName)
 {
-    if (newLanguageName.isEmpty() || newLanguageName == _currentLang || !_translations.contains(newLanguageName))
+    if (newLanguageName.isEmpty() || newLanguageName == _currentLang || !_translations.contains(newLanguageName)) {
         return;
+    }
 
     QString langcode = _translations[newLanguageName];
     qDebug() << "Changing language to" << langcode;
@@ -3829,8 +3874,9 @@ void ImageWriter::changeLanguage(const QString &newLanguageName)
 
 void ImageWriter::changeKeyboard(const QString &newKeymapLayout)
 {
-    if (newKeymapLayout.isEmpty() || newKeymapLayout == _currentKeyboard)
+    if (newKeymapLayout.isEmpty() || newKeymapLayout == _currentKeyboard) {
         return;
+    }
 
 
     _currentKeyboard = newKeymapLayout;
@@ -3922,8 +3968,9 @@ QString ImageWriter::getCurrentUser()
 {
     QString user = qgetenv("USER");
 
-    if (user.isEmpty())
+    if (user.isEmpty()) {
         user = qgetenv("USERNAME");
+    }
 
     user = user.toLower();
     if (user.contains(" "))
@@ -3932,8 +3979,9 @@ QString ImageWriter::getCurrentUser()
         user = names.first();
     }
 
-    if (user.isEmpty() || user == "root")
+    if (user.isEmpty() || user == "root") {
         user = "pi";
+    }
 
     return user;
 }
@@ -4104,20 +4152,22 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
         // Use platform-specific write device path (e.g., rdisk on macOS for direct I/O)
         QString writeDevicePath = PlatformQuirks::getWriteDevicePath(_dst);
         QString lowercaseurl = urlstr.toLower();
-        if (lowercaseurl.endsWith(".vsi"))
+        if (lowercaseurl.endsWith(".vsi")) {
             _thread = new VsiExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
-        else
+        } else {
             _thread = new LocalFileExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
+        }
     }
     else
     {
         // Use platform-specific write device path (e.g., rdisk on macOS for direct I/O)
         QString writeDevicePath = PlatformQuirks::getWriteDevicePath(_dst);
         QString lowercaseurl = urlstr.toLower();
-        if (lowercaseurl.endsWith(".vsi"))
+        if (lowercaseurl.endsWith(".vsi")) {
             _thread = new VsiExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
-        else
+        } else {
             _thread = new DownloadExtractThread(urlstr.toLatin1(), writeDevicePath.toLatin1(), _expectedHash, this);
+        }
         if (_repo.toString() == OSLIST_URL)
         {
             DownloadStatsTelemetry *tele = new DownloadStatsTelemetry(urlstr.toLatin1(), _parentCategory.toLatin1(), _osName.toLatin1(), isEmbeddedMode(), _currentLangcode, this);
@@ -4182,8 +4232,9 @@ void ImageWriter::_continueStartWriteAfterCacheVerification(bool cacheIsValid)
         // Also transition state to Verifying when verify progress first arrives
         connect(downloadThread, &DownloadExtractThread::verifyProgressChanged,
                 this, [this](quint64 /*now*/, quint64 /*total*/){
-                    if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded)
+                    if (_writeState != WriteState::Verifying && _writeState != WriteState::Finalizing && _writeState != WriteState::Succeeded) {
                         setWriteState(WriteState::Verifying);
+                    }
                 });
         
         // Capture ring buffer stall events for time-series correlation
@@ -4666,14 +4717,16 @@ bool ImageWriter::verifyAuthKey(const QString &s, bool strict) const
 
     // Required prefix
     bool hasPrefix = s.startsWith(QStringLiteral("rpuak_")) || s.startsWith(QStringLiteral("rpoak_"));
-    if (!hasPrefix)
+    if (!hasPrefix) {
         return false;
+    }
 
     const QString payload = s.mid(6);
     bool base58Match = base58OnlyRe.match(payload).hasMatch();
     
-    if (payload.isEmpty() || !base58Match)
+    if (payload.isEmpty() || !base58Match) {
         return false;
+    }
 
     if (strict) {
         // Exactly 24 Base58 chars today → total length 30
@@ -4686,8 +4739,9 @@ bool ImageWriter::verifyAuthKey(const QString &s, bool strict) const
 
 QString ImageWriter::parseTokenFromUrl(const QUrl &url, bool strictAuthKey) const {
     // Handle QUrl or string, accept auth_key
-    if (!url.isValid())
+    if (!url.isValid()) {
         return {};
+    }
 
     QUrlQuery q(url);
     const QString val = q.queryItemValue(QStringLiteral("auth_key"), QUrl::FullyDecoded);

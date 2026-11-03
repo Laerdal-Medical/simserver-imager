@@ -67,6 +67,8 @@ route it through device writes.
 
 ## State and compatibility invariants
 
+- Always use braces for `if` and `else` bodies, including single statements,
+  in first-party C++, Objective-C++, and QML code. Preserve `else if` chains.
 - Wizard navigation clears/recreates step instances. State needed across steps
   belongs in `WizardContainer` or the appropriate C++ owner, not only in a
   step's local properties.

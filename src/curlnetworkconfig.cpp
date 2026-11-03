@@ -93,7 +93,9 @@ void CurlNetworkConfig::setUserAgent(const QByteArray &ua)
 
 void CurlNetworkConfig::applyCurlSettings(CURL *curl, FetchProfile profile, char *errorBuffer) const
 {
-    if (!curl) return;
+    if (!curl) {
+        return;
+    }
     
     // =========================================================================
     // Thread safety - REQUIRED for all multi-threaded curl usage

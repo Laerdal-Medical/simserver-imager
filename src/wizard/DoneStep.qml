@@ -285,17 +285,39 @@ WizardStepBase {
                     // Build a list of visible customizations to announce using snapshot
                     var items = []
                     var snapshot = wizardContainer.completionSnapshot
-                    if (snapshot.hostnameConfigured) items.push(CommonStrings.hostnameConfigured)
-                    if (snapshot.localeConfigured) items.push(CommonStrings.localeConfigured)
-                    if (snapshot.userConfigured) items.push(CommonStrings.userAccountConfigured)
-                    if (snapshot.wifiConfigured) items.push(CommonStrings.wifiConfigured)
-                    if (snapshot.sshEnabled) items.push(CommonStrings.sshEnabled)
-                    if (snapshot.piConnectEnabled) items.push(CommonStrings.piConnectEnabled)
-                    if (snapshot.featUsbGadgetEnabled) items.push(CommonStrings.usbGadgetEnabled)
-                    if (snapshot.ifI2cEnabled) items.push(CommonStrings.i2cEnabled)
-                    if (snapshot.ifSpiEnabled) items.push(CommonStrings.spiEnabled)
-                    if (snapshot.if1WireEnabled) items.push(CommonStrings.onewireEnabled)
-                    if (snapshot.ifSerial !== "" && snapshot.ifSerial !== "Disabled") items.push(CommonStrings.serialConfigured)
+                    if (snapshot.hostnameConfigured) {
+                        items.push(CommonStrings.hostnameConfigured)
+                    }
+                    if (snapshot.localeConfigured) {
+                        items.push(CommonStrings.localeConfigured)
+                    }
+                    if (snapshot.userConfigured) {
+                        items.push(CommonStrings.userAccountConfigured)
+                    }
+                    if (snapshot.wifiConfigured) {
+                        items.push(CommonStrings.wifiConfigured)
+                    }
+                    if (snapshot.sshEnabled) {
+                        items.push(CommonStrings.sshEnabled)
+                    }
+                    if (snapshot.piConnectEnabled) {
+                        items.push(CommonStrings.piConnectEnabled)
+                    }
+                    if (snapshot.featUsbGadgetEnabled) {
+                        items.push(CommonStrings.usbGadgetEnabled)
+                    }
+                    if (snapshot.ifI2cEnabled) {
+                        items.push(CommonStrings.i2cEnabled)
+                    }
+                    if (snapshot.ifSpiEnabled) {
+                        items.push(CommonStrings.spiEnabled)
+                    }
+                    if (snapshot.if1WireEnabled) {
+                        items.push(CommonStrings.onewireEnabled)
+                    }
+                    if (snapshot.ifSerial !== "" && snapshot.ifSerial !== "Disabled") {
+                        items.push(CommonStrings.serialConfigured)
+                    }
                     
                     return items.length + " " + (items.length === 1 ? qsTr("customization") : qsTr("customizations")) + ": " + items.join(", ")
                 }

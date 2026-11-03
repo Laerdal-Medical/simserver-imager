@@ -168,7 +168,9 @@ DownloadThread::~DownloadThread()
     _closeFiles();
 
     if (_firstBlock)
+    {
         qFreeAligned(_firstBlock);
+    }
     
     // Note: curl_global_cleanup() is not called here - it happens at process exit.
     // This is safe and avoids issues with multiple DownloadThread instances.
@@ -332,7 +334,9 @@ bool DownloadThread::_openAndPrepareDevice()
             {
                 driveLetter = QByteArray::fromStdString(i.mountpoints.front());
                 if (driveLetter.endsWith("\\"))
+                {
                     driveLetter.chop(1);
+                }
             }
             else if (i.mountpoints.size() > 1)
             {
@@ -421,9 +425,13 @@ bool DownloadThread::_openAndPrepareDevice()
         QByteArray cid = _fileGetContentsTrimmed("/sys/block/"+devname+"/device/cid");
         QByteArray csd = _fileGetContentsTrimmed("/sys/block/"+devname+"/device/csd");
         if (!cid.isEmpty())
+        {
             qDebug() << "SD card CID:" << cid;
+        }
         if (!csd.isEmpty())
+        {
             qDebug() << "SD card CSD:" << csd;
+        }
 
         QByteArray discardmax = _fileGetContentsTrimmed("/sys/block/"+devname+"/queue/discard_max_bytes");
 
@@ -530,13 +538,21 @@ bool DownloadThread::_openAndPrepareDevice()
         rpi_imager::FileError lastMBResult;
         bool completed = runWithTimeout([file, seekPosition, bufferData, emptyMBSize]() {
             if (file->Seek(seekPosition) != rpi_imager::FileError::kSuccess)
+            {
                 return rpi_imager::FileError::kSeekError;
+            }
             if (file->WriteSequential(bufferData, emptyMBSize) != rpi_imager::FileError::kSuccess)
+            {
                 return rpi_imager::FileError::kWriteError;
+            }
             if (file->Flush() != rpi_imager::FileError::kSuccess)
+            {
                 return rpi_imager::FileError::kFlushError;
+            }
             if (file->ForceSync() != rpi_imager::FileError::kSuccess)
+            {
                 return rpi_imager::FileError::kSyncError;
+            }
             return rpi_imager::FileError::kSuccess;
         }, lastMBResult, kCounterfeitDetectionTimeoutSeconds);
         
@@ -656,10 +672,14 @@ void DownloadThread::run()
     const int MAX_HTTP2_FAILURES = 3;
     
     if (_inputBufferSize)
+    {
         curl_easy_setopt(_c, CURLOPT_BUFFERSIZE, _inputBufferSize);
+    }
 
     if (!_useragent.isEmpty())
+    {
         curl_easy_setopt(_c, CURLOPT_USERAGENT, _useragent.constData());
+    }
 
     struct curl_slist *httpHeaders = nullptr;
     if (!_httpHeaders.isEmpty()) {
@@ -700,7 +720,9 @@ void DownloadThread::run()
     }
 
     if (!_proxy.isEmpty())
+    {
         curl_easy_setopt(_c, CURLOPT_PROXY, _proxy.constData());
+    }
 
 #ifdef Q_OS_LINUX
     // Set CA certificate bundle path for AppImage compatibility.
@@ -842,7 +864,9 @@ void DownloadThread::run()
             // Clean cancellation via progress callback
             // Don't delete file - partial cache may be preserved for resume
             if (!_cancelled)
+            {
                 deleteDownloadedFile();
+            }
             break;
         default:
             // On actual errors (not cancellation), delete the file
@@ -852,14 +876,20 @@ void DownloadThread::run()
                 QString errorMsg;
 
                 if (!errorBuf[0])
+                {
                     /* No detailed error message text provided, use standard text for libcurl result code */
                     errorMsg += curl_easy_strerror(ret);
+                }
                 else
+                {
                     errorMsg += errorBuf;
+                }
 
                 char *ipstr;
                 if (curl_easy_getinfo(_c, CURLINFO_PRIMARY_IP, &ipstr) == CURLE_OK && ipstr && ipstr[0])
+                {
                     errorMsg += QString(" - Server IP: ")+ipstr;
+                }
 
                 _onDownloadError(tr("Error downloading: %1").arg(errorMsg));
             }
@@ -871,7 +901,9 @@ size_t DownloadThread::_writeData(const char *buf, size_t len)
     // Abort CURL cleanly if cancelled - returning 0 triggers CURLE_WRITE_ERROR
     // which we handle by checking _cancelled before showing error dialogs
     if (_cancelled)
+    {
         return 0;
+    }
 
     _writeCache(buf, len);
 
@@ -889,7 +921,9 @@ size_t DownloadThread::_writeData(const char *buf, size_t len)
 void DownloadThread::_writeCache(const char *buf, size_t len)
 {
     if (!_cacheEnabled || _cancelled)
+    {
         return;
+    }
 
     // Check if async writer exists and is still healthy
     if (!_asyncCacheWriter) {
@@ -980,7 +1014,10 @@ void DownloadThread::_hashData(const char *buf, size_t len)
 size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCallback onComplete)
 {
     if (_cancelled) {
-        if (onComplete) onComplete();
+        if (onComplete)
+        {
+            onComplete();
+        }
         return len;
     }
 
@@ -991,7 +1028,10 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
         _firstBlockSize = len;
         ::memcpy(_firstBlock, buf, len);
         qDebug() << "_writeFile: captured first block (" << len << ") and advanced file offset via seek";
-        if (onComplete) onComplete();
+        if (onComplete)
+        {
+            onComplete();
+        }
         return (_file->Seek(len) == rpi_imager::FileError::kSuccess) ? len : 0;
     }
 
@@ -1090,7 +1130,10 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
                 }
 
                 // Release the buffer - hash was computed inline before queueing
-                if (onComplete) onComplete();
+                if (onComplete)
+                {
+                    onComplete();
+                }
                 if (result != rpi_imager::FileError::kSuccess) {
                     qDebug() << "Async write (zero-copy): error" << static_cast<int>(result)
                              << "expected" << writeLen << "wrote" << written;
@@ -1112,7 +1155,10 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
                 _bytesWritten += bytes_written;
             }
             // Call completion callback since we're done synchronously
-            if (onComplete) onComplete();
+            if (onComplete)
+            {
+                onComplete();
+            }
         }
     } else if (useAsync) {
         // ASYNC WITH COPY: No completion callback, must copy buffer for safety
@@ -1181,7 +1227,10 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
             qDebug() << "Write error: FileOperations write failed with error code" << static_cast<int>(write_result) << "while writing len:" << len;
         }
         // For sync writes, call completion immediately
-        if (onComplete) onComplete();
+        if (onComplete)
+        {
+            onComplete();
+        }
     }
     
     syscallMs = static_cast<quint64>(opTimer.elapsed());
@@ -1232,7 +1281,9 @@ size_t DownloadThread::_writeFile(const char *buf, size_t len, WriteCompleteCall
 bool DownloadThread::_progress(curl_off_t dltotal, curl_off_t dlnow, curl_off_t /*ultotal*/, curl_off_t /*ulnow*/)
 {
     if (dltotal)
+    {
         _lastDlTotal = _startOffset + dltotal;
+    }
     _lastDlNow   = _startOffset + dlnow;
 
     return !_cancelled;
@@ -1351,9 +1402,13 @@ uint64_t DownloadThread::verifyTotal()
 uint64_t DownloadThread::bytesWritten()
 {
     if (_sectorsStart != -1)
+    {
         return qMin((uint64_t) (_sectorsWritten()-_sectorsStart)*512, (uint64_t) _bytesWritten);
+    }
     else
+    {
         return _bytesWritten;
+    }
 }
 
 void DownloadThread::_onDownloadSuccess()
@@ -1375,7 +1430,9 @@ void DownloadThread::_onWriteError()
     // Don't report write errors if the operation was cancelled
     // (cancellation can cause writes to fail, which is expected)
     if (_cancelled)
+    {
         return;
+    }
 
 #ifdef Q_OS_WIN
     // TODO: Implement platform-specific error handling in FileOperations
@@ -2017,18 +2074,24 @@ qint64 DownloadThread::_sectorsWritten()
 {
 #ifdef Q_OS_LINUX
     if (!_filename.startsWith("/dev/"))
+    {
         return -1;
+    }
 
     QFile f("/sys/class/block/"+_filename.mid(5)+"/stat");
     if (!f.open(f.ReadOnly))
+    {
         return -1;
+    }
     QByteArray ioline = f.readAll().simplified();
     f.close();
 
     QList<QByteArray> stats = ioline.split(' ');
 
     if (stats.count() >= 6)
+    {
         return stats.at(6).toLongLong(); /* write sectors */
+    }
 #endif
     return -1;
 }
@@ -2095,12 +2158,30 @@ bool DownloadThread::_customizeImage()
     
     // Build metadata for performance tracking (what was configured, not values)
     QStringList configuredItems;
-    if (!_config.isEmpty()) configuredItems << "config: set";
-    if (!_cmdline.isEmpty()) configuredItems << "cmdline: set";
-    if (!_firstrun.isEmpty()) configuredItems << "firstrun: set";
-    if (!_cloudinit.isEmpty()) configuredItems << "cloudinit: set";
-    if (!_cloudinitNetwork.isEmpty()) configuredItems << "network: set";
-    if (_advancedOptions.testFlag(ImageOptions::EnableSecureBoot)) configuredItems << "secureboot: enabled";
+    if (!_config.isEmpty())
+    {
+        configuredItems << "config: set";
+    }
+    if (!_cmdline.isEmpty())
+    {
+        configuredItems << "cmdline: set";
+    }
+    if (!_firstrun.isEmpty())
+    {
+        configuredItems << "firstrun: set";
+    }
+    if (!_cloudinit.isEmpty())
+    {
+        configuredItems << "cloudinit: set";
+    }
+    if (!_cloudinitNetwork.isEmpty())
+    {
+        configuredItems << "network: set";
+    }
+    if (_advancedOptions.testFlag(ImageOptions::EnableSecureBoot))
+    {
+        configuredItems << "secureboot: enabled";
+    }
     QString metadata = configuredItems.join("; ");
 
     // Use DeviceWrapper with existing FileOperations for image customization
@@ -2143,9 +2224,13 @@ bool DownloadThread::_customizeImage()
                 } else {
                     // Append new line to config.txt
                     if (config.right(1) != QByteArray("\n"))
+                    {
                         config += "\n"+item+"\n";
+                    }
                     else
+                    {
                         config += item+"\n";
+                    }
                 }
             }
 

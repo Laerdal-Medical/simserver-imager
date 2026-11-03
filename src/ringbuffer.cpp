@@ -132,7 +132,9 @@ RingBuffer::Slot* RingBuffer::acquireWriteSlot(int timeoutMs)
 
 void RingBuffer::commitWriteSlot(Slot* slot, size_t dataSize)
 {
-    if (!slot) return;
+    if (!slot) {
+        return;
+    }
     
     slot->size = dataSize;
     
@@ -212,7 +214,9 @@ RingBuffer::Slot* RingBuffer::acquireReadSlot(int timeoutMs)
 
 void RingBuffer::releaseReadSlot(Slot* slot)
 {
-    if (!slot) return;
+    if (!slot) {
+        return;
+    }
     
     slot->size = 0;  // Reset size
     

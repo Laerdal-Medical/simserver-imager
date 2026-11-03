@@ -322,7 +322,9 @@ void GitHubClient::searchWicFilesInArtifacts(const QString &owner, const QString
 void GitHubClient::fetchArtifactWorkflowRunsPage(const QString &searchKey, int page)
 {
     const auto state = _artifactSearchStates.constFind(searchKey);
-    if (state == _artifactSearchStates.cend()) return;
+    if (state == _artifactSearchStates.cend()) {
+        return;
+    }
 
     QUrl url(QString("%1/repos/%2/%3/actions/runs")
                  .arg(API_BASE_URL, state->owner, state->repo));
@@ -350,10 +352,14 @@ void GitHubClient::fetchArtifactWorkflowRunsPage(const QString &searchKey, int p
 void GitHubClient::fetchArtifactRunFiles(const QString &searchKey, const QJsonObject &run)
 {
     auto state = _artifactSearchStates.find(searchKey);
-    if (state == _artifactSearchStates.cend()) return;
+    if (state == _artifactSearchStates.cend()) {
+        return;
+    }
 
     const qint64 runId = run["id"].toVariant().toLongLong();
-    if (runId <= 0) return;
+    if (runId <= 0) {
+        return;
+    }
 
     const QString runBranch = run["head_branch"].toString();
     const QString runCreatedAt = run["created_at"].toString();
@@ -1052,7 +1058,9 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
                 const bool activeArtifactSearch = finishFailedArtifactRequest();
                 if (requestType == RequestArtifactWicSearch
                     || requestType == RequestArtifactRunWicSearch) {
-                    if (activeArtifactSearch) emit error(tr("GitHub API rate limit exceeded"));
+                    if (activeArtifactSearch) {
+                        emit error(tr("GitHub API rate limit exceeded"));
+                    }
                 }
                 emit rateLimitExceeded(resetTime);
                 return;
@@ -1061,7 +1069,9 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
 
         const bool activeArtifactSearch = finishFailedArtifactRequest();
         if ((requestType == RequestArtifactWicSearch
-             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) return;
+             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) {
+            return;
+        }
         if (statusCode == 404) {
             emit error(tr("Repository not found or not accessible: %1/%2")
                            .arg(metadata.first, metadata.second));
@@ -1077,7 +1087,9 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     if (doc.isNull()) {
         const bool activeArtifactSearch = finishFailedArtifactRequest();
         if ((requestType == RequestArtifactWicSearch
-             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) return;
+             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) {
+            return;
+        }
         emit error(tr("Invalid JSON response from GitHub"));
         return;
     }

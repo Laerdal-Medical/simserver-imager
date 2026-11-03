@@ -56,7 +56,9 @@ GnomeSuspendInhibitor::~GnomeSuspendInhibitor()
         QDBusInterface sessionManagerInterface(service, path, service, _bus);
 
         if (sessionManagerInterface.isValid())
+        {
             sessionManagerInterface.call("Uninhibit", _cookie);
+        }
     }
 }
 
@@ -153,7 +155,9 @@ ProcessScopedSuspendInhibitor::ProcessScopedSuspendInhibitor(const char *fileNam
         // The parent may have disk devices, network sockets, etc. open.
         long maxfd = sysconf(_SC_OPEN_MAX);
         if (maxfd == -1)
+        {
             maxfd = 1024; // Fallback if sysconf fails
+        }
         
         for (int fd = 3; fd < maxfd; fd++)
         {

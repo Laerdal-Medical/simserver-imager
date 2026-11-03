@@ -25,12 +25,16 @@ namespace DiskpartUtil {
 static void notifyShellDriveRemoved(const QString &driveLetter)
 {
     if (driveLetter.isEmpty())
+    {
         return;
+    }
     
     // Get the drive path (e.g., "E:\")
     QString drivePath = driveLetter;
     if (!drivePath.endsWith("\\"))
+    {
         drivePath += "\\";
+    }
     
     wchar_t pathW[MAX_PATH];
     drivePath.toWCharArray(pathW);
@@ -82,7 +86,9 @@ DiskpartResult unmountVolumes(const QByteArray &device, TimingCallback timingCal
             {
                 QString driveLetter = QString::fromStdString(mountpoint);
                 if (driveLetter.endsWith("\\"))
+                {
                     driveLetter.chop(1);
+                }
                 
                 qDebug() << "Unmounting volume" << driveLetter;
                 
@@ -345,7 +351,9 @@ DiskpartResult cleanDisk(const QByteArray &device, std::chrono::milliseconds tim
                 {
                     QString driveLetter = QString::fromStdString(mountpoint);
                     if (driveLetter.endsWith("\\"))
+                    {
                         driveLetter.chop(1);
+                    }
                     
                     qDebug() << "Attempting to unmount drive" << driveLetter;
                     

@@ -46,11 +46,15 @@ QVariant DriveListModel::data(const QModelIndex &index, int role) const
 {
     int row = index.row();
     if (row < 0 || row >= _drivelist.count())
+    {
         return QVariant();
+    }
 
     QByteArray propertyName = _rolenames.value(role);
     if (propertyName.isEmpty())
+    {
         return QVariant();
+    }
     else {
         auto it = _drivelist.cbegin();
         std::advance(it, row);
@@ -89,22 +93,30 @@ void DriveListModel::processDriveList(std::vector<Drivelist::DeviceDescriptor> l
 
         // Should already be caught by isSystem variable, but just in case...
         if (mountpoints.contains("/") || mountpoints.contains("C://"))
+        {
             continue;
+        }
 
         // Skip zero-sized devices
         if (i.size == 0)
+        {
             continue;
+        }
 
         // Allow read/write virtual devices (mounted disk images) but filter out:
         // - Read-only virtual devices
         // - System virtual devices (like APFS volumes on macOS)
         // - Virtual devices that are not removable/ejectable (likely system virtual devices)
         if (i.isVirtual && (i.isReadOnly || i.isSystem || !i.isRemovable))
+        {
             continue;
+        }
 
         QString deviceNamePlusSize = QString::fromStdString(i.device)+":"+QString::number(i.size);
         if (i.isReadOnly)
+        {
             deviceNamePlusSize += "ro";
+        }
         drivesInNewList.insert(deviceNamePlusSize);
 
         // Mark virtual disks as system drives to trigger confirmation dialog
@@ -210,7 +222,9 @@ void DriveListModel::processDriveList(std::vector<Drivelist::DeviceDescriptor> l
         for (auto it = _drivelist.constBegin(); it != _drivelist.constEnd(); ++it)
         {
             if (it.key() >= info.key)
+            {
                 break;
+            }
             ++row;
         }
 

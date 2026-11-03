@@ -96,8 +96,9 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
         if (deviceName.isEmpty()) {
             // Unknown type: capitalize first letter as fallback
             deviceName = simpadType;
-            if (!deviceName.isEmpty())
+            if (!deviceName.isEmpty()) {
                 deviceName[0] = deviceName[0].toUpper();
+            }
         }
         osEntry["name"] = QString("%1 v%2").arg(deviceName, version);
 

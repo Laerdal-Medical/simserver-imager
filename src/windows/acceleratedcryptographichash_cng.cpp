@@ -19,7 +19,9 @@
 struct AcceleratedCryptographicHash::impl {
     explicit impl(QCryptographicHash::Algorithm algo) {
         if (algo != QCryptographicHash::Sha256)
+        {
             throw std::runtime_error("Only sha256 implemented");
+        }
 
         //open an algorithm handle
         if(!NT_SUCCESS(status = BCryptOpenAlgorithmProvider(

@@ -22,19 +22,23 @@ WizardStepBase {
     
     title: {
         if (repoManager) {
-            if (repoManager.selectedSourceType === 'github-ci')
+            if (repoManager.selectedSourceType === 'github-ci') {
                 return qsTr("Choose CI Artifact")
-            if (repoManager.selectedSourceType === 'github-releases')
+            }
+            if (repoManager.selectedSourceType === 'github-releases') {
                 return qsTr("Choose Release")
+            }
         }
         return qsTr("Choose system image")
     }
     subtitle: {
         if (repoManager) {
-            if (repoManager.selectedSourceType === 'github-ci')
+            if (repoManager.selectedSourceType === 'github-ci') {
                 return qsTr("Choose CI Artifact to install on your device")
-            if (repoManager.selectedSourceType === 'github-releases')
+            }
+            if (repoManager.selectedSourceType === 'github-releases') {
                 return qsTr("Choose a release to install on your device")
+            }
         }
         return qsTr("Select a system image to install on your device")
     }
@@ -94,7 +98,9 @@ WizardStepBase {
     // Inspect the currently selected artifact (deferred download)
     function inspectSelectedArtifact() {
         var model = root.selectedArtifactModel
-        if (!model) return
+        if (!model) {
+            return
+        }
 
         console.log("Inspecting artifact:", model.artifact_id, model.name)
 
@@ -410,7 +416,9 @@ WizardStepBase {
     }
 
     function _restoreCachedOsSelection() {
-        if (!root.wizardContainer) return
+        if (!root.wizardContainer) {
+            return
+        }
 
         var cachedId = root.wizardContainer.cachedOsArtifactId
         var cachedName = root.wizardContainer.cachedOsName
@@ -653,7 +661,9 @@ WizardStepBase {
                     var sz = root.customSelected ? root.customSelectedSize : 0
                     return sz > 0 ? qsTr("Local - %1").arg(root.imageWriter.formatSize(sz)) : ""
                 }
-                if (!delegateItem.url) return ""
+                if (!delegateItem.url) {
+                    return ""
+                }
                 // Check for partial download first (resume available)
                 if (typeof(delegateItem.extract_sha256) !== "undefined" &&
                     root.cacheStatusVersion >= 0 &&
@@ -693,13 +703,18 @@ WizardStepBase {
             // Badges: source type + image type (using ImBadge type property)
             badges: {
                 var b = []
-                if (delegateItem.source === "github")
+                if (delegateItem.source === "github") {
                     b.push({ type: delegateItem.source_type === "artifact" ? "ci" : "release" })
+                }
                 var url = (delegateItem.url || "").toLowerCase()
                 if (url && !url.startsWith("internal://")) {
-                    if (url.endsWith(".spu"))          b.push({ type: "spu" })
-                    else if (url.endsWith(".vsi"))     b.push({ type: "vsi" })
-                    else if (url.includes(".wic"))     b.push({ type: "wic" })
+                    if (url.endsWith(".spu")) {
+                        b.push({ type: "spu" })
+                    } else if (url.endsWith(".vsi")) {
+                        b.push({ type: "vsi" })
+                    } else if (url.includes(".wic")) {
+                        b.push({ type: "wic" })
+                    }
                 }
                 return b
             }

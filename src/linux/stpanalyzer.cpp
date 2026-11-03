@@ -60,7 +60,9 @@ void StpAnalyzer::startListening(const QByteArray &ifname)
     int iface;
 
     if (_s != -1)
+    {
         return; /* Already listening */
+    }
 
     _s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_802_2));
     if (_s < 0)

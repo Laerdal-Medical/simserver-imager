@@ -12,11 +12,17 @@ QUrl PlatformHelper::localFileUrl(const QString &path) const
 {
     QString value = path.trimmed();
     if (value.startsWith("file///"))
+    {
         return QUrl::fromLocalFile(value.mid(6));
+    }
     if (value == "~" || value.startsWith("~/"))
+    {
         value = QDir::homePath() + value.mid(1);
+    }
     if (QDir::isAbsolutePath(value))
+    {
         return QUrl::fromLocalFile(value);
+    }
     const QUrl url(value);
     return url.isLocalFile() && QDir::isAbsolutePath(url.toLocalFile()) ? url : QUrl();
 }

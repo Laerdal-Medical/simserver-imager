@@ -17,7 +17,9 @@ WinFile::WinFile(QObject *parent)
 WinFile::~WinFile()
 {
     if (isOpen())
+    {
         close();
+    }
 }
 
 void WinFile::setFileName(const QString &name)
@@ -39,7 +41,9 @@ bool WinFile::open(QIODevice::OpenMode)
 
     // Try with FILE_SHARE_WRITE
     if (_h == INVALID_HANDLE_VALUE)
-        _h = CreateFileA(n.data(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);;
+    {
+        _h = CreateFileA(n.data(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    };
 
     if (_h == INVALID_HANDLE_VALUE)
     {
@@ -55,7 +59,9 @@ bool WinFile::open(QIODevice::OpenMode)
 void WinFile::close()
 {
     if (!isOpen())
+    {
         return;
+    }
 
     if (_locked)
     {
@@ -76,7 +82,9 @@ qint64 WinFile::write(const char *data, qint64 maxSize)
     DWORD bytesWritten;
 
     if (maxSize % 512)
+    {
         qDebug() << "write: NOT SECTOR ALIGNED";
+    }
 
     if (!WriteFile(_h, data, maxSize, &bytesWritten, NULL))
     {
@@ -203,7 +211,9 @@ bool WinFile::lockVolume()
 bool WinFile::unlockVolume()
 {
     if (!_locked)
+    {
         return true;
+    }
 
     DWORD bytesRet;
     if (DeviceIoControl(_h, FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0, &bytesRet, NULL))

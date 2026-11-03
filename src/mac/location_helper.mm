@@ -34,7 +34,9 @@
 #endif
     
     // Only set authorized if actually authorized (don't clear if already set)
-    if (isAuth) _authorized = YES;
+    if (isAuth) {
+        _authorized = YES;
+    }
     _finished = YES;
     
     // Invoke callback if permission was granted and we have a callback
@@ -63,9 +65,13 @@ static CLLocationManager *g_persistentManager = nil;
 static RPIImagerLocationDelegate *g_persistentDelegate = nil;
 
 static BOOL isAuthorizedStatus(CLAuthorizationStatus status) {
-    if (status == kCLAuthorizationStatusAuthorized) return YES;
+    if (status == kCLAuthorizationStatusAuthorized) {
+        return YES;
+    }
 #ifdef kCLAuthorizationStatusAuthorizedAlways
-    if (status == kCLAuthorizationStatusAuthorizedAlways) return YES;
+    if (status == kCLAuthorizationStatusAuthorizedAlways) {
+        return YES;
+    }
 #endif
     return NO;
 }

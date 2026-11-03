@@ -75,8 +75,9 @@ QByteArray CustomisationGenerator::generateSystemdScript(const QVariantMap& s, c
     const QString ssid = s.value("wifiSSID").toString();
     const QString cryptedPskFromSettings = s.value("wifiPasswordCrypt").toString();
     bool hidden = s.value("wifiHidden").toBool();
-    if (!hidden)
+    if (!hidden) {
         hidden = s.value("wifiSSIDHidden").toBool();
+    }
     const QString wifiCountry = s.value("recommendedWifiCountry").toString().trimmed();
     
     // Prefer persisted crypted PSK; fallback to deriving from legacy plaintext setting
@@ -183,18 +184,24 @@ QByteArray CustomisationGenerator::generateSystemdScript(const QVariantMap& s, c
         // Prefer imager_custom set_wlan; fallback to manual wpa_supplicant
         line(QStringLiteral("if [ -f /usr/lib/raspberrypi-sys-mods/imager_custom ]; then"), script);
         QString wlanCmd = QStringLiteral("   /usr/lib/raspberrypi-sys-mods/imager_custom set_wlan ");
-        if (hidden) wlanCmd += QStringLiteral(" -h ");
+        if (hidden) {
+            wlanCmd += QStringLiteral(" -h ");
+        }
         wlanCmd += shellQuote(ssid) + QStringLiteral(" ") + shellQuote(cryptedPsk) + QStringLiteral(" ") + shellQuote(wifiCountry);
         line(wlanCmd, script);
         line(QStringLiteral("else"), script);
         line(QStringLiteral("cat >/etc/wpa_supplicant/wpa_supplicant.conf <<'WPAEOF'"), script);
-        if (!wifiCountry.isEmpty()) line(QStringLiteral("country=") + wifiCountry, script);
+        if (!wifiCountry.isEmpty()) {
+            line(QStringLiteral("country=") + wifiCountry, script);
+        }
         line(QStringLiteral("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev"), script);
         line(QStringLiteral("ap_scan=1"), script);
         line(QStringLiteral(""), script);
         line(QStringLiteral("update_config=1"), script);
         line(QStringLiteral("network={"), script);
-        if (hidden) line(QStringLiteral("\tscan_ssid=1"), script);
+        if (hidden) {
+            line(QStringLiteral("\tscan_ssid=1"), script);
+        }
         // Escape quotes and backslashes for wpa_supplicant.conf quoted strings
         QString escapedSsid = ssid;
         escapedSsid.replace("\\", "\\\\");  // Backslash must be escaped first

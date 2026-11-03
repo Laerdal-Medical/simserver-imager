@@ -25,7 +25,9 @@ namespace {
         (void)target;
         (void)info;
         
-        if (!g_networkCallback) return;
+        if (!g_networkCallback) {
+            return;
+        }
         
         bool isReachable = (flags & kSCNetworkReachabilityFlagsReachable) != 0;
         bool needsConnection = (flags & kSCNetworkReachabilityFlagsConnectionRequired) != 0;

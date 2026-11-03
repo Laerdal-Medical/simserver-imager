@@ -219,9 +219,15 @@ WizardStepBase {
             // Labels are automatically skipped when screen reader is not active (via activeFocusOnTab)
             root.registerFocusGroup("if_section_interfaces", function() {
                 var items = []
-                if (supportsI2c) items.push(chkEnableI2C.focusItem)
-                if (supportsSpi) items.push(chkEnableSPI.focusItem)
-                if (supports1Wire) items.push(chkEnable1Wire.focusItem)
+                if (supportsI2c) {
+                    items.push(chkEnableI2C.focusItem)
+                }
+                if (supportsSpi) {
+                    items.push(chkEnableSPI.focusItem)
+                }
+                if (supports1Wire) {
+                    items.push(chkEnable1Wire.focusItem)
+                }
                 if (supportsSerial) {
                     items.push(labelSerial)
                     items.push(comboSerial)
@@ -230,11 +236,14 @@ WizardStepBase {
             }, 0)
 
             root.registerFocusGroup("if_section_features", function() {
-                if (!supportsUsbOtg) return []
+                if (!supportsUsbOtg) {
+                    return []
+                }
                 var items = [chkEnableUsbGadget.focusItem]
                 // Include help link if visible
-                if (chkEnableUsbGadget.helpLinkItem && chkEnableUsbGadget.helpLinkItem.visible)
+                if (chkEnableUsbGadget.helpLinkItem && chkEnableUsbGadget.helpLinkItem.visible) {
                     items.push(chkEnableUsbGadget.helpLinkItem)
+                }
                 return items
             }, 1)
 
@@ -446,8 +455,9 @@ WizardStepBase {
                 // Rebuild focus order based on new capabilities
                 root.rebuildFocusOrder()
                 // If Console is no longer supported and was selected, fall back
-                if (!supportsSerialConsoleOnly && comboSerial.editText === qsTr("Console"))
+                if (!supportsSerialConsoleOnly && comboSerial.editText === qsTr("Console")) {
                     comboSerial.currentIndex = 0;
+                }
             })
         }
     }

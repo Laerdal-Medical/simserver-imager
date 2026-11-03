@@ -54,8 +54,11 @@ BaseDialog {
         } else {
             if (savedFolder) {
                 dialog.validationError = qsTr("The previous folder is unavailable: %1. Choose an existing local folder.").arg(savedFolder)
-                if (isSaveDialog) dialogSettings.lastSaveFolder = ""
-                else dialogSettings.lastOpenFolder = ""
+                if (isSaveDialog) {
+                    dialogSettings.lastSaveFolder = ""
+                } else {
+                    dialogSettings.lastOpenFolder = ""
+                }
             }
             var configuredUrl = PlatformHelper.localFileUrl(String(dialog.currentFolder))
             if (PlatformHelper.directoryExists(configuredUrl)) {
@@ -100,9 +103,13 @@ BaseDialog {
     function _buildFilePath() {
         var folder = _toDisplayPath(currentFolder)
         var filename = String(_currentFilename).trim()
-        if (!filename) return ""
+        if (!filename) {
+            return ""
+        }
         // Ensure folder ends with /
-        if (!folder.endsWith("/")) folder += "/"
+        if (!folder.endsWith("/")) {
+            folder += "/"
+        }
         return folder + filename
     }
 
@@ -126,7 +133,9 @@ BaseDialog {
                 out.push(f)
             }
         }
-        if (out.length === 0) out = ["*"]
+        if (out.length === 0) {
+            out = ["*"]
+        }
         return out
     }
 
@@ -146,8 +155,9 @@ BaseDialog {
     function _getImageGlobs(filters) {
         var globs = dialog._extractGlobs(filters)
         var specific = globs.filter(function(g) { return g !== "*" })
-        if (specific.length > 0)
+        if (specific.length > 0) {
             return specific
+        }
         // Default accepted image formats
         return ["*.img", "*.zip", "*.iso", "*.gz", "*.xz", "*.zst", "*.wic"]
     }
@@ -155,7 +165,9 @@ BaseDialog {
     // Return true if the given url/path resolves to filesystem root
     function _isRoot(u) {
         var s = String(u || "").trim()
-        if (s.indexOf("file://") === 0) s = s.substring(7)
+        if (s.indexOf("file://") === 0) {
+            s = s.substring(7)
+        }
         // Normalize trailing slashes
         while (s.length > 1 && s.endsWith("/")) s = s.substring(0, s.length - 1)
         return s === "/"
@@ -164,19 +176,31 @@ BaseDialog {
     // Compute normalized parent folder URL without '..' segments
     function _parentUrl(u) {
         var s = String(u || "").trim()
-        if (s.indexOf("file://") === 0) s = s.substring(7)
+        if (s.indexOf("file://") === 0) {
+            s = s.substring(7)
+        }
         // Strip trailing slashes
         while (s.length > 1 && s.endsWith("/")) s = s.substring(0, s.length - 1)
-        if (s === "/") return "file:///"
+        if (s === "/") {
+            return "file:///"
+        }
         var slash = s.lastIndexOf("/")
-        if (slash <= 0) return "file:///"
+        if (slash <= 0) {
+            return "file:///"
+        }
         var parent = s.substring(0, slash)
-        if (parent.length === 0) parent = "/"
+        if (parent.length === 0) {
+            parent = "/"
+        }
         return "file://" + parent
     }
 
     function _canGoUp() { return !_isRoot(dialog.currentFolder) }
-    function _goUp() { if (_canGoUp()) dialog.currentFolder = _parentUrl(dialog.currentFolder) }
+    function _goUp() {
+        if (_canGoUp()) {
+            dialog.currentFolder = _parentUrl(dialog.currentFolder)
+        }
+    }
 
     // Data models
     FolderListModel {
@@ -224,7 +248,9 @@ BaseDialog {
     function _rebuildFolderTreeModel() {
         parentPathModel.clear()
         var path = _toDisplayPath(dialog.currentFolder)
-        if (!path || path.length === 0) return
+        if (!path || path.length === 0) {
+            return
+        }
 
         // Split path into components
         var parts = path.split("/").filter(function(p) { return p.length > 0 })
@@ -543,12 +569,13 @@ BaseDialog {
                         Accessible.name: text
                         background: Rectangle {
                             color: {
-                                if (ListView.isCurrentItem && placesList.activeFocus)
+                                if (ListView.isCurrentItem && placesList.activeFocus) {
                                     return Style.listViewHighlightColor
-                                else if (hovered)
+                                } else if (hovered) {
                                     return Style.listViewHoverRowBackgroundColor
-                                else
+                                } else {
                                     return "transparent"
+                                }
                             }
                             radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
                             antialiasing: true
@@ -641,23 +668,25 @@ BaseDialog {
                         highlighted: ListView.isCurrentItem
                         Accessible.role: Accessible.ListItem
                         Accessible.name: {
-                            if (pathDelegate.isCurrentFolder)
+                            if (pathDelegate.isCurrentFolder) {
                                 return qsTr("Current folder: %1").arg(pathDelegate.label)
-                            else if (pathDelegate.isSubfolder)
+                            } else if (pathDelegate.isSubfolder) {
                                 return qsTr("Subfolder: %1").arg(pathDelegate.label)
-                            else
+                            } else {
                                 return qsTr("Parent folder: %1").arg(pathDelegate.label)
+                            }
                         }
                         background: Rectangle {
                             color: {
-                                if (pathDelegate.isCurrentFolder)
+                                if (pathDelegate.isCurrentFolder) {
                                     return Style.listViewHighlightColor
-                                else if (pathDelegate.ListView.isCurrentItem && pathDelegate.ListView.view.activeFocus)
+                                } else if (pathDelegate.ListView.isCurrentItem && pathDelegate.ListView.view.activeFocus) {
                                     return Style.listViewHighlightColor
-                                else if (pathDelegate.hovered)
+                                } else if (pathDelegate.hovered) {
                                     return Style.listViewHoverRowBackgroundColor
-                                else
+                                } else {
                                     return "transparent"
+                                }
                             }
                             radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
                             antialiasing: true
@@ -892,14 +921,15 @@ BaseDialog {
                             Accessible.name: qsTr("File: %1").arg(fileName)
                             background: Rectangle {
                                 color: {
-                                    if (dialog.selectedFile === fileUrl)
+                                    if (dialog.selectedFile === fileUrl) {
                                         return Style.listViewHighlightColor
-                                    else if (ListView.isCurrentItem && filesList.activeFocus)
+                                    } else if (ListView.isCurrentItem && filesList.activeFocus) {
                                         return Style.listViewHighlightColor
-                                    else if (hovered)
+                                    } else if (hovered) {
                                         return Style.listViewHoverRowBackgroundColor
-                                    else
+                                    } else {
                                         return "transparent"
+                                    }
                                 }
                                 radius: (dialog.imageWriter && dialog.imageWriter.isEmbeddedMode()) ? Style.listItemBorderRadiusEmbedded : Style.listItemBorderRadius
                                 antialiasing: true

@@ -152,7 +152,10 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--install-elevation-policy") == 0) {
             bool success = PlatformQuirks::installElevationPolicy();
-            if (g_logFile) fclose(g_logFile);
+            if (g_logFile)
+            {
+                fclose(g_logFile);
+            }
             return success ? 0 : 1;
         }
     }
@@ -608,16 +611,24 @@ int main(int argc, char *argv[])
 #endif
 
         if (translator->load(QLocale(), "rpi-imager", "_", QLatin1String(":/i18n")))
+        {
             imageWriter.replaceTranslator(translator);
+        }
         else
+        {
             delete translator;
+        }
     }
     else
     {
         if (translator->load(customQm))
+        {
             imageWriter.replaceTranslator(translator);
+        }
         else
+        {
             delete translator;
+        }
     }
 
     if (cliRefreshInterval >= 0 || cliRefreshJitter >= 0)
@@ -632,9 +643,13 @@ int main(int argc, char *argv[])
         int sanitizedJitter = cliRefreshJitter;
 
         if (sanitizedInterval > 0 && sanitizedInterval < MIN_BASE_MINUTES)
+        {
             sanitizedInterval = MIN_BASE_MINUTES;
+        }
         if (sanitizedJitter > 0 && sanitizedJitter < MIN_JITTER_MINUTES)
+        {
             sanitizedJitter = MIN_JITTER_MINUTES;
+        }
 
         imageWriter.setOsListRefreshOverride(sanitizedInterval, sanitizedJitter);
     }
@@ -649,7 +664,9 @@ int main(int argc, char *argv[])
     {
         QLocale::Language sysLang = QLocale::system().language();
         if (sysLang == QLocale::AnyLanguage || sysLang == QLocale::C)
+        {
             couldDetermineLanguage = false;
+        }
     }
 
     // Check if user has previously made a language selection - if so, always show the selector
@@ -678,7 +695,9 @@ int main(int argc, char *argv[])
     engine.load(QUrl(QStringLiteral("qrc:/qt/qml/RpiImager/main.qml")));
 
     if (engine.rootObjects().isEmpty())
+    {
         return -1;
+    }
 
     QObject *qmlwindow = engine.rootObjects().value(0);
     qmlwindow->connect(&imageWriter, SIGNAL(downloadProgress(QVariant,QVariant)), qmlwindow, SLOT(onDownloadProgress(QVariant,QVariant)));

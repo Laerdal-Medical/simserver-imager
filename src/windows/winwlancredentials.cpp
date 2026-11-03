@@ -61,7 +61,9 @@ inline QString unescapeXml(QString str)
 WinWlanCredentials::WinWlanCredentials()
 {
     if (!hWlanApi)
+    {
         hWlanApi = LoadLibraryExA("wlanapi.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    }
     if (!hWlanApi)
     {
         qDebug() << "wlanapi.dll not available";
@@ -74,7 +76,9 @@ WinWlanCredentials::WinWlanCredentials()
     DWORD clientVersion = 2;
 
     if (WlanOpenHandle(clientVersion, NULL, &supportedVersion, &h) != ERROR_SUCCESS)
+    {
         return;
+    }
 
     PWLAN_INTERFACE_INFO_LIST ifList = NULL;
 
@@ -85,7 +89,9 @@ WinWlanCredentials::WinWlanCredentials()
             PWLAN_PROFILE_INFO_LIST profileList = NULL;
 
             if (ifList->InterfaceInfo[i].isState != wlan_interface_state_connected)
+            {
                 continue; /* Wlan adapter not connected */
+            }
 
             /* Get current connection info for SSID */
             PWLAN_CONNECTION_ATTRIBUTES pConnectInfo = NULL;
@@ -107,7 +113,9 @@ WinWlanCredentials::WinWlanCredentials()
             WlanFreeMemory(pConnectInfo);
 
             if (_ssid.isEmpty())
+            {
                 continue;
+            }
 
             if (WlanGetProfileList(h, &ifList->InterfaceInfo[i].InterfaceGuid,
                                    NULL, &profileList) == ERROR_SUCCESS)
@@ -149,7 +157,9 @@ WinWlanCredentials::WinWlanCredentials()
     }
 
     if (ifList)
+    {
         WlanFreeMemory(ifList);
+    }
     WlanCloseHandle(h, NULL);
 }
 
@@ -178,7 +188,9 @@ WlanCredentials *WlanCredentials::_instance = NULL;
 WlanCredentials *WlanCredentials::instance()
 {
     if (!_instance)
+    {
         _instance = new WinWlanCredentials();
+    }
 
     return _instance;
 }

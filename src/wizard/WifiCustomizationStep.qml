@@ -157,7 +157,9 @@ WizardStepBase {
     }
 
     function passwordErrorMessage() {
-        if (!showPw) return " ";
+        if (!showPw) {
+            return " ";
+        }
 
         // Gather state
         var ssidNow = (fieldWifiSSID.text || "").trim();
@@ -166,27 +168,40 @@ WizardStepBase {
         var conf = fieldWifiPasswordConfirm.text || "";
 
         // Open mode: no errors
-        if (wifiMode === "open") return " ";
+        if (wifiMode === "open") {
+            return " ";
+        }
 
         // If we can keep the saved crypt and user left blank => OK
-        if (canKeep && pwd.length === 0) return " ";
+        if (canKeep && pwd.length === 0) {
+            return " ";
+        }
 
         // New/changed password is required from here
         // Empty -> prompt explicitly
-        if (pwd.length === 0) return qsTr("Enter a password");
+        if (pwd.length === 0) {
+            return qsTr("Enter a password");
+        }
 
         // Detailed validity (mirrors isValidWifiPassword)
         // 64 hex is allowed => if it's 64 chars but not hex, say invalid chars
         var isHex = isHex64(pwd);
         if (!isHex) {
-            if (pwd.length < 8) return qsTr("Password is too short (min 8 characters)");
-            if (pwd.length > 63) return qsTr("Password is too long (max 63 characters)");
-            if (!isAsciiPrintable(pwd)) return qsTr("Password contains unsupported characters");
+            if (pwd.length < 8) {
+                return qsTr("Password is too short (min 8 characters)");
+            }
+            if (pwd.length > 63) {
+                return qsTr("Password is too long (max 63 characters)");
+            }
+            if (!isAsciiPrintable(pwd)) {
+                return qsTr("Password contains unsupported characters");
+            }
         }
 
         // Always enforce match when either field has content (like user customization step)
-        if ((conf.length > 0 || pwd.length > 0) && pwd !== conf)
+        if ((conf.length > 0 || pwd.length > 0) && pwd !== conf) {
             return qsTr("Passwords don't match");
+        }
 
         // No errors -> keep row height stable
         return " ";
@@ -202,10 +217,14 @@ WizardStepBase {
 
         // Smoothly bring a child item into view (vertical)
         function scrollToItem(item, margin) {
-            if (!item || !wifiScroll.contentItem) return;
+            if (!item || !wifiScroll.contentItem) {
+                return;
+            }
             var flick = wifiScroll.contentItem;              // QQuickFlickable
             var content = flick.contentItem;                 // the inner Item holding children
-            if (!content) return;
+            if (!content) {
+                return;
+            }
 
             var pos = item.mapToItem(content, 0, 0);         // item position in content coords
             var top = pos.y;
@@ -244,7 +263,9 @@ WizardStepBase {
                         onClicked: { wifiMode = "secure"; updatePasswordFieldUI() }
 
                         onActiveFocusChanged: {
-                            if (activeFocus) wifiScroll.scrollToItem(this);
+                            if (activeFocus) {
+                                wifiScroll.scrollToItem(this);
+                            }
                         }
                     }
 
@@ -256,7 +277,9 @@ WizardStepBase {
                         onClicked: { wifiMode = "open"; updatePasswordFieldUI() }
 
                         onActiveFocusChanged: {
-                            if (activeFocus) wifiScroll.scrollToItem(this);
+                            if (activeFocus) {
+                                wifiScroll.scrollToItem(this);
+                            }
                         }
                     }
 
@@ -282,8 +305,9 @@ WizardStepBase {
                         font.pixelSize: Style.fontSizeInput
                         onTextChanged: updatePasswordFieldUI()
                         onActiveFocusChanged: {
-                            if (activeFocus)
+                            if (activeFocus) {
                                 wifiScroll.scrollToItem(this);
+                            }
                         }
                     }
 
@@ -306,8 +330,9 @@ WizardStepBase {
                         visible: showPw
 
                         textField.onActiveFocusChanged: {
-                            if (textField.activeFocus)
+                            if (textField.activeFocus) {
                                 wifiScroll.scrollToItem(fieldWifiPassword);
+                            }
                         }
                         textField.onTextChanged: {
                             updatePasswordFieldUI()
@@ -338,8 +363,9 @@ WizardStepBase {
                         }
                         visible: showPw
                         textField.onActiveFocusChanged: {
-                            if (textField.activeFocus)
+                            if (textField.activeFocus) {
                                 wifiScroll.scrollToItem(fieldWifiPasswordConfirm);
+                            }
                         }
                         textField.onTextChanged: {
                             // keep scroll behavior pleasant while typing
@@ -373,8 +399,9 @@ WizardStepBase {
                         Accessible.description: qsTr("Check this if your Wi-Fi network does not broadcast its name and requires manual SSID entry to connect.")
 
                         onActiveFocusChanged: {
-                            if (activeFocus)
+                            if (activeFocus) {
                                 wifiScroll.scrollToItem(this);
+                            }
                         }
                     }
                 }
@@ -427,9 +454,13 @@ WizardStepBase {
     // - all WiFi fields are empty (skip)
     nextButtonEnabled: (function(){
         var haveSSID = fieldWifiSSID.text && fieldWifiSSID.text.trim().length > 0
-        if (!haveSSID) return true  // allow skipping by leaving fields empty
+        if (!haveSSID) {
+            return true  // allow skipping by leaving fields empty
+        }
 
-        if (wifiMode === "open") return true
+        if (wifiMode === "open") {
+            return true
+        }
 
         // secure / closed mode
         var ssidNow = fieldWifiSSID.text.trim()
@@ -442,11 +473,17 @@ WizardStepBase {
         }
 
         // Need a new password -> must be valid and must match confirm (like user customization step)
-        if (pwd.length === 0) return false
-        if (!root.isValidWifiPassword(pwd)) return false
+        if (pwd.length === 0) {
+            return false
+        }
+        if (!root.isValidWifiPassword(pwd)) {
+            return false
+        }
 
         // Always check that passwords match
-        if (pwd !== (fieldWifiPasswordConfirm.text || "")) return false
+        if (pwd !== (fieldWifiPasswordConfirm.text || "")) {
+            return false
+        }
         return true
     })()
 
@@ -473,7 +510,9 @@ WizardStepBase {
                // secure / closed mode
                if (pwd.length > 0) {
                    // extra safety; normally unreachable because nextButtonEnabled prevents this
-                   if (pwd !== fieldWifiPasswordConfirm.text) return;
+                   if (pwd !== fieldWifiPasswordConfirm.text) {
+                       return;
+                   }
                    // overwrite with new password
                    var isPassphrase = (pwd.length >= 8 && pwd.length < 64)
                    wizardContainer.customizationSettings.wifiPasswordCrypt = isPassphrase ? imageWriter.pbkdf2(pwd, ssid) : pwd

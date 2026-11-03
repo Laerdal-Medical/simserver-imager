@@ -543,7 +543,10 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
     // Stream each chunk directly to FAT32 and cache
     connect(reply, &QNetworkReply::readyRead, reply,
             [this, &destFile, &cacheFile, &caching, &success, &totalWritten, reply]() {
-                if (_cancelled || !success) return;
+                if (_cancelled || !success)
+                {
+                    return;
+                }
 
                 QByteArray data = reply->readAll();
                 qint64 written = destFile.write(data);
@@ -569,9 +572,15 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
         if (!remaining.isEmpty())
         {
             qint64 written = destFile.write(remaining);
-            if (written != remaining.size()) success = false;
+            if (written != remaining.size())
+            {
+                success = false;
+            }
             totalWritten += written;
-            if (caching) cacheFile.write(remaining);
+            if (caching)
+            {
+                cacheFile.write(remaining);
+            }
         }
     }
 
@@ -592,7 +601,10 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
     {
         emit error(tr("Download failed: %1").arg(reply->errorString()));
         destFile.remove();
-        if (caching) cacheFile.remove();
+        if (caching)
+        {
+            cacheFile.remove();
+        }
         reply->deleteLater();
         return false;
     }
@@ -601,7 +613,10 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
     {
         emit error(tr("Error writing to USB drive: %1").arg(destFile.errorString()));
         destFile.remove();
-        if (caching) cacheFile.remove();
+        if (caching)
+        {
+            cacheFile.remove();
+        }
         reply->deleteLater();
         return false;
     }

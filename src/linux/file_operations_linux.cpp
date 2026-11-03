@@ -529,7 +529,9 @@ int LinuxFileOperations::GetLastErrorCode() const {
 // ============= Async I/O Implementation (using io_uring) =============
 
 bool LinuxFileOperations::SetAsyncQueueDepth(int depth) {
-  if (depth < 1) depth = 1;
+  if (depth < 1) {
+    depth = 1;
+  }
 
   async_queue_depth_ = depth;
 
@@ -577,7 +579,9 @@ bool LinuxFileOperations::SetAsyncQueueDepth(int depth) {
 FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, std::size_t size, 
                                                      AsyncWriteCallback callback) {
   if (fd_ < 0) {
-    if (callback) callback(FileError::kOpenError, 0);
+    if (callback) {
+      callback(FileError::kOpenError, 0);
+    }
     return FileError::kOpenError;
   }
   
@@ -585,14 +589,18 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
   if (async_queue_depth_ <= 1 || !io_uring_available_ || ring_ == nullptr) {
     FileError result = WriteSequential(data, size);
     // Note: WriteSequential already updates async_write_offset_
-    if (callback) callback(result, result == FileError::kSuccess ? size : 0);
+    if (callback) {
+      callback(result, result == FileError::kSuccess ? size : 0);
+    }
     return result;
   }
   
 #ifdef HAVE_LIBURING
   // Check for previous errors
   if (first_async_error_ != FileError::kSuccess) {
-    if (callback) callback(first_async_error_, 0);
+    if (callback) {
+      callback(first_async_error_, 0);
+    }
     return first_async_error_;
   }
   
@@ -628,7 +636,9 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
     sqe = io_uring_get_sqe(ring_);
     if (sqe == nullptr) {
       Log("io_uring: failed to get SQE even after flush");
-      if (callback) callback(FileError::kWriteError, 0);
+      if (callback) {
+        callback(FileError::kWriteError, 0);
+      }
       return FileError::kWriteError;
     }
   }
@@ -667,7 +677,9 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
     std::ostringstream oss;
     oss << "io_uring_submit failed: " << strerror(-ret);
     Log(oss.str());
-    if (callback) callback(FileError::kWriteError, 0);
+    if (callback) {
+      callback(FileError::kWriteError, 0);
+    }
     return FileError::kWriteError;
   }
 
@@ -675,7 +687,9 @@ FileError LinuxFileOperations::AsyncWriteSequential(const std::uint8_t* data, st
 #else
   // Should never reach here, but just in case
   FileError result = WriteSequential(data, size);
-  if (callback) callback(result, result == FileError::kSuccess ? size : 0);
+  if (callback) {
+    callback(result, result == FileError::kSuccess ? size : 0);
+  }
   return result;
 #endif
 }

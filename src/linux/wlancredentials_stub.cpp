@@ -18,7 +18,9 @@ WlanCredentials *WlanCredentials::_instance = NULL;
 WlanCredentials *WlanCredentials::instance()
 {
     if (!_instance)
+    {
         _instance = new WlanCredentialsStub();
+    }
 
     return _instance;
 }

@@ -399,8 +399,9 @@ ApplicationWindow {
         // Clear backend dst reference
         window.imageWriter.setDst("");
         // Navigate back to storage selection for safety
-        if (wizardContainer)
+        if (wizardContainer) {
             wizardContainer.jumpToStep(wizardContainer.stepStorageSelection);
+        }
         // Show dedicated dialog
         storageRemovedDialog.open();
     }

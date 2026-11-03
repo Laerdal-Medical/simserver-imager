@@ -47,7 +47,9 @@ MacFile::authOpenResult MacFile::authOpen(const QByteArray &filename)
     
     AuthorizationRef authRef;
     if (AuthorizationCreate(&rights, &env, flags, &authRef) != 0)
+    {
         return authOpenCancelled;
+    }
 
     AuthorizationExternalForm externalForm;
     if (AuthorizationMakeExternalForm(authRef, &externalForm) != 0)

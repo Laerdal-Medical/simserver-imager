@@ -84,7 +84,10 @@ void DownloadArchiveExtractThread::extractImageRun()
 
         while (archive_read_next_header(outerArchive, &entry) == ARCHIVE_OK)
         {
-            if (_cancelled) break;
+            if (_cancelled)
+            {
+                break;
+            }
 
             QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
             qint64 entrySize = archive_entry_size(entry);
@@ -228,7 +231,10 @@ void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outer
         }
         if (!slot)
         {
-            if (_cancelled) break;
+            if (_cancelled)
+            {
+                break;
+            }
             throw runtime_error("Failed to acquire write buffer slot");
         }
 
@@ -304,7 +310,10 @@ void DownloadArchiveExtractThread::_extractUncompressedEntry(struct archive *out
         }
         if (!slot)
         {
-            if (_cancelled) break;
+            if (_cancelled)
+            {
+                break;
+            }
             throw runtime_error("Failed to acquire write buffer slot");
         }
 

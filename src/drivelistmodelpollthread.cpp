@@ -124,7 +124,9 @@ void DriveListModelPollThread::run()
         emit eventDriveListPoll(elapsed);
 
         if (elapsed > 1000)
+        {
             qDebug() << "Enumerating drives took a long time:" << elapsed/1000.0 << "seconds";
+        }
 
         // Sleep based on current mode
         int sleepSeconds = (currentMode == ScanMode::Slow) ? 5 : 1;

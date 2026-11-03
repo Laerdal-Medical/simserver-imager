@@ -58,7 +58,9 @@ void DownloadStatsTelemetry::run()
 {
     QSettings settings;
     if (!settings.value("telemetry", TELEMETRY_ENABLED_DEFAULT).toBool())
+    {
         return;
+    }
 
     _c = curl_easy_init();
     if (!_c) {

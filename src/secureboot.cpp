@@ -167,7 +167,9 @@ QByteArray SecureBoot::rsaSign(const QByteArray &data, const QString &rsaKeyPath
     
     if (status != errSecSuccess || !items || CFArrayGetCount(items) == 0) {
         qDebug() << "SecureBoot::rsaSign: failed to import private key, status:" << status;
-        if (items) CFRelease(items);
+        if (items) {
+            CFRelease(items);
+        }
         return QByteArray();
     }
 

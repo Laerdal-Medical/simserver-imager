@@ -244,8 +244,12 @@ FocusScope {
             var items = []
             // Only include title/subtitle in focus order when screen reader is active
             if (root.imageWriter && root.imageWriter.isScreenReaderActive()) {
-                if (titleText.visible) items.push(titleText)
-                if (subtitleText.visible) items.push(subtitleText)
+                if (titleText.visible) {
+                    items.push(titleText)
+                }
+                if (subtitleText.visible) {
+                    items.push(subtitleText)
+                }
             }
             return items
         }, -100) // Negative order ensures header is always first when included
@@ -287,7 +291,9 @@ FocusScope {
 
     // Public API for steps
     function registerFocusGroup(name, getItemsFn, order) {
-        if (order === undefined) order = 0
+        if (order === undefined) {
+            order = 0
+        }
         // Replace if exists
         for (var i = 0; i < _focusGroups.length; i++) {
             if (_focusGroups[i].name === name) {
@@ -319,9 +325,13 @@ FocusScope {
         var items = []
         for (var i = 0; i < _focusGroups.length; i++) {
             var g = _focusGroups[i]
-            if (!g.enabled || !g.getItemsFn) continue
+            if (!g.enabled || !g.getItemsFn) {
+                continue
+            }
             var arr = g.getItemsFn()
-            if (!arr || !arr.length) continue
+            if (!arr || !arr.length) {
+                continue
+            }
             for (var k = 0; k < arr.length; k++) {
                 var it = arr[k]
                 // Skip items that have activeFocusOnTab explicitly set to false (e.g. labels when screen reader inactive)
@@ -336,11 +346,21 @@ FocusScope {
         var navigationChain = []
         
         // Add navigation buttons in order (include if visible, regardless of enabled state)
-        if (nextButton.visible) navigationChain.push(nextButton)
-        if (downloadButton.visible) navigationChain.push(downloadButton)
-        if (backButton.visible) navigationChain.push(backButton)
-        if (skipButton.visible) navigationChain.push(skipButton)
-        if (appOptionsButton && appOptionsButton.visible) navigationChain.push(appOptionsButton)
+        if (nextButton.visible) {
+            navigationChain.push(nextButton)
+        }
+        if (downloadButton.visible) {
+            navigationChain.push(downloadButton)
+        }
+        if (backButton.visible) {
+            navigationChain.push(backButton)
+        }
+        if (skipButton.visible) {
+            navigationChain.push(skipButton)
+        }
+        if (appOptionsButton && appOptionsButton.visible) {
+            navigationChain.push(appOptionsButton)
+        }
         
         // Add all focusable fields
         for (var i = 0; i < _focusableItems.length; i++) {
@@ -364,7 +384,9 @@ FocusScope {
 
         // Ensure initialFocusItem set
         var firstField = _focusableItems.length > 0 ? _focusableItems[0] : null
-        if (!initialFocusItem) initialFocusItem = firstField
+        if (!initialFocusItem) {
+            initialFocusItem = firstField
+        }
     }
 
     // Helper functions for global Tab navigation fallback
@@ -374,10 +396,18 @@ FocusScope {
         }
 
         var allFocusable = _focusableItems.slice() // copy array
-        if (nextButton.visible && nextButton.enabled) allFocusable.push(nextButton)
-        if (downloadButton.visible && downloadButton.enabled) allFocusable.push(downloadButton)
-        if (backButton.visible && backButton.enabled) allFocusable.push(backButton)
-        if (skipButton.visible && skipButton.enabled) allFocusable.push(skipButton)
+        if (nextButton.visible && nextButton.enabled) {
+            allFocusable.push(nextButton)
+        }
+        if (downloadButton.visible && downloadButton.enabled) {
+            allFocusable.push(downloadButton)
+        }
+        if (backButton.visible && backButton.enabled) {
+            allFocusable.push(backButton)
+        }
+        if (skipButton.visible && skipButton.enabled) {
+            allFocusable.push(skipButton)
+        }
 
         if (allFocusable.length === 0) {
             return null
@@ -398,10 +428,18 @@ FocusScope {
         }
 
         var allFocusable = _focusableItems.slice() // copy array
-        if (nextButton.visible && nextButton.enabled) allFocusable.push(nextButton)
-        if (downloadButton.visible && downloadButton.enabled) allFocusable.push(downloadButton)
-        if (backButton.visible && backButton.enabled) allFocusable.push(backButton)
-        if (skipButton.visible && skipButton.enabled) allFocusable.push(skipButton)
+        if (nextButton.visible && nextButton.enabled) {
+            allFocusable.push(nextButton)
+        }
+        if (downloadButton.visible && downloadButton.enabled) {
+            allFocusable.push(downloadButton)
+        }
+        if (backButton.visible && backButton.enabled) {
+            allFocusable.push(backButton)
+        }
+        if (skipButton.visible && skipButton.enabled) {
+            allFocusable.push(skipButton)
+        }
 
         if (allFocusable.length === 0) {
             return null

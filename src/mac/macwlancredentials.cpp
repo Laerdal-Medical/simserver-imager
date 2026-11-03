@@ -26,7 +26,9 @@ QByteArray MacWlanCredentials::getSSID()
             _ssid = QByteArray(ssid_c);
             free((void*)ssid_c);
             if (!_ssid.isEmpty())
+            {
                 qDebug() << "Detected SSID via CoreWLAN:" << _ssid;
+            }
         }
         else
         {
@@ -70,7 +72,9 @@ static QByteArray searchKeychainForPassword(const QByteArray &ssid, CFStringRef 
                                          reinterpret_cast<const UInt8*>(ssid.constData()),
                                          ssid.length());
     if (!accountData)
+    {
         return psk;
+    }
 
     CFMutableDictionaryRef query = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
                                                              &kCFTypeDictionaryKeyCallBacks,
@@ -84,7 +88,9 @@ static QByteArray searchKeychainForPassword(const QByteArray &ssid, CFStringRef 
     CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
     CFDictionarySetValue(query, kSecAttrAccount, accountData);
     if (service)
+    {
         CFDictionarySetValue(query, kSecAttrService, service);
+    }
     CFDictionarySetValue(query, kSecReturnData, kCFBooleanTrue);
     CFDictionarySetValue(query, kSecMatchLimit, kSecMatchLimitOne);
 
@@ -143,7 +149,9 @@ WlanCredentials *WlanCredentials::_instance = NULL;
 WlanCredentials *WlanCredentials::instance()
 {
     if (!_instance)
+    {
         _instance = new MacWlanCredentials();
+    }
 
     return _instance;
 }

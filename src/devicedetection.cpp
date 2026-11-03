@@ -15,21 +15,35 @@ DeviceType detectFromFilename(const QString &filename)
 
     // SimMan variants (must come before simpad to avoid false matches)
     if (lower.contains("simman3g-64") || lower.contains("simman-64"))
+    {
         return DeviceType::SimMan3G64;
+    }
     if (lower.contains("simman3g-32") || lower.contains("simman-32"))
+    {
         return DeviceType::SimMan3G32;
+    }
     if (lower.contains("simman3g") || lower.contains("simman"))
+    {
         return DeviceType::SimMan3G;
+    }
 
     // Explicit peripheral device names (must come before simpad pattern matching)
     if (lower.contains("linkbox2"))
+    {
         return DeviceType::LinkBox2;
+    }
     if (lower.contains("linkbox"))
+    {
         return DeviceType::LinkBox;
+    }
     if (lower.contains("cancpu2"))
+    {
         return DeviceType::CANCPU2;
+    }
     if (lower.contains("cancpu"))
+    {
         return DeviceType::CANCPU;
+    }
 
     // SimPad sysinfo is shared by both platforms, not a device-specific update.
     if (lower.contains("simpad-sysinfo") || lower.contains("simpad_sysinfo"))
@@ -41,13 +55,17 @@ DeviceType detectFromFilename(const QString &filename)
     if (lower.contains("imx8") || lower.contains("simpad-plus2")
         || lower.contains("simpad_plus2") || lower.contains("simpad plus 2")
         || lower.contains("simpadplus2") || lower.contains("simpad2"))
+    {
         return DeviceType::SimPadPlus2;
+    }
 
     // SimPad Plus / imx6
     if (lower.contains("imx6") || lower.contains("simpad-plus")
         || lower.contains("simpad_plus") || lower.contains("simpad plus")
         || lower.contains("simpadplus") || lower.contains("simpad"))
+    {
         return DeviceType::SimPadPlus;
+    }
 
     return DeviceType::Unknown;
 }
@@ -57,23 +75,41 @@ DeviceType detectFromCdnType(const QString &simpadType)
     QString type = simpadType.toLower();
 
     if (type == "plus" || type == "imx6")
+    {
         return DeviceType::SimPadPlus;
+    }
     if (type == "plus2" || type == "imx8")
+    {
         return DeviceType::SimPadPlus2;
+    }
     if (type.contains("simman") && type.contains("32"))
+    {
         return DeviceType::SimMan3G32;
+    }
     if (type.contains("simman") && type.contains("64"))
+    {
         return DeviceType::SimMan3G64;
+    }
     if (type.contains("simman"))
+    {
         return DeviceType::SimMan3G;
+    }
     if (type.contains("linkbox2"))
+    {
         return DeviceType::LinkBox2;
+    }
     if (type.contains("linkbox"))
+    {
         return DeviceType::LinkBox;
+    }
     if (type.contains("cancpu2"))
+    {
         return DeviceType::CANCPU2;
+    }
     if (type.contains("cancpu"))
+    {
         return DeviceType::CANCPU;
+    }
 
     return DeviceType::Unknown;
 }
@@ -165,7 +201,9 @@ bool isFileCompatibleWithDevice(const QString &filename, const QString &deviceTa
 
     // Unknown device in file = generic/platform-independent, show to all
     if (fileType == DeviceType::Unknown)
+    {
         return true;
+    }
 
     // Get the tags this file would be tagged with (non-VSI, so cross-device tags included)
     QJsonArray fileTags = getDeviceTags(fileType, false);
@@ -173,7 +211,9 @@ bool isFileCompatibleWithDevice(const QString &filename, const QString &deviceTa
     // Check if the selected device tag appears in this file's tags
     for (const auto &tag : fileTags) {
         if (tag.toString() == deviceTag)
+        {
             return true;
+        }
     }
 
     return false;

@@ -38,10 +38,18 @@ BaseDialog {
 
         registerFocusGroup("dialog_buttons", function() {
             var buttons = []
-            if (tryAgainButton.visible && tryAgainButton.enabled) buttons.push(tryAgainButton)
-            if (copyCodeButton.visible && copyCodeButton.enabled) buttons.push(copyCodeButton)
-            if (openGitHubButton.visible && openGitHubButton.enabled) buttons.push(openGitHubButton)
-            if (cancelButton.visible) buttons.push(cancelButton)
+            if (tryAgainButton.visible && tryAgainButton.enabled) {
+                buttons.push(tryAgainButton)
+            }
+            if (copyCodeButton.visible && copyCodeButton.enabled) {
+                buttons.push(copyCodeButton)
+            }
+            if (openGitHubButton.visible && openGitHubButton.enabled) {
+                buttons.push(openGitHubButton)
+            }
+            if (cancelButton.visible) {
+                buttons.push(cancelButton)
+            }
             return buttons
         }, 1)
     }

@@ -116,8 +116,9 @@ WizardStepBase {
         root.registerFocusGroup("ssh_controller", function(){ 
             var items = [sshEnablePill.focusItem]
             // Include help link if visible
-            if (sshEnablePill.helpLinkItem && sshEnablePill.helpLinkItem.visible)
+            if (sshEnablePill.helpLinkItem && sshEnablePill.helpLinkItem.visible) {
                 items.push(sshEnablePill.helpLinkItem)
+            }
             return items
         }, 0)
         // Include labels before their corresponding controls so users hear the explanation first

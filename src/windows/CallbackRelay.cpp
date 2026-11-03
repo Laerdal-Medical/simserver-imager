@@ -30,7 +30,9 @@ static int send_url_over_tcp_utf8(const wchar_t* urlW)
 {
     int rc = 1;
     WSADATA wsa{};
-    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) return 1;
+    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
+        return 1;
+    }
 
     SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s == INVALID_SOCKET) { WSACleanup(); return 1; }
@@ -104,7 +106,9 @@ static void start_imager_with_url(const wchar_t* urlW)
     }
 
     wchar_t* lastSlash = wcsrchr(exePath, L'\\');
-    if (!lastSlash) return;
+    if (!lastSlash) {
+        return;
+    }
     *lastSlash = L'\0'; // strip exe name, leave folder
 
     wchar_t imagerExe[MAX_PATH];
@@ -145,7 +149,9 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR cmdLine, int)
         // Skip executable path (handles quoted and unquoted paths)
         if (urlW && *urlW == L'"') {
             urlW = wcschr(urlW + 1, L'"');
-            if (urlW) urlW++;
+            if (urlW) {
+                urlW++;
+            }
         } else if (urlW) {
             while (*urlW && *urlW != L' ') urlW++;
         }
@@ -153,7 +159,9 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR cmdLine, int)
         while (urlW && *urlW == L' ') urlW++;
     }
 
-    if (!urlW || !*urlW) return 0;
+    if (!urlW || !*urlW) {
+        return 0;
+    }
 
     // Trim surrounding quotes if present and copy to buffer for safety
     wchar_t urlBuf[2048];

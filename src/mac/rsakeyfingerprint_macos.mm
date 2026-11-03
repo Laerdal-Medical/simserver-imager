@@ -33,7 +33,9 @@ static bool parseRSAPublicKeyDER(const QByteArray &der, QByteArray &modulus, qui
     
     // Parse SEQUENCE length
     int seqLen = 0;
-    if (pos >= length) return false;
+    if (pos >= length) {
+        return false;
+    }
     if (data[pos] & 0x80) {
         int numBytes = data[pos] & 0x7F;
         pos++;
@@ -53,7 +55,9 @@ static bool parseRSAPublicKeyDER(const QByteArray &der, QByteArray &modulus, qui
     
     // Parse modulus length
     int modLen = 0;
-    if (pos >= length) return false;
+    if (pos >= length) {
+        return false;
+    }
     if (data[pos] & 0x80) {
         int numBytes = data[pos] & 0x7F;
         pos++;
@@ -87,7 +91,9 @@ static bool parseRSAPublicKeyDER(const QByteArray &der, QByteArray &modulus, qui
     
     // Parse exponent length
     int expLen = 0;
-    if (pos >= length) return false;
+    if (pos >= length) {
+        return false;
+    }
     if (data[pos] & 0x80) {
         int numBytes = data[pos] & 0x7F;
         pos++;
@@ -120,14 +126,20 @@ static QByteArray pemToDer(const QByteArray &pem)
     
     // Find the base64 content between headers
     int startPos = pem.indexOf("-----BEGIN");
-    if (startPos < 0) return QByteArray();
+    if (startPos < 0) {
+        return QByteArray();
+    }
     
     startPos = pem.indexOf('\n', startPos);
-    if (startPos < 0) return QByteArray();
+    if (startPos < 0) {
+        return QByteArray();
+    }
     startPos++; // Skip newline
     
     int endPos = pem.indexOf("-----END", startPos);
-    if (endPos < 0) return QByteArray();
+    if (endPos < 0) {
+        return QByteArray();
+    }
     
     // Extract base64 content (remove whitespace)
     QByteArray base64Data = pem.mid(startPos, endPos - startPos);
@@ -254,7 +266,9 @@ QString getRsaKeyFingerprint(const QString &keyPath)
     QString fingerprint;
     for (int i = 0; i < 16; i++) {
         fingerprint += QString("%1").arg(hash[i], 2, 16, QChar('0'));
-        if (i == 7) fingerprint += ":"; // Add separator in middle
+        if (i == 7) {
+            fingerprint += ":"; // Add separator in middle
+        }
     }
 
     return fingerprint.toUpper();

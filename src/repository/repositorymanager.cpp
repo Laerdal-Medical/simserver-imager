@@ -434,7 +434,9 @@ QJsonArray RepositoryManager::getGitHubOsList() const
         QString dateA = a.toObject()["release_date"].toString();
         QString dateB = b.toObject()["release_date"].toString();
         // ISO 8601 dates can be compared lexicographically
-        if (dateA != dateB) return dateA > dateB;  // Descending order (newest first)
+        if (dateA != dateB) {
+            return dateA > dateB;  // Descending order (newest first)
+        }
 
         const QByteArray keyA = QJsonDocument(a.toObject()).toJson(QJsonDocument::Compact);
         const QByteArray keyB = QJsonDocument(b.toObject()).toJson(QJsonDocument::Compact);
@@ -647,11 +649,15 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
 
         // Get version from release name or tag
         QString version = extractVersion(releaseName);
-        if (version.isEmpty()) version = extractVersion(tag);
+        if (version.isEmpty()) {
+            version = extractVersion(tag);
+        }
 
         // Get device name from release name or tag (releases can be device-specific)
         QString deviceName = extractDeviceName(releaseName);
-        if (deviceName.isEmpty()) deviceName = extractDeviceName(tag);
+        if (deviceName.isEmpty()) {
+            deviceName = extractDeviceName(tag);
+        }
 
         // Determine compatible devices and icon from assets
         QSet<QString> deviceSet;
@@ -664,16 +670,18 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
             bool isVsi = assetName.toLower().endsWith(".vsi");
 
             const QString assetVersion = extractVersion(assetName);
-            if (!assetVersion.isEmpty() && assetVersion != version && !assetVersions.contains(assetVersion))
+            if (!assetVersion.isEmpty() && assetVersion != version && !assetVersions.contains(assetVersion)) {
                 assetVersions.append(assetVersion);
+            }
 
             auto type = DeviceDetection::detectFromFilename(assetName);
             if (type != DeviceDetection::DeviceType::Unknown) {
                 QJsonArray devTags = DeviceDetection::getDeviceTags(type, isVsi);
                 for (const auto &t : devTags)
                     deviceSet.insert(t.toString());
-                if (icon.contains("use_custom"))
+                if (icon.contains("use_custom")) {
                     icon = DeviceDetection::getIconPath(type);
+                }
             }
         }
 
@@ -681,8 +689,9 @@ void RepositoryManager::onGitHubWicFilesReady(const QJsonArray &releaseGroups)
         // asset filenames don't contain device identifiers
         if (deviceSet.isEmpty()) {
             auto type = DeviceDetection::detectFromFilename(releaseName);
-            if (type == DeviceDetection::DeviceType::Unknown)
+            if (type == DeviceDetection::DeviceType::Unknown) {
                 type = DeviceDetection::detectFromFilename(tag);
+            }
             if (type != DeviceDetection::DeviceType::Unknown) {
                 QJsonArray devTags = DeviceDetection::getDeviceTags(type, false);
                 for (const auto &t : devTags)
@@ -733,14 +742,18 @@ bool RepositoryManager::appendGitHubArtifactEntries(const QJsonArray &wicFiles)
     QSet<qint64> existingArtifactIds;
     for (const auto &entry : _githubOsList) {
         const qint64 artifactId = entry.toObject()["artifact_id"].toVariant().toLongLong();
-        if (artifactId > 0) existingArtifactIds.insert(artifactId);
+        if (artifactId > 0) {
+            existingArtifactIds.insert(artifactId);
+        }
     }
 
     bool appended = false;
     for (const auto &wicValue : wicFiles) {
         QJsonObject wic = wicValue.toObject();
         const qint64 artifactId = wic["artifact_id"].toVariant().toLongLong();
-        if (artifactId <= 0 || existingArtifactIds.contains(artifactId)) continue;
+        if (artifactId <= 0 || existingArtifactIds.contains(artifactId)) {
+            continue;
+        }
         existingArtifactIds.insert(artifactId);
 
         QString artifactName = wic["name"].toString();
@@ -1112,7 +1125,9 @@ void RepositoryManager::inspectSpuArtifact(qint64 artifactId, const QString &art
             [this, artifactId, artifactName, owner, repo, branch]
             (qint64 id, const QString &name, const QString &own, const QString &rep,
              const QString &br, const QJsonArray &spuFiles, const QString &zipPath) {
-                if (id != artifactId) return;  // Not our artifact
+                if (id != artifactId) {
+                    return;  // Not our artifact
+                }
 
                 setLoading(false);
                 setStatusMessage(tr("Found %1 SPU file(s) in artifact").arg(spuFiles.size()));

@@ -81,9 +81,13 @@ namespace Drivelist
                eMMC boot partitions (mmcblk*boot*) are special hardware boot areas that
                should not be exposed as writable targets. */
             if (name.startsWith("/dev/sr") || name.startsWith("/dev/ram") || name.startsWith("/dev/zram") || name.isEmpty())
+            {
                 continue;
+            }
             if (name.contains("boot") && name.contains("mmcblk"))
+            {
                 continue;
+            }
 
             d.busType    = bdev["busType"].toString().toStdString();
             d.device     = name.toStdString();
@@ -151,7 +155,9 @@ namespace Drivelist
             {
                 dp.removeAll("");
                 if (dp.empty())
+                {
                     dp.append(QObject::tr("Internal SD card reader"));
+                }
             }
 
             QString mp = bdev["mountpoint"].toString();

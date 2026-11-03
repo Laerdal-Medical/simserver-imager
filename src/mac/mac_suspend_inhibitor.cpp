@@ -14,7 +14,9 @@ MacSuspendInhibitor::MacSuspendInhibitor()
         &_systemSleepAssertion);
         
     if (result != kIOReturnSuccess)
+    {
         _systemSleepAssertion = kIOPMNullAssertionID;
+    }
 
     // Prevent display sleep
     result = IOPMAssertionCreateWithName(
@@ -24,7 +26,9 @@ MacSuspendInhibitor::MacSuspendInhibitor()
         &_displaySleepAssertion);
         
     if (result != kIOReturnSuccess)
+    {
         _displaySleepAssertion = kIOPMNullAssertionID;
+    }
 }
 
 /*virtual*/ MacSuspendInhibitor::~MacSuspendInhibitor()

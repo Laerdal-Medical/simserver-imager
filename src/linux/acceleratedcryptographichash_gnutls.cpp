@@ -12,7 +12,9 @@ struct AcceleratedCryptographicHash::impl {
     explicit impl(QCryptographicHash::Algorithm method)
     {
         if (method != QCryptographicHash::Sha256)
+        {
             throw std::runtime_error("Only sha256 implemented");
+        }
 
         gnutls_hash_init(&_sha256, GNUTLS_DIG_SHA256);
 

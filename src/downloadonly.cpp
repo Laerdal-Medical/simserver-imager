@@ -32,7 +32,9 @@ size_t writeData(char *data, size_t size, size_t count, void *opaque)
 {
     auto &transfer = *static_cast<Transfer *>(opaque);
     const auto bytes = static_cast<qint64>(size * count);
-    if (transfer.cancelled->load()) return 0;
+    if (transfer.cancelled->load()) {
+        return 0;
+    }
     if (transfer.output->write(data, bytes) != bytes) {
         transfer.error = transfer.output->errorString();
         return 0;
@@ -43,7 +45,9 @@ size_t writeData(char *data, size_t size, size_t count, void *opaque)
 int reportProgress(void *opaque, curl_off_t total, curl_off_t received, curl_off_t, curl_off_t)
 {
     auto &transfer = *static_cast<Transfer *>(opaque);
-    if (transfer.cancelled->load()) return 1;
+    if (transfer.cancelled->load()) {
+        return 1;
+    }
     if (transfer.timer.elapsed() >= 100) {
         transfer.progress(received, total);
         transfer.timer.restart();
@@ -54,10 +58,13 @@ int reportProgress(void *opaque, curl_off_t total, curl_off_t received, curl_off
 QString fetch(const QUrl &url, QIODevice &output, const QString &token,
               std::atomic<bool> &cancelled, const std::function<void(qint64, qint64)> &progress)
 {
-    if (url.scheme() != "https" && url.scheme() != "http")
+    if (url.scheme() != "https" && url.scheme() != "http") {
         return DownloadOnly::tr("Unsupported download URL.");
+    }
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup);
-    if (!curl) return DownloadOnly::tr("Could not initialize the download.");
+    if (!curl) {
+        return DownloadOnly::tr("Could not initialize the download.");
+    }
     char error[CURL_ERROR_SIZE] = {};
     CurlNetworkConfig::instance().applyCurlSettings(curl.get(), CurlNetworkConfig::FetchProfile::LargeFile, error);
     const QByteArray encoded = url.toEncoded();
@@ -76,14 +83,19 @@ QString fetch(const QUrl &url, QIODevice &output, const QString &token,
     curl_slist *headers = nullptr;
     if (url.host() == "api.github.com") {
         headers = curl_slist_append(headers, "Accept: application/octet-stream");
-        if (!token.isEmpty())
+        if (!token.isEmpty()) {
             headers = curl_slist_append(headers, ("Authorization: Bearer " + token).toUtf8().constData());
+        }
         curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, headers);
     }
     const CURLcode result = curl_easy_perform(curl.get());
     curl_slist_free_all(headers);
-    if (!transfer.error.isEmpty()) return transfer.error;
-    if (result != CURLE_OK) return QString::fromUtf8(error[0] ? error : curl_easy_strerror(result));
+    if (!transfer.error.isEmpty()) {
+        return transfer.error;
+    }
+    if (result != CURLE_OK) {
+        return QString::fromUtf8(error[0] ? error : curl_easy_strerror(result));
+    }
     return {};
 }
 
@@ -96,25 +108,35 @@ QString extract(const QString &zip, const QString &entryName, bool matchBasename
         const char *message = archive_error_string(reader.get());
         return message ? QString::fromUtf8(message) : DownloadOnly::tr("Could not read the artifact ZIP.");
     };
-    if (archive_read_open_filename(reader.get(), QFile::encodeName(zip).constData(), 256 * 1024) != ARCHIVE_OK)
+    if (archive_read_open_filename(reader.get(), QFile::encodeName(zip).constData(), 256 * 1024) != ARCHIVE_OK) {
         return archiveError();
+    }
     archive_entry *entry = nullptr;
     bool found = false;
     int result;
     std::array<char, 256 * 1024> buffer;
     while ((result = archive_read_next_header(reader.get(), &entry)) == ARCHIVE_OK) {
-        if (cancelled.load()) return {};
+        if (cancelled.load()) {
+            return {};
+        }
         const char *pathname = archive_entry_pathname_utf8(entry);
-        if (!pathname) pathname = archive_entry_pathname(entry);
+        if (!pathname) {
+            pathname = archive_entry_pathname(entry);
+        }
         const QString name = QString::fromUtf8(pathname ? pathname : "");
         const bool matches = matchBasename ? QFileInfo(name).fileName() == entryName : name == entryName;
         if (!matches) {
-            if (archive_read_data_skip(reader.get()) != ARCHIVE_OK) return archiveError();
+            if (archive_read_data_skip(reader.get()) != ARCHIVE_OK) {
+                return archiveError();
+            }
             continue;
         }
-        if (found) return DownloadOnly::tr("The artifact contains ambiguous duplicate image filenames.");
-        if (archive_entry_filetype(entry) != AE_IFREG || archive_entry_symlink(entry) || archive_entry_hardlink(entry))
+        if (found) {
+            return DownloadOnly::tr("The artifact contains ambiguous duplicate image filenames.");
+        }
+        if (archive_entry_filetype(entry) != AE_IFREG || archive_entry_symlink(entry) || archive_entry_hardlink(entry)) {
             return DownloadOnly::tr("The selected archive entry is not a regular file.");
+        }
         found = true;
         qint64 received = 0;
         const qint64 total = archive_entry_size(entry);
@@ -122,20 +144,29 @@ QString extract(const QString &zip, const QString &entryName, bool matchBasename
         timer.start();
         la_ssize_t bytes;
         while ((bytes = archive_read_data(reader.get(), buffer.data(), buffer.size())) > 0) {
-            if (cancelled.load()) return {};
-            if (output.write(buffer.data(), bytes) != bytes) return output.errorString();
+            if (cancelled.load()) {
+                return {};
+            }
+            if (output.write(buffer.data(), bytes) != bytes) {
+                return output.errorString();
+            }
             received += bytes;
             if (timer.elapsed() >= 100) {
                 progress(received, total);
                 timer.restart();
             }
         }
-        if (bytes < 0) return archiveError();
-        if (total >= 0 && received != total)
+        if (bytes < 0) {
+            return archiveError();
+        }
+        if (total >= 0 && received != total) {
             return DownloadOnly::tr("The selected image is incomplete.");
+        }
         progress(received, total);
     }
-    if (result != ARCHIVE_EOF) return archiveError();
+    if (result != ARCHIVE_EOF) {
+        return archiveError();
+    }
     return found ? QString() : DownloadOnly::tr("The selected image file was not found in the artifact.");
 }
 }
@@ -161,7 +192,9 @@ bool DownloadOnly::destinationExists(const QUrl &destination) const
 QString DownloadOnly::suggestedFilename(const QVariantMap &source) const
 {
     QString name = source.value("filename").toString();
-    if (name.isEmpty()) name = QUrl(source.value("url").toString()).fileName(QUrl::FullyDecoded);
+    if (name.isEmpty()) {
+        name = QUrl(source.value("url").toString()).fileName(QUrl::FullyDecoded);
+    }
     name.replace('\\', '/');
     name = name.section('/', -1);
     name.remove(QChar('\0'));
@@ -180,7 +213,9 @@ void DownloadOnly::progress(qint64 received, qint64 total, const QString &status
 
 void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, const QString &token, bool overwrite)
 {
-    if (_busy) return;
+    if (_busy) {
+        return;
+    }
     if (_worker) {
         _worker->wait();
         delete _worker;
@@ -197,15 +232,18 @@ void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, con
         QString error;
         const QString path = destination.toLocalFile();
         const QFileInfo info(path);
-        if (!destination.isLocalFile() || path.isEmpty() || !QFileInfo(info.absolutePath()).isDir())
+        if (!destination.isLocalFile() || path.isEmpty() || !QFileInfo(info.absolutePath()).isDir()) {
             error = tr("Choose a file in an existing local folder.");
-        else if (info.isSymLink() || (info.exists() && !info.isFile()))
+        } else if (info.isSymLink() || (info.exists() && !info.isFile())) {
             error = tr("The destination must be a regular file, not a device or symbolic link.");
-        else if (info.exists() && !overwrite)
+        } else if (info.exists() && !overwrite) {
             error = tr("The destination already exists. Choose another filename or confirm replacement.");
+        }
         QSaveFile output(path);
         output.setDirectWriteFallback(false);
-        if (error.isEmpty() && !output.open(QIODevice::WriteOnly)) error = output.errorString();
+        if (error.isEmpty() && !output.open(QIODevice::WriteOnly)) {
+            error = output.errorString();
+        }
         const auto downloading = [this](qint64 received, qint64 total) { progress(received, total, tr("Downloading…")); };
         const auto extracting = [this](qint64 received, qint64 total) { progress(received, total, tr("Saving selected image…")); };
         const qint64 artifactId = source.value("artifact_id").toLongLong();
@@ -214,24 +252,30 @@ void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, con
         QTemporaryFile zipFile(info.absolutePath() + "/.imager-artifact-XXXXXX");
         QString zip = source.value("zip_path").toString();
         const QString entry = source.value("entry").toString();
-        if (error.isEmpty() && artifactId > 0 && entry.isEmpty())
+        if (error.isEmpty() && artifactId > 0 && entry.isEmpty()) {
             error = tr("Select an image file from the artifact before downloading.");
+        }
         if (error.isEmpty() && !entry.isEmpty()) {
             if (zip.isEmpty()) {
-                if (!zipFile.open()) error = zipFile.errorString();
-                else {
+                if (!zipFile.open()) {
+                    error = zipFile.errorString();
+                } else {
                     error = fetch(url, zipFile, token, _cancelled, downloading);
-                    if (error.isEmpty() && !zipFile.flush()) error = zipFile.errorString();
+                    if (error.isEmpty() && !zipFile.flush()) {
+                        error = zipFile.errorString();
+                    }
                     zip = zipFile.fileName();
                     zipFile.close();
                 }
             }
-            if (error.isEmpty() && !_cancelled.load())
+            if (error.isEmpty() && !_cancelled.load()) {
                 error = extract(zip, entry, source.value("match_basename").toBool(), output, _cancelled, extracting);
+            }
         } else if (error.isEmpty() && url.isLocalFile()) {
             QFile input(url.toLocalFile());
-            if (!input.open(QIODevice::ReadOnly)) error = input.errorString();
-            else {
+            if (!input.open(QIODevice::ReadOnly)) {
+                error = input.errorString();
+            } else {
                 std::array<char, 256 * 1024> buffer;
                 qint64 received = 0, bytes;
                 QElapsedTimer timer;
@@ -241,7 +285,9 @@ void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, con
                     received += bytes;
                     if (timer.elapsed() >= 100) { downloading(received, input.size()); timer.restart(); }
                 }
-                if (input.error() != QFile::NoError) error = input.errorString();
+                if (input.error() != QFile::NoError) {
+                    error = input.errorString();
+                }
             }
         } else if (error.isEmpty()) {
             error = fetch(url, output, token, _cancelled, downloading);
@@ -249,9 +295,11 @@ void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, con
         bool cancelled = _cancelled.load();
         if (error.isEmpty() && !cancelled) {
             const QFileInfo current(path);
-            if (current.isSymLink() || (current.exists() && (!current.isFile() || !overwrite)))
+            if (current.isSymLink() || (current.exists() && (!current.isFile() || !overwrite))) {
                 error = tr("The destination changed while downloading. Choose another filename.");
-            else if (!output.commit()) error = output.errorString();
+            } else if (!output.commit()) {
+                error = output.errorString();
+            }
         } else {
             output.cancelWriting();
         }
@@ -259,7 +307,9 @@ void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, con
             _busy = false;
             _error = cancelled ? QString() : error;
             _status = cancelled ? tr("Download cancelled.") : error.isEmpty() ? tr("Download complete.") : tr("Download failed.");
-            if (!cancelled && error.isEmpty()) _savedFile = destination;
+            if (!cancelled && error.isEmpty()) {
+                _savedFile = destination;
+            }
             emit changed();
         }, Qt::QueuedConnection);
     });
@@ -268,7 +318,9 @@ void DownloadOnly::start(const QVariantMap &source, const QUrl &destination, con
 
 bool DownloadOnly::openFolder(const QString &path)
 {
-    if (_folderLauncher && _folderLauncher(QUrl::fromLocalFile(path))) return true;
+    if (_folderLauncher && _folderLauncher(QUrl::fromLocalFile(path))) {
+        return true;
+    }
     _error = tr("Could not open the folder: %1").arg(path);
     emit changed();
     return false;
@@ -281,7 +333,9 @@ void DownloadOnly::setFolderLauncher(std::function<bool(const QUrl &)> launcher)
 
 bool DownloadOnly::openContainingFolder()
 {
-    if (_savedFile.isEmpty()) return false;
+    if (_savedFile.isEmpty()) {
+        return false;
+    }
     return openFolder(QFileInfo(_savedFile.toLocalFile()).absolutePath());
 }
 

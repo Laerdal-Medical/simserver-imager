@@ -83,7 +83,9 @@ NSArray<NSDictionary*>* parseQtFilters(const QString &qtFilter)
     
     for (const QString &filter : filters) {
         QString trimmed = filter.trimmed();
-        if (trimmed.isEmpty()) continue;
+        if (trimmed.isEmpty()) {
+            continue;
+        }
         
         // Extract display name (everything before the parenthesis, or the whole string)
         QString displayName = trimmed.section('(', 0, 0).trimmed();

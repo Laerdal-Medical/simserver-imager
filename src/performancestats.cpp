@@ -147,8 +147,9 @@ void PerformanceStats::endSession(bool success, const QString &errorMessage)
 {
     QMutexLocker locker(&_mutex);
     
-    if (!_sessionActive)
+    if (!_sessionActive) {
         return;
+    }
     
     // Emit CycleEnd event to mark the end of this imaging cycle
     TimedEvent cycleEndEvent;
@@ -214,8 +215,9 @@ void PerformanceStats::endEvent(int eventId, bool success, const QString &additi
     event.durationMs = static_cast<uint32_t>(qMax(0LL, duration));
     event.metadata = pending.metadata;
     if (!additionalMetadata.isEmpty()) {
-        if (!event.metadata.isEmpty())
+        if (!event.metadata.isEmpty()) {
             event.metadata += "; ";
+        }
         event.metadata += additionalMetadata;
     }
     event.success = success;
@@ -298,8 +300,9 @@ void PerformanceStats::recordFinalising()
 {
     QMutexLocker locker(&_mutex);
     
-    if (!_sessionActive)
+    if (!_sessionActive) {
         return;
+    }
     
     _currentPhase = Phase::Finalising;
     _phaseStartTimes[static_cast<int>(Phase::Finalising)] = _sessionTimer.elapsed();
@@ -309,8 +312,9 @@ void PerformanceStats::addRawSample(Phase phase, quint64 bytesNow, quint64 bytes
 {
     QMutexLocker locker(&_mutex);
     
-    if (!_sessionActive)
+    if (!_sessionActive) {
         return;
+    }
     
     // Map phase to array index: 0=download, 1=decompress, 2=write, 3=verify
     int phaseIdx = -1;
@@ -332,8 +336,9 @@ void PerformanceStats::addRawSample(Phase phase, quint64 bytesNow, quint64 bytes
     }
     
     // Rate limit samples - this is the only check, very fast
-    if (currentTime - _lastSampleTime[phaseIdx] < MIN_SAMPLE_INTERVAL_MS)
+    if (currentTime - _lastSampleTime[phaseIdx] < MIN_SAMPLE_INTERVAL_MS) {
         return;
+    }
     
     // Get appropriate vector
     QVector<RawSample> *samples = nullptr;
@@ -346,8 +351,9 @@ void PerformanceStats::addRawSample(Phase phase, quint64 bytesNow, quint64 bytes
     }
     
     // Check capacity limit
-    if (samples->size() >= MAX_SAMPLES_PER_PHASE)
+    if (samples->size() >= MAX_SAMPLES_PER_PHASE) {
         return;
+    }
     
     // Store raw sample - minimal work
     RawSample sample;
@@ -449,17 +455,39 @@ int PerformanceStats::getThroughputBucket(uint32_t kbps) const
     // Logarithmic buckets in MB/s: 0-1, 1-2, 2-4, 4-8, 8-16, 16-32, 32-64, 64-128, 128-256, 256-512, 512-1024, 1024+
     uint32_t mbps = kbps / 1024;
     
-    if (mbps < 1) return 0;
-    if (mbps < 2) return 1;
-    if (mbps < 4) return 2;
-    if (mbps < 8) return 3;
-    if (mbps < 16) return 4;
-    if (mbps < 32) return 5;
-    if (mbps < 64) return 6;
-    if (mbps < 128) return 7;
-    if (mbps < 256) return 8;
-    if (mbps < 512) return 9;
-    if (mbps < 1024) return 10;
+    if (mbps < 1) {
+        return 0;
+    }
+    if (mbps < 2) {
+        return 1;
+    }
+    if (mbps < 4) {
+        return 2;
+    }
+    if (mbps < 8) {
+        return 3;
+    }
+    if (mbps < 16) {
+        return 4;
+    }
+    if (mbps < 32) {
+        return 5;
+    }
+    if (mbps < 64) {
+        return 6;
+    }
+    if (mbps < 128) {
+        return 7;
+    }
+    if (mbps < 256) {
+        return 8;
+    }
+    if (mbps < 512) {
+        return 9;
+    }
+    if (mbps < 1024) {
+        return 10;
+    }
     return 11;
 }
 
@@ -469,8 +497,9 @@ QJsonArray PerformanceStats::buildHistogramForPhase(const QVector<RawSample> &sa
     // This is the complex processing - only done at export time
     
     QJsonArray result;
-    if (samples.size() < 2)
+    if (samples.size() < 2) {
         return result;
+    }
     
     // Process samples into 1-second windows
     int windowStart = 0;
@@ -522,8 +551,9 @@ QJsonArray PerformanceStats::buildHistogramForPhase(const QVector<RawSample> &sa
         }
         
         // Move to next window
-        if (windowEnd >= samples.size())
+        if (windowEnd >= samples.size()) {
             break;
+        }
         windowStart = windowEnd;
         windowStartTime = samples[windowStart].timestampMs;
     }
@@ -597,8 +627,9 @@ QJsonObject PerformanceStats::buildSummary() const
     // Phase statistics (calculated from raw samples)
     auto buildPhaseStats = [this](const QVector<RawSample> &samples, quint64 totalBytes) -> QJsonObject {
         QJsonObject stats;
-        if (samples.isEmpty())
+        if (samples.isEmpty()) {
             return stats;
+        }
         
         stats["sampleCount"] = samples.size();
         stats["bytesTotal"] = static_cast<qint64>(totalBytes);
@@ -695,14 +726,18 @@ QJsonDocument PerformanceStats::exportToJson() const
         // Imager build info
         QJsonObject imager;
         imager["version"] = _systemInfo.imagerVersion;
-        if (!_systemInfo.imagerBuildType.isEmpty())
+        if (!_systemInfo.imagerBuildType.isEmpty()) {
             imager["buildType"] = _systemInfo.imagerBuildType;
-        if (!_systemInfo.imagerBinarySha256.isEmpty())
+        }
+        if (!_systemInfo.imagerBinarySha256.isEmpty()) {
             imager["binarySha256"] = _systemInfo.imagerBinarySha256;
-        if (!_systemInfo.qtVersion.isEmpty())
+        }
+        if (!_systemInfo.qtVersion.isEmpty()) {
             imager["qtRuntime"] = _systemInfo.qtVersion;
-        if (!_systemInfo.qtBuildVersion.isEmpty())
+        }
+        if (!_systemInfo.qtBuildVersion.isEmpty()) {
             imager["qtBuild"] = _systemInfo.qtBuildVersion;
+        }
         sysInfo["imager"] = imager;
         
         // Write configuration (helps diagnose performance issues like sync overhead)
@@ -714,8 +749,9 @@ QJsonDocument PerformanceStats::exportToJson() const
             writeConfig["syncIntervalMB"] = _systemInfo.syncIntervalBytes / (1024 * 1024);
             writeConfig["syncIntervalMs"] = _systemInfo.syncIntervalMs;
         }
-        if (!_systemInfo.memoryTier.isEmpty())
+        if (!_systemInfo.memoryTier.isEmpty()) {
             writeConfig["memoryTier"] = _systemInfo.memoryTier;
+        }
         
         // Buffer configuration
         QJsonObject buffers;

@@ -140,8 +140,9 @@ bool HWListModel::reload()
         };
         _hwDevices.append(hwDevice);
 
-        if (deviceObj["default"].isBool() && deviceObj["default"].toBool())
+        if (deviceObj["default"].isBool() && deviceObj["default"].toBool()) {
             indexOfDefault = _hwDevices.size() - 1;
+        }
     }
 
     // Add "Erase" option - formats card as FAT32
@@ -198,8 +199,9 @@ QHash<int, QByteArray> HWListModel::roleNames() const
 
 QVariant HWListModel::data(const QModelIndex &index, int role) const {
     const int row = index.row();
-    if (row < 0 || row >= _hwDevices.size())
+    if (row < 0 || row >= _hwDevices.size()) {
         return {};
+    }
 
     const HardwareDevice &device = _hwDevices[row];
 
@@ -226,24 +228,27 @@ QVariant HWListModel::data(const QModelIndex &index, int role) const {
 }
 
 QString HWListModel::currentName() const {
-    if (_currentIndex < 0 || _currentIndex >= _hwDevices.size())
+    if (_currentIndex < 0 || _currentIndex >= _hwDevices.size()) {
         return tr("CHOOSE DEVICE");
+    }
 
     HardwareDevice device = _hwDevices[_currentIndex];
     return device.name;
 }
 
 QString HWListModel::currentArchitecture() const {
-    if (_currentIndex < 0 || _currentIndex >= _hwDevices.size())
+    if (_currentIndex < 0 || _currentIndex >= _hwDevices.size()) {
         return QString();
+    }
 
     HardwareDevice device = _hwDevices[_currentIndex];
     return device.architecture;
 }
 
 void HWListModel::setCurrentIndex(int index) {
-    if (_currentIndex == index)
+    if (_currentIndex == index) {
         return;
+    }
 
     // Allow -1 to clear the selection
     if (index < -1 || index >= _hwDevices.size()) {
@@ -268,12 +273,18 @@ void HWListModel::setCurrentIndex(int index) {
     // Only clear image source if the device actually changed (not just re-selecting same device)
     bool deviceChanged = (_lastSelectedDeviceName != device.name);
     
-    if (_actions.setFilter) _actions.setFilter(device.tags, device.isInclusive());
-    if (_actions.setCapabilities) _actions.setCapabilities(device.capabilities);
+    if (_actions.setFilter) {
+        _actions.setFilter(device.tags, device.isInclusive());
+    }
+    if (_actions.setCapabilities) {
+        _actions.setCapabilities(device.capabilities);
+    }
     
     if (deviceChanged) {
         qDebug() << "Hardware device changed from" << _lastSelectedDeviceName << "to" << device.name << "- clearing image selection";
-        if (_actions.clearSelectedImage) _actions.clearSelectedImage();
+        if (_actions.clearSelectedImage) {
+            _actions.clearSelectedImage();
+        }
         _lastSelectedDeviceName = device.name;
     } else {
         qDebug() << "Hardware device re-selected (" << device.name << ") - preserving image selection";

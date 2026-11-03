@@ -46,9 +46,13 @@ public:
     virtual void run()
     {
         if (_de->isImage())
+        {
             _de->extractImageRun();
+        }
         else
+        {
             _de->extractMultiFileRun();
+        }
     }
 
 protected:
@@ -82,7 +86,9 @@ DownloadExtractThread::DownloadExtractThread(const QByteArray &url, const QByteA
 void DownloadExtractThread::_allocateBuffers()
 {
     if (_ringBuffer)
+    {
         return;  // Already allocated
+    }
 
     size_t pageSize = SystemMemoryManager::instance().getSystemPageSize();
 
@@ -247,7 +253,9 @@ void DownloadExtractThread::_emitProgressUpdate()
 size_t DownloadExtractThread::_writeData(const char *buf, size_t len)
 {
     if (_cancelled)
+    {
         return 0;
+    }
 
     // Emit progress updates when data starts flowing
     _emitProgressUpdate();
@@ -397,7 +405,10 @@ void DownloadExtractThread::extractImageRun()
                 slot = _writeRingBuffer->acquireWriteSlot(100);
             }
             if (!slot) {
-                if (_cancelled) break;
+                if (_cancelled)
+                {
+                    break;
+                }
                 throw runtime_error("Failed to acquire write buffer slot");
             }
             
@@ -572,9 +583,13 @@ void DownloadExtractThread::extractMultiFileRun()
         folder = td.path();
         QByteArray fatpartition = _filename;
         if (isdigit(fatpartition.at(fatpartition.length()-1)))
+        {
             fatpartition += "p1";
+        }
         else
+        {
             fatpartition += "1";
+        }
         args << "-t" << "vfat" << fatpartition << folder;
 
         if (QProcess::execute("mount", args) != 0)
@@ -591,7 +606,9 @@ void DownloadExtractThread::extractMultiFileRun()
     for (int tries=0; tries<3; tries++)
     {
         if (isMountPoint(folder))
+        {
             break;
+        }
         QThread::sleep(1);
     }
 #endif
@@ -622,7 +639,9 @@ void DownloadExtractThread::extractMultiFileRun()
             /*ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_FFLAGS | ARCHIVE_EXTRACT_XATTR*/;
 #ifndef Q_OS_WIN
     if (::getuid() == 0)
+    {
         flags |= ARCHIVE_EXTRACT_OWNER;
+    }
 #endif
 
     archive_read_support_filter_all(a);
@@ -643,7 +662,9 @@ void DownloadExtractThread::extractMultiFileRun()
           _checkResult(r, a);
           r = archive_write_header(ext, entry);
           if (r < ARCHIVE_OK)
+          {
               qDebug() << archive_error_string(ext);
+          }
           else if (archive_entry_size(entry) > 0)
           {
               //checkResult(copyData(a, ext), a);
@@ -652,10 +673,13 @@ void DownloadExtractThread::extractMultiFileRun()
               int64_t offset;
               QString filename = QString::fromWCharArray(archive_entry_pathname_w(entry));
 
-              if (archive_entry_filetype(entry) == AE_IFDIR) // Empty directory
+              if (archive_entry_filetype(entry) == AE_IFDIR) { // Empty directory
                   dirExtracted.append(filename);
+              }
               else
+              {
                   filesExtracted.append(filename);
+              }
 
               while ( (r = archive_read_data_block(a, &buff, &size, &offset)) != ARCHIVE_EOF)
               {
@@ -709,7 +733,9 @@ void DownloadExtractThread::extractMultiFileRun()
             QFileInfo fi(filename);
             QString path = fi.path();
             if (!path.isEmpty() && path != "." && !dirExtracted.contains(path))
+            {
                 dirExtracted.append(path);
+            }
 
             QFile::remove(filename);
         }
@@ -847,8 +873,14 @@ void DownloadExtractThread::_configureArchiveOptions(struct archive *a)
 {
     // Get number of CPU cores for multi-threading hints
     int numCores = QThread::idealThreadCount();
-    if (numCores < 1) numCores = 1;
-    if (numCores > 8) numCores = 8;  // Cap at 8 to avoid excessive memory usage
+    if (numCores < 1)
+    {
+        numCores = 1;
+    }
+    if (numCores > 8)
+    {
+        numCores = 8;  // Cap at 8 to avoid excessive memory usage
+    }
     
     QString threadsStr = QString::number(numCores);
     QByteArray threadsBytes = threadsStr.toLatin1();

@@ -100,20 +100,23 @@ RadioButton {
     
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Space) {
-            if (!checked)            // prevent unchecking the current one
+            if (!checked) {            // prevent unchecking the current one
                 click()              // goes through the normal “mouse click” path
+            }
             event.accepted = true
         }
     }
     Keys.onEnterPressed: (event) => {
-        if (!checked)
+        if (!checked) {
             click()
+        }
         event.accepted = true
     }
 
     Keys.onReturnPressed: (event) => {
-        if (!checked)
+        if (!checked) {
           click()
+        }
         event.accepted = true
     }
 }

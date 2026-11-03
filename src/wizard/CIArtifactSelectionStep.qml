@@ -103,7 +103,9 @@ WizardStepBase {
 
     // Filter release assets by device - delegates to DeviceDetection::isFileCompatibleWithDevice() in C++
     function filterAssetsByDevice(assets, selectedDevice) {
-        if (!assets || !selectedDevice) return assets
+        if (!assets || !selectedDevice) {
+            return assets
+        }
         var mgr = root.repoManager
         return assets.filter(function(asset) {
             return mgr.isFileCompatibleWithDevice(asset.name || "", selectedDevice)
@@ -112,7 +114,9 @@ WizardStepBase {
 
     // Sort assets: factory-image first, then system update SPUs, then others
     function sortAssetsByPriority(assets) {
-        if (!assets) return assets
+        if (!assets) {
+            return assets
+        }
 
         // Regex to match system update SPU files: *-X.X.X.XXX.spu (version pattern)
         var systemSpuRegex = /\d+\.\d+\.\d+\.\d+\.spu$/i
@@ -124,9 +128,15 @@ WizardStepBase {
 
             // Priority: factory-image = 0, system SPU (version pattern) = 1, update = 2, others = 3
             function getPriority(name) {
-                if (name.includes("factory-image")) return 0
-                if (systemSpuRegex.test(name)) return 1  // System update SPU with version
-                if (name.includes("update")) return 2
+                if (name.includes("factory-image")) {
+                    return 0
+                }
+                if (systemSpuRegex.test(name)) {
+                    return 1  // System update SPU with version
+                }
+                if (name.includes("update")) {
+                    return 2
+                }
                 return 3
             }
 
@@ -401,8 +411,12 @@ WizardStepBase {
 
         function onArtifactDownloadProgress(bytesReceived, bytesTotal) {
             // Ignore signals on zombie instances (being animated out after StackView.clear())
-            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) return
-            if (!root.isDownloading) return
+            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) {
+                return
+            }
+            if (!root.isDownloading) {
+                return
+            }
 
             root.bytesReceived = bytesReceived
             root.bytesTotal = bytesTotal
@@ -435,7 +449,9 @@ WizardStepBase {
 
         function onArtifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath) {
             // Ignore signals on zombie instances (being animated out after StackView.clear())
-            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) return
+            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) {
+                return
+            }
 
             console.log("CIArtifactSelectionStep: Artifact contents ready -", artifactName)
             console.log("CIArtifactSelectionStep: Number of files found:", imageFiles.length)
@@ -487,8 +503,12 @@ WizardStepBase {
 
         function onRefreshError(message) {
             // Ignore signals on zombie instances (being animated out after StackView.clear())
-            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) return
-            if (!root.isDownloading) return
+            if (root.wizardContainer.currentStep !== root.wizardContainer.stepCIArtifactSelection) {
+                return
+            }
+            if (!root.isDownloading) {
+                return
+            }
             console.log("CIArtifactSelectionStep: Download error:", message)
             root.isDownloading = false
             root.wizardContainer.pendingArtifactInspection = null

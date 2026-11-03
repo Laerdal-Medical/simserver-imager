@@ -79,7 +79,9 @@ WizardStepBase {
 
         root.registerFocusGroup("branch_filter_section", function(){
             var items = []
-            if (branchFilterCombo.visible) items.push(branchFilterCombo)
+            if (branchFilterCombo.visible) {
+                items.push(branchFilterCombo)
+            }
             return items
         }, 2)
     }
@@ -478,7 +480,9 @@ WizardStepBase {
 
                         // Handle text input for filtering - find and highlight matching branch
                         onEditTextChanged: {
-                            if (_filtering) return
+                            if (_filtering) {
+                                return
+                            }
                             if (!editText || editText.trim() === "") {
                                 _matchedIndex = -1
                                 return

@@ -22,7 +22,9 @@ BaseDialog {
     closePolicy: root.transfer.busy ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     function choose(sourceInfo) {
-        if (root.transfer.busy) return
+        if (root.transfer.busy) {
+            return
+        }
         root.source = sourceInfo
         saveDialog.suggestedFilename = root.transfer.suggestedFilename(sourceInfo)
         saveDialog.open()
@@ -34,8 +36,11 @@ BaseDialog {
     }
 
     function escapePressed() {
-        if (root.transfer.busy) root.transfer.cancel()
-        else root.close()
+        if (root.transfer.busy) {
+            root.transfer.cancel()
+        } else {
+            root.close()
+        }
     }
 
     ImSaveFileDialog {
@@ -48,8 +53,11 @@ BaseDialog {
         nameFilters: [qsTr("All files (*)")]
         onAccepted: {
             root.destination = saveDialog.selectedFile
-            if (root.transfer.destinationExists(root.destination)) overwriteDialog.open()
-            else root.start(false)
+            if (root.transfer.destinationExists(root.destination)) {
+                overwriteDialog.open()
+            } else {
+                root.start(false)
+            }
         }
     }
 
@@ -109,8 +117,11 @@ BaseDialog {
         ImButton {
             text: root.transfer.busy ? CommonStrings.cancel : qsTr("Close")
             onClicked: {
-                if (root.transfer.busy) root.transfer.cancel()
-                else root.close()
+                if (root.transfer.busy) {
+                    root.transfer.cancel()
+                } else {
+                    root.close()
+                }
             }
         }
     }

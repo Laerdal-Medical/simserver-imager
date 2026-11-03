@@ -331,6 +331,7 @@ Image type is NOT stored in JSON metadata - it's determined at runtime from the 
 
 ## Coding Conventions
 
+- Always use braces for `if` and `else` bodies, including single statements, in first-party C++, Objective-C++, and QML code. Preserve `else if` chains.
 - Qt signal/slot architecture with `Q_OBJECT` macro
 - Platform-specific code uses `#ifdef Q_OS_LINUX`, `Q_OS_WIN`, `Q_OS_MACOS`
 - QML classes exposed via `QML_ELEMENT` macro

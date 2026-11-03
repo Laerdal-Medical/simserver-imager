@@ -68,16 +68,19 @@ ConfirmDialog {
         registerFocusGroup("options", function(){
             var items = [chkBeep.focusItem, chkEject.focusItem, chkTelemetry.focusItem]
             // Include telemetry help link if visible
-            if (chkTelemetry.helpLinkItem && chkTelemetry.helpLinkItem.visible)
+            if (chkTelemetry.helpLinkItem && chkTelemetry.helpLinkItem.visible) {
                 items.push(chkTelemetry.helpLinkItem)
+            }
             items.push(chkDisableWarnings.focusItem, editRepoButton.focusItem)
             // Only include secure boot key button if visible
-            if (secureBootKeyButton.visible)
+            if (secureBootKeyButton.visible) {
                 items.push(secureBootKeyButton.focusItem)
+            }
             // GitHub integration buttons
             items.push(githubSignInButton.focusItem)
-            if (githubReposButton.visible)
+            if (githubReposButton.visible) {
                 items.push(githubReposButton.focusItem)
+            }
             // Cache button
             items.push(clearCacheButton.focusItem)
             items.push(openCacheButton.focusItem)
@@ -267,11 +270,15 @@ ConfirmDialog {
 
                 Text {
                     text: {
-                        if (!popup.repoManager) return qsTr("Connected")
+                        if (!popup.repoManager) {
+                            return qsTr("Connected")
+                        }
                         var repos = popup.repoManager.githubRepos
                         var enabledCount = 0
                         for (var i = 0; i < repos.length; i++) {
-                            if (repos[i].enabled) enabledCount++
+                            if (repos[i].enabled) {
+                                enabledCount++
+                            }
                         }
                         return qsTr("Connected - %1 repositories enabled").arg(enabledCount)
                     }
@@ -507,8 +514,9 @@ ConfirmDialog {
         imageWriter.setSetting("telemetry", chkTelemetry.checked);
         imageWriter.setSetting("secureboot_rsa_key", rsaKeyPath.text);
         // Do not persist disable_warnings; set ephemeral flag only
-        if (popup.wizardContainer)
+        if (popup.wizardContainer) {
             popup.wizardContainer.disableWarnings = chkDisableWarnings.checked;
+        }
     }
 
     function updateCacheSize() {
@@ -551,8 +559,9 @@ ConfirmDialog {
 
         onAccepted: {
             confirmDisableWarnings.confirmAccepted = true;
-            if (popup.wizardContainer)
+            if (popup.wizardContainer) {
                 popup.wizardContainer.disableWarnings = true;
+            }
         }
     }
 }

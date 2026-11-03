@@ -29,7 +29,9 @@ ColumnLayout {
     
     // Helper function to split text by newlines and filter empty lines
     function splitKeys(text) {
-        if (!text || text.length === 0) return []
+        if (!text || text.length === 0) {
+            return []
+        }
         var lines = text.split(/\r?\n/)
         var result = []
         for (var i = 0; i < lines.length; i++) {

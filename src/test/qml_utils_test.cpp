@@ -46,7 +46,9 @@ struct Utils {
         REQUIRE(QMetaObject::invokeMethod(object.get(), method, Qt::DirectConnection,
                                          Q_RETURN_ARG(QVariant, result), Q_ARG(QVariant, QVariant(args))...));
         if (result.metaType() == QMetaType::fromType<QJSValue>())
+        {
             return result.value<QJSValue>().toVariant();
+        }
         return result;
     }
 };

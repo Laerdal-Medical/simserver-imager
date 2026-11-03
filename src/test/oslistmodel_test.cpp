@@ -68,7 +68,10 @@ struct Fixture {
         writer.hw.reload();
         QObject::connect(&model, &QAbstractItemModel::modelReset, &model, [this] { ++resets; });
         QObject::connect(&model, &QAbstractItemModel::rowsInserted, &model, [this](const QModelIndex &, int first, int) {
-            if (inserts++ == 0) firstInsertedRow = first;
+            if (inserts++ == 0)
+            {
+                firstInsertedRow = first;
+            }
         });
         QObject::connect(&model, &QAbstractItemModel::dataChanged, &model,
                          [this](const QModelIndex &, const QModelIndex &, const QList<int> &roles) { dataChangedRoles.append(roles); });

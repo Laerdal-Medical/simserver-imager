@@ -157,7 +157,9 @@ QtObject {
      * @returns Formatted string like "45.3 MB/s" or empty string if invalid
      */
     function calculateAverageSpeed(bytes, seconds) {
-        if (seconds <= 0) return ""
+        if (seconds <= 0) {
+            return ""
+        }
         var mbps = bytes / (1024 * 1024) / seconds
         return qsTr("%1 MB/s").arg(mbps.toFixed(1))
     }

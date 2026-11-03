@@ -452,7 +452,9 @@ MessageDialog {
         text: {
             var enabledCount = 0
             for (var i = 0; i < root.repos.length; i++) {
-                if (root.repos[i].enabled) enabledCount++
+                if (root.repos[i].enabled) {
+                    enabledCount++
+                }
             }
             return qsTr("%1 of %2 repositories enabled").arg(enabledCount).arg(root.repos.length)
         }

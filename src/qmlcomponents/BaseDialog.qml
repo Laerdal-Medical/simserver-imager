@@ -171,7 +171,9 @@ Dialog {
         property var initialFocusItem: null
         
         function registerFocusGroup(name, getItemsFn, order) {
-            if (order === undefined) order = 0
+            if (order === undefined) {
+                order = 0
+            }
             // Replace if exists
             for (var i = 0; i < _focusGroups.length; i++) {
                 if (_focusGroups[i].name === name) {
@@ -190,9 +192,13 @@ Dialog {
             var items = []
             for (var i = 0; i < _focusGroups.length; i++) {
                 var g = _focusGroups[i]
-                if (!g.enabled || !g.getItemsFn) continue
+                if (!g.enabled || !g.getItemsFn) {
+                    continue
+                }
                 var arr = g.getItemsFn()
-                if (!arr || !arr.length) continue
+                if (!arr || !arr.length) {
+                    continue
+                }
                 for (var k = 0; k < arr.length; k++) {
                     var it = arr[k]
                     // Skip items that have activeFocusOnTab explicitly set to false (e.g. text labels when screen reader inactive)
@@ -220,7 +226,9 @@ Dialog {
 
             // Set initial focus item to first focusable item (respecting focus group order)
             var firstField = _focusableItems.length > 0 ? _focusableItems[0] : null
-            if (!initialFocusItem) initialFocusItem = firstField
+            if (!initialFocusItem) {
+                initialFocusItem = firstField
+            }
         }
         
         // Main content layout

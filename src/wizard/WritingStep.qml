@@ -258,17 +258,39 @@ WizardStepBase {
                 Accessible.name: {
                     // Build a list of visible customizations to announce
                     var items = []
-                    if (root.wizardContainer.hostnameConfigured) items.push(CommonStrings.hostnameConfigured)
-                    if (root.wizardContainer.localeConfigured) items.push(CommonStrings.localeConfigured)
-                    if (root.wizardContainer.userConfigured) items.push(CommonStrings.userAccountConfigured)
-                    if (root.wizardContainer.wifiConfigured) items.push(CommonStrings.wifiConfigured)
-                    if (root.wizardContainer.sshEnabled) items.push(CommonStrings.sshEnabled)
-                    if (root.wizardContainer.piConnectEnabled) items.push(CommonStrings.piConnectEnabled)
-                    if (root.wizardContainer.featUsbGadgetEnabled) items.push(CommonStrings.usbGadgetEnabled)
-                    if (root.wizardContainer.ifI2cEnabled) items.push(CommonStrings.i2cEnabled)
-                    if (root.wizardContainer.ifSpiEnabled) items.push(CommonStrings.spiEnabled)
-                    if (root.wizardContainer.if1WireEnabled) items.push(CommonStrings.onewireEnabled)
-                    if (root.wizardContainer.ifSerial !== "" && root.wizardContainer.ifSerial !== "Disabled") items.push(CommonStrings.serialConfigured)
+                    if (root.wizardContainer.hostnameConfigured) {
+                        items.push(CommonStrings.hostnameConfigured)
+                    }
+                    if (root.wizardContainer.localeConfigured) {
+                        items.push(CommonStrings.localeConfigured)
+                    }
+                    if (root.wizardContainer.userConfigured) {
+                        items.push(CommonStrings.userAccountConfigured)
+                    }
+                    if (root.wizardContainer.wifiConfigured) {
+                        items.push(CommonStrings.wifiConfigured)
+                    }
+                    if (root.wizardContainer.sshEnabled) {
+                        items.push(CommonStrings.sshEnabled)
+                    }
+                    if (root.wizardContainer.piConnectEnabled) {
+                        items.push(CommonStrings.piConnectEnabled)
+                    }
+                    if (root.wizardContainer.featUsbGadgetEnabled) {
+                        items.push(CommonStrings.usbGadgetEnabled)
+                    }
+                    if (root.wizardContainer.ifI2cEnabled) {
+                        items.push(CommonStrings.i2cEnabled)
+                    }
+                    if (root.wizardContainer.ifSpiEnabled) {
+                        items.push(CommonStrings.spiEnabled)
+                    }
+                    if (root.wizardContainer.if1WireEnabled) {
+                        items.push(CommonStrings.onewireEnabled)
+                    }
+                    if (root.wizardContainer.ifSerial !== "" && root.wizardContainer.ifSerial !== "Disabled") {
+                        items.push(CommonStrings.serialConfigured)
+                    }
 
                     return items.length + " " + (items.length === 1 ? qsTr("customization") : qsTr("customizations")) + ": " + items.join(", ")
                 }

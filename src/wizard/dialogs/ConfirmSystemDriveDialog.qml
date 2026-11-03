@@ -146,7 +146,9 @@ WarningDialog {
             }
         }
         onAccepted: {
-            if (root.actionButtonItem.enabled) root.actionButtonItem.clicked()
+            if (root.actionButtonItem.enabled) {
+                root.actionButtonItem.clicked()
+            }
         }
         MouseArea {
             anchors.fill: parent

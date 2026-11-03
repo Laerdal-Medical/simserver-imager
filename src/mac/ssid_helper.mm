@@ -21,10 +21,14 @@ const char *rpiimager_current_ssid_cstr()
             if (ssid && [ssid length] > 0) {
                 NSLog(@"laerdal-imager CoreWLAN default interface %@ SSID: %@", iface.interfaceName, ssid);
                 const char *utf8 = [ssid UTF8String];
-                if (!utf8) return NULL;
+                if (!utf8) {
+                    return NULL;
+                }
                 size_t len = strlen(utf8);
                 char *dup = (char *)malloc(len + 1);
-                if (!dup) return NULL;
+                if (!dup) {
+                    return NULL;
+                }
                 memcpy(dup, utf8, len + 1);
                 return dup;
             } else {
@@ -50,10 +54,14 @@ const char *rpiimager_current_ssid_cstr()
                   ssid ? ssid : @"<none>");
             if (ssid && [ssid length] > 0) {
                 const char *utf8 = [ssid UTF8String];
-                if (!utf8) continue;
+                if (!utf8) {
+                    continue;
+                }
                 size_t len = strlen(utf8);
                 char *dup = (char *)malloc(len + 1);
-                if (!dup) return NULL;
+                if (!dup) {
+                    return NULL;
+                }
                 memcpy(dup, utf8, len + 1);
                 return dup;
             }
@@ -86,10 +94,14 @@ const char *rpiimager_current_ssid_cstr()
                         if (ssid.length > 0) {
                             NSLog(@"laerdal-imager networksetup %@ -> %@", it.interfaceName, ssid);
                             const char *utf8 = [ssid UTF8String];
-                            if (!utf8) continue;
+                            if (!utf8) {
+                                continue;
+                            }
                             size_t len = strlen(utf8);
                             char *dup = (char *)malloc(len + 1);
-                            if (!dup) return NULL;
+                            if (!dup) {
+                                return NULL;
+                            }
                             memcpy(dup, utf8, len + 1);
                             return dup;
                         }
