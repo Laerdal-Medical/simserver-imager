@@ -5,6 +5,8 @@ laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
   * Show shared SimPad sysinfo SPU assets for both i.MX6 and i.MX8 devices
   * Consistently use braces for conditional bodies throughout first-party code
   * Expand contributor architecture guidance and document the release process
+  * Add a repository clang-format configuration and document formatting changed
+    C++ lines with clang-format 19
 
  -- Laerdal Medical <support@laerdal.com>  Tue, 03 Nov 2026 13:14:40 +0100
 

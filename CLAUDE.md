@@ -346,6 +346,19 @@ Before committing, update `RELEASE_NOTES.md` and `debian/changelog` with entries
 
 ## Post-Change Workflow
 
+### C++ Formatting
+
+Format changed first-party C++ lines with the repository `.clang-format` (clang-format 19), without reformatting untouched code. Stage the files first, because `git-clang-format` refuses files with unstaged changes:
+
+```bash
+git add <changed-cpp-files>
+git-clang-format-19 --binary clang-format-19 HEAD -- <changed-cpp-files>
+```
+
+Do not format bundled code in `src/dependencies/`.
+
+### Build
+
 After completing code changes, always build the project to verify there are no compilation errors:
 
 ```bash

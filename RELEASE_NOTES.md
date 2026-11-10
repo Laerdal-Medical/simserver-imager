@@ -8,6 +8,8 @@
   deploying Qt twice before packaging
 - Consistently use braces for conditional bodies throughout first-party code
 - Expand contributor architecture guidance and document the release process
+- Add a repository clang-format configuration and document formatting changed
+  C++ lines with clang-format 19
 
 ### Bug Fixes
 

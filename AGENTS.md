@@ -108,6 +108,16 @@ cmake --build build --parallel
 ctest --test-dir build -L unit --output-on-failure
 ```
 
+Format changed first-party C++ lines with the repository `.clang-format`
+before building, without reformatting untouched code:
+
+```bash
+git add <changed-cpp-files>
+git-clang-format-19 --binary clang-format-19 HEAD -- <changed-cpp-files>
+```
+
+Do not format bundled code in `src/dependencies/`.
+
 Always build after code changes. Run the smallest relevant test selection
 first; targets and CTest registration are in `src/test/CMakeLists.txt`.
 
