@@ -1,4 +1,4 @@
-laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
+laerdal-simserver-imager (1.0.13) stable; urgency=medium
 
   * Apply clang-format 19 to Laerdal-created C++ headers and sources, preserving
     upstream formatting in inherited and mixed files
@@ -6,7 +6,6 @@ laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
     available logical CPUs
   * Use Ninja with CPU-limited parallelism for macOS CI builds and avoid
     deploying Qt twice before packaging
-  * Show shared SimPad sysinfo SPU assets for both i.MX6 and i.MX8 devices
   * Fix Next on device selection jumping straight to storage when the OS list
     was still loading at startup
   * Show a loading banner while the Laerdal image list is fetched, and only warn
@@ -14,10 +13,16 @@ laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
     selected
   * Show GitHub images immediately even while the Laerdal image list is still
     loading or unavailable
-  * Consistently use braces for conditional bodies throughout first-party code
-  * Expand contributor architecture guidance and document the release process
   * Add a repository clang-format configuration and document formatting changed
     C++ lines with clang-format 19
+
+ -- Laerdal Medical <support@laerdal.com>  Tue, 10 Nov 2026 14:30:11 +0100
+
+laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
+
+  * Show shared SimPad sysinfo SPU assets for both i.MX6 and i.MX8 devices
+  * Consistently use braces for conditional bodies throughout first-party code
+  * Expand contributor architecture guidance and document the release process
 
  -- Laerdal Medical <support@laerdal.com>  Tue, 03 Nov 2026 13:14:40 +0100
 
