@@ -327,10 +327,9 @@ WizardStepBase {
             var loadingCiArtifacts = root.isLoadingCIImages
                     && root.repoManager.selectedSourceType === "github-ci"
 
-            // If we were showing offline state and now have data, force full reload
-            // (softRefresh only updates existing rows, doesn't add new ones)
-            if (root.osListUnavailable && !loadingCiArtifacts) {
-                // Still unavailable - no point refreshing
+            // Nothing to refresh while the selected CDN source has no data yet;
+            // GitHub sources do not depend on the CDN list.
+            if (root.cdnListUnavailable) {
                 return
             }
 
@@ -456,7 +455,11 @@ WizardStepBase {
     
     // Track whether OS list is unavailable (no data loaded)
     readonly property bool osListUnavailable: imageWriter.isOsListUnavailable
+    readonly property bool osListLoading: imageWriter.isOsListLoading
 
+    // The Laerdal CDN list only feeds the image list when the CDN source is selected
+    readonly property bool cdnSourceSelected: repoManager ? repoManager.selectedSourceType === "cdn" : true
+    readonly property bool cdnListUnavailable: cdnSourceSelected && osListUnavailable
     // Track whether CI images are being fetched
     readonly property var repoManager: imageWriter.getRepositoryManager()
     readonly property bool isLoadingCIImages: repoManager
@@ -487,12 +490,19 @@ WizardStepBase {
                         ? ImBanner.Type.Success : ImBanner.Type.Info
         }
 
-        // Offline banner (shown when OS list fetch failed)
+        // Laerdal CDN image list still being fetched
+        ImLoadingBanner {
+            id: cdnLoadingBanner
+            active: root.cdnListUnavailable && root.osListLoading
+            text: qsTr("Loading images from the Laerdal server...")
+        }
+
+        // Laerdal CDN image list fetch failed
         ImBanner {
             id: offlineBanner
-            visible: root.osListUnavailable
+            visible: root.cdnListUnavailable && !root.osListLoading
             bannerType: ImBanner.Type.Warning
-            text: qsTr("Unable to download OS list. You can still use a local image file.")
+            text: qsTr("Could not reach the Laerdal image server. Check your network connection and try again.")
 
             ImButton {
                 id: retryButton

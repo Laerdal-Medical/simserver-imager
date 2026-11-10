@@ -73,6 +73,7 @@ public:
 
     Q_PROPERTY(WriteState writeState READ writeState NOTIFY writeStateChanged)
     Q_PROPERTY(bool isOsListUnavailable READ isOsListUnavailable NOTIFY osListUnavailableChanged)
+    Q_PROPERTY(bool isOsListLoading READ isOsListLoading NOTIFY osListLoadingChanged)
     Q_PROPERTY(QUrl startupImageUrl READ startupImageUrl WRITE setStartupImageUrl NOTIFY startupImageUrlChanged)
     Q_PROPERTY(DownloadOnly* downloadOnly READ downloadOnly CONSTANT)
     DownloadOnly *downloadOnly() const { return _downloadOnly; }
@@ -407,6 +408,12 @@ public:
     /* Check if OS list is unavailable - derived from whether we have data (for QML offline UI) */
     bool isOsListUnavailable() const { return _completeOsList.isEmpty(); }
 
+    /* Whether the top-level OS list fetch is currently in progress */
+    bool isOsListLoading() const
+    {
+        return _osListLoading;
+    }
+
     /* Get access to performance stats for instrumentation */
     PerformanceStats* performanceStats() { return _performanceStats; }
 
@@ -510,6 +517,7 @@ signals:
     void cacheStatusChanged();
     void partialDownloadAvailable();
     void osListUnavailableChanged();
+    void osListLoadingChanged();
     void permissionWarning(QVariant msg);
     void elevationNeeded();  // Emitted when write requires elevation (Windows)
     void locationPermissionGranted();
@@ -561,6 +569,8 @@ private:
     void queueSublistFetches(const QJsonArray &list, int depth);
     QHash<QUrl, qint64> _pendingFetchStartTimes;  // Track request start times for performance
     QJsonDocument _completeOsList;
+    bool _osListLoading = false;
+    void setOsListLoading(bool loading);
     QJsonArray _deviceFilter, _hwCapabilities, _swCapabilities;
     bool _deviceFilterIsInclusive;
     std::shared_ptr<DeviceInfo> _device_info;

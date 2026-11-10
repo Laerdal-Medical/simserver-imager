@@ -201,14 +201,13 @@ Item {
     }
 
     Component.onCompleted: {
-        // Set initial step based on language selection preference and network connectivity at startup.
-        // Language selection step is shown first if requested, then device selection (if online) or OS selection (if offline).
+        // Keep currentStep in sync with wizardStack.initialItem. The OS list is still
+        // unavailable while the startup fetch is in flight, so deriving the step from
+        // connectivity here would desynchronize navigation from the displayed page.
         if (showLanguageSelection) {
             currentStep = stepLanguageSelection
-        } else if (hasNetworkConnectivity) {
-            currentStep = stepDeviceSelection
         } else {
-            currentStep = stepOSSelection
+            currentStep = stepDeviceSelection
         }
 
         // Default to disabling warnings in embedded mode (per-run, non-persistent)
@@ -242,12 +241,13 @@ Item {
     Connections {
         target: imageWriter
         function onOsListUnavailableChanged() {
-            // When OS list becomes available after starting offline, navigate to device
-            // selection so the user can choose their target device (now that the list is available).
-            // Guard: don't interrupt an active write operation or if a startup image was provided.
+            // When OS list becomes available after the user continued offline without a device,
+            // navigate to device selection so they can choose their target device.
+            // Guard: don't interrupt an active write operation, a chosen device, or a startup image.
             // Check both hasStartupImage flag AND imageWriter.startupImageUrl to handle race conditions.
             var hasStartup = root.hasStartupImage || (imageWriter.startupImageUrl && imageWriter.startupImageUrl.toString().length > 0)
-            if (root.hasNetworkConnectivity && root.currentStep === root.stepOSSelection && !root.isWriting && !hasStartup) {
+            if (root.hasNetworkConnectivity && root.currentStep === root.stepOSSelection
+                    && root.selectedDeviceName === "" && !root.isWriting && !hasStartup) {
                 console.log("OS list now available - navigating to device selection")
                 root.jumpToStep(root.stepDeviceSelection)
             }

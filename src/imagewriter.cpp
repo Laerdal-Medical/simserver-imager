@@ -2125,6 +2125,10 @@ void ImageWriter::onOsListFetchComplete(const QByteArray &data, const QUrl &url)
     
     // Track if this is the top-level OS list request
     bool isTopLevelRequest = (url == osListUrl());
+    if (isTopLevelRequest)
+    {
+        setOsListLoading(false);
+    }
 
     auto response_object = QJsonDocument::fromJson(data).object();
 
@@ -2222,6 +2226,7 @@ void ImageWriter::onOsListFetchError(const QString &errorMessage, const QUrl &ur
     qDebug() << "Failed to fetch URL [" << url << "]:" << errorMessage;
     
     if (isTopLevelRequest) {
+        setOsListLoading(false);
         if (_completeOsList.isEmpty()) {
             // No data at all - notify UI of offline state
             qWarning() << "Top-level OS list fetch failed:" << errorMessage << ". Operating in offline mode.";
@@ -2371,13 +2376,25 @@ QJsonDocument ImageWriter::getFilteredOSlistDocument() {
     ));
 }
 
+void ImageWriter::setOsListLoading(bool loading)
+{
+    if (_osListLoading != loading)
+    {
+        _osListLoading = loading;
+        emit osListLoadingChanged();
+    }
+}
+
 void ImageWriter::beginOSListFetch() {
     const QUrl topUrl = osListUrl();
     if (!preflightValidateUrl(topUrl, QStringLiteral("repository:"))) {
+        setOsListLoading(false);
         // Even if we can't fetch, emit osListPrepared so device selection can proceed
         emit osListPrepared();
         return;
     }
+
+    setOsListLoading(true);
 
     // Create a CurlFetcher to fetch the OS list
     auto *fetcher = new CurlFetcher(this);
