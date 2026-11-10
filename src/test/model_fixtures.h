@@ -11,17 +11,27 @@
 #include "../hwlistmodel.h"
 
 // Records what HWListModel asks its owner to do, using the model's public Actions seam.
-struct TestOwner {
+struct TestOwner
+{
     QJsonDocument osListDocument;
     QJsonArray filterTags;
     QJsonArray capabilities;
     bool filterInclusive = false;
     int clearImageCalls = 0;
 
-    HWListModel hw{HWListModel::Actions{
-        [this](const QJsonArray &tags, bool inclusive) { filterTags = tags; filterInclusive = inclusive; },
-        [this](const QJsonArray &caps) { capabilities = caps; },
-        [this] { ++clearImageCalls; }}};
+    HWListModel hw {HWListModel::Actions {[this](const QJsonArray& tags, bool inclusive)
+                                          {
+                                              filterTags = tags;
+                                              filterInclusive = inclusive;
+                                          },
+                                          [this](const QJsonArray& caps)
+                                          {
+                                              capabilities = caps;
+                                          },
+                                          [this]
+                                          {
+                                              ++clearImageCalls;
+                                          }}};
 };
 
 #endif

@@ -9,8 +9,8 @@
 #ifndef ARCHIVEENTRYEXTRACTTHREAD_H
 #define ARCHIVEENTRYEXTRACTTHREAD_H
 
-#include "downloadextractthread.h"
 #include "archiveentryiodevice.h"
+#include "downloadextractthread.h"
 
 class ArchiveEntryExtractThread : public DownloadExtractThread
 {
@@ -23,22 +23,22 @@ public:
      * @param dst Destination device path
      * @param parent Parent QObject
      */
-    explicit ArchiveEntryExtractThread(const QString &archivePath, const QString &entryName,
-                                        const QByteArray &dst, QObject *parent = nullptr);
+    explicit ArchiveEntryExtractThread(const QString& archivePath, const QString& entryName, const QByteArray& dst,
+                                       QObject* parent = nullptr);
     virtual ~ArchiveEntryExtractThread();
 
 protected:
     virtual void run() override;
-    virtual ssize_t _on_read(struct archive *a, const void **buff) override;
-    virtual int _on_close(struct archive *a) override;
+    virtual ssize_t _on_read(struct archive* a, const void** buff) override;
+    virtual int _on_close(struct archive* a) override;
     void _cancelExtract();
     void extractRawImageRun();
 
 private:
     QString _archivePath;
     QString _entryName;
-    ArchiveEntryIODevice *_archiveDevice = nullptr;
-    char *_inputBuf = nullptr;
+    ArchiveEntryIODevice* _archiveDevice = nullptr;
+    char* _inputBuf = nullptr;
     size_t _inputBufSize = 0;
 };
 

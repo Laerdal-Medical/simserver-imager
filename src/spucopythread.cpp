@@ -4,77 +4,74 @@
  */
 
 #include "spucopythread.h"
-#include "disk_format_helper.h"
-#include "mount_helper.h"
-
-#include <QDebug>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QThread>
-#include <QUrl>
-#include <QStandardPaths>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QEventLoop>
 
 #include <archive.h>
 #include <archive_entry.h>
 
-SPUCopyThread::SPUCopyThread(const QString &archivePath, const QString &spuEntry,
-                             const QByteArray &device, bool skipFormat,
-                             QObject *parent)
-    : QThread(parent)
-    , _archivePath(archivePath)
-    , _spuEntry(spuEntry)
-    , _device(device)
-    , _skipFormat(skipFormat)
-    , _isDirectFile(false)
-    , _isUrlDownload(false)
-    , _isArtifactStreaming(false)
-    , _cancelled(false)
+#include <QDebug>
+#include <QDir>
+#include <QEventLoop>
+#include <QFile>
+#include <QFileInfo>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QStandardPaths>
+#include <QThread>
+#include <QUrl>
+
+#include "disk_format_helper.h"
+#include "mount_helper.h"
+
+SPUCopyThread::SPUCopyThread(const QString& archivePath, const QString& spuEntry, const QByteArray& device, bool skipFormat,
+                             QObject* parent):
+    QThread(parent),
+    _archivePath(archivePath),
+    _spuEntry(spuEntry),
+    _device(device),
+    _skipFormat(skipFormat),
+    _isDirectFile(false),
+    _isUrlDownload(false),
+    _isArtifactStreaming(false),
+    _cancelled(false)
 {
 }
 
-SPUCopyThread::SPUCopyThread(const QString &spuFilePath, const QByteArray &device,
-                             bool skipFormat, QObject *parent)
-    : QThread(parent)
-    , _spuFilePath(spuFilePath)
-    , _device(device)
-    , _skipFormat(skipFormat)
-    , _isDirectFile(true)
-    , _isUrlDownload(false)
-    , _isArtifactStreaming(false)
-    , _cancelled(false)
+SPUCopyThread::SPUCopyThread(const QString& spuFilePath, const QByteArray& device, bool skipFormat, QObject* parent):
+    QThread(parent),
+    _spuFilePath(spuFilePath),
+    _device(device),
+    _skipFormat(skipFormat),
+    _isDirectFile(true),
+    _isUrlDownload(false),
+    _isArtifactStreaming(false),
+    _cancelled(false)
 {
 }
 
-SPUCopyThread::SPUCopyThread(const QUrl &url, const QByteArray &device,
-                             bool skipFormat, QObject *parent)
-    : QThread(parent)
-    , _spuUrl(url)
-    , _device(device)
-    , _skipFormat(skipFormat)
-    , _isDirectFile(false)
-    , _isUrlDownload(true)
-    , _isArtifactStreaming(false)
-    , _cancelled(false)
+SPUCopyThread::SPUCopyThread(const QUrl& url, const QByteArray& device, bool skipFormat, QObject* parent):
+    QThread(parent),
+    _spuUrl(url),
+    _device(device),
+    _skipFormat(skipFormat),
+    _isDirectFile(false),
+    _isUrlDownload(true),
+    _isArtifactStreaming(false),
+    _cancelled(false)
 {
 }
 
-SPUCopyThread::SPUCopyThread(const QUrl &artifactUrl, const QString &targetEntry,
-                             const QByteArray &device, bool skipFormat,
-                             QObject *parent)
-    : QThread(parent)
-    , _spuUrl(artifactUrl)
-    , _artifactEntry(targetEntry)
-    , _device(device)
-    , _skipFormat(skipFormat)
-    , _isDirectFile(false)
-    , _isUrlDownload(false)
-    , _isArtifactStreaming(true)
-    , _cancelled(false)
+SPUCopyThread::SPUCopyThread(const QUrl& artifactUrl, const QString& targetEntry, const QByteArray& device, bool skipFormat,
+                             QObject* parent):
+    QThread(parent),
+    _spuUrl(artifactUrl),
+    _artifactEntry(targetEntry),
+    _device(device),
+    _skipFormat(skipFormat),
+    _isDirectFile(false),
+    _isUrlDownload(false),
+    _isArtifactStreaming(true),
+    _cancelled(false)
 {
 }
 
@@ -84,22 +81,22 @@ SPUCopyThread::~SPUCopyThread()
     wait();
 }
 
-void SPUCopyThread::setAuthToken(const QString &token)
+void SPUCopyThread::setAuthToken(const QString& token)
 {
     _authToken = token;
 }
 
-void SPUCopyThread::setDownloadFilename(const QString &filename)
+void SPUCopyThread::setDownloadFilename(const QString& filename)
 {
     _downloadFilename = filename;
 }
 
-void SPUCopyThread::setCacheDir(const QString &cacheDir)
+void SPUCopyThread::setCacheDir(const QString& cacheDir)
 {
     _cacheDir = cacheDir;
 }
 
-void SPUCopyThread::setHttpHeaders(const QStringList &headers)
+void SPUCopyThread::setHttpHeaders(const QStringList& headers)
 {
     _httpHeaders = headers;
 }
@@ -259,17 +256,17 @@ QString SPUCopyThread::mountDrive()
     return MountHelper::mountDevice(QString::fromLatin1(_device));
 }
 
-bool SPUCopyThread::unmountDrive(const QString &mountPoint)
+bool SPUCopyThread::unmountDrive(const QString& mountPoint)
 {
     return MountHelper::unmountDevice(mountPoint);
 }
 
-bool SPUCopyThread::extractAndCopy(const QString &mountPoint)
+bool SPUCopyThread::extractAndCopy(const QString& mountPoint)
 {
     qDebug() << "SPUCopyThread: Extracting" << _spuEntry << "from" << _archivePath;
 
-    struct archive *a = archive_read_new();
-    struct archive_entry *entry;
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
 
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
@@ -312,7 +309,7 @@ bool SPUCopyThread::extractAndCopy(const QString &mountPoint)
 
             // Copy data with progress
             const size_t bufferSize = 1024 * 1024; // 1MB buffer
-            char *buffer = new char[bufferSize];
+            char* buffer = new char[bufferSize];
             qint64 totalWritten = 0;
 
             while (!_cancelled)
@@ -379,7 +376,7 @@ bool SPUCopyThread::extractAndCopy(const QString &mountPoint)
     return success;
 }
 
-bool SPUCopyThread::copyDirectFile(const QString &mountPoint)
+bool SPUCopyThread::copyDirectFile(const QString& mountPoint)
 {
     qDebug() << "SPUCopyThread: Copying direct file" << _spuFilePath;
 
@@ -408,7 +405,7 @@ bool SPUCopyThread::copyDirectFile(const QString &mountPoint)
 
     // Copy with progress
     const size_t bufferSize = 1024 * 1024; // 1MB buffer
-    char *buffer = new char[bufferSize];
+    char* buffer = new char[bufferSize];
     qint64 totalWritten = 0;
     bool success = true;
 
@@ -461,7 +458,7 @@ bool SPUCopyThread::copyDirectFile(const QString &mountPoint)
     return success;
 }
 
-bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
+bool SPUCopyThread::streamUrlToFile(const QString& mountPoint)
 {
     qDebug() << "SPUCopyThread: Streaming SPU from URL:" << _spuUrl;
 
@@ -504,8 +501,7 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
     // Set up network request
     QNetworkAccessManager manager;
     QNetworkRequest request(_spuUrl);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
     if (!_authToken.isEmpty())
     {
@@ -513,7 +509,7 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
         request.setRawHeader("Accept", "application/octet-stream");
     }
 
-    for (const QString &header : _httpHeaders)
+    for (const QString& header : _httpHeaders)
     {
         int colonPos = header.indexOf(':');
         if (colonPos > 0)
@@ -524,7 +520,7 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
         }
     }
 
-    QNetworkReply *reply = manager.get(request);
+    QNetworkReply* reply = manager.get(request);
 
     bool success = true;
     qint64 totalWritten = 0;
@@ -533,7 +529,8 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
 
     connect(reply, &QNetworkReply::downloadProgress, reply,
-            [this](qint64 received, qint64 total) {
+            [this](qint64 received, qint64 total)
+            {
                 if (total > 0)
                 {
                     emit copyProgress(received, total);
@@ -542,7 +539,8 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
 
     // Stream each chunk directly to FAT32 and cache
     connect(reply, &QNetworkReply::readyRead, reply,
-            [this, &destFile, &cacheFile, &caching, &success, &totalWritten, reply]() {
+            [this, &destFile, &cacheFile, &caching, &success, &totalWritten, reply]()
+            {
                 if (_cancelled || !success)
                 {
                     return;
@@ -626,7 +624,7 @@ bool SPUCopyThread::streamUrlToFile(const QString &mountPoint)
     return true;
 }
 
-bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
+bool SPUCopyThread::downloadArtifactAndCopy(const QString& mountPoint)
 {
     qDebug() << "SPUCopyThread: Downloading artifact ZIP from:" << _spuUrl;
     qDebug() << "SPUCopyThread: Target SPU entry:" << _artifactEntry;
@@ -661,8 +659,7 @@ bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
     // Download the full artifact ZIP
     QNetworkAccessManager manager;
     QNetworkRequest request(_spuUrl);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
     if (!_authToken.isEmpty())
     {
@@ -670,7 +667,7 @@ bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
         request.setRawHeader("Accept", "application/octet-stream");
     }
 
-    for (const QString &header : _httpHeaders)
+    for (const QString& header : _httpHeaders)
     {
         int colonPos = header.indexOf(':');
         if (colonPos > 0)
@@ -681,7 +678,7 @@ bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
         }
     }
 
-    QNetworkReply *reply = manager.get(request);
+    QNetworkReply* reply = manager.get(request);
 
     QFile file(cachePath);
     if (!file.open(QIODevice::WriteOnly))
@@ -695,7 +692,8 @@ bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
 
     connect(reply, &QNetworkReply::downloadProgress, reply,
-            [this](qint64 received, qint64 total) {
+            [this](qint64 received, qint64 total)
+            {
                 if (total > 0)
                 {
                     // Show download progress as first half of the operation
@@ -704,7 +702,8 @@ bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
             });
 
     connect(reply, &QNetworkReply::readyRead, reply,
-            [&file, reply]() {
+            [&file, reply]()
+            {
                 file.write(reply->readAll());
             });
 
@@ -734,14 +733,14 @@ bool SPUCopyThread::downloadArtifactAndCopy(const QString &mountPoint)
     return extractAndCopy(mountPoint);
 }
 
-void SPUCopyThread::deleteExistingSpuFiles(const QString &mountPoint)
+void SPUCopyThread::deleteExistingSpuFiles(const QString& mountPoint)
 {
     qDebug() << "SPUCopyThread: Deleting existing SPU files from:" << mountPoint;
 
     QDir dir(mountPoint);
     QStringList spuFiles = dir.entryList({"*.spu", "*.SPU"}, QDir::Files);
 
-    for (const QString &filename : spuFiles)
+    for (const QString& filename : spuFiles)
     {
         QString filePath = mountPoint + "/" + filename;
         qDebug() << "SPUCopyThread: Deleting:" << filePath;

@@ -4,14 +4,16 @@
  */
 
 #include "laerdalcdnsource.h"
-#include "../devicedetection.h"
+
+#include <QDebug>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QDebug>
 
-LaerdalCdnSource::LaerdalCdnSource(QObject *parent)
-    : QObject(parent)
+#include "../devicedetection.h"
+
+LaerdalCdnSource::LaerdalCdnSource(QObject* parent):
+    QObject(parent)
 {
 }
 
@@ -19,9 +21,10 @@ LaerdalCdnSource::~LaerdalCdnSource()
 {
 }
 
-void LaerdalCdnSource::fetchList(const QUrl &url)
+void LaerdalCdnSource::fetchList(const QUrl& url)
 {
-    if (_isFetching) {
+    if (_isFetching)
+    {
         qWarning() << "LaerdalCdnSource: Already fetching";
         return;
     }
@@ -32,20 +35,23 @@ void LaerdalCdnSource::fetchList(const QUrl &url)
     request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager");
     request.setRawHeader("Accept", "application/json");
 
-    QNetworkReply *reply = _networkManager.get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        onNetworkReply(reply);
-    });
+    QNetworkReply* reply = _networkManager.get(request);
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                onNetworkReply(reply);
+            });
 
     qDebug() << "LaerdalCdnSource: Fetching from" << url.toString();
 }
 
-void LaerdalCdnSource::onNetworkReply(QNetworkReply *reply)
+void LaerdalCdnSource::onNetworkReply(QNetworkReply* reply)
 {
     reply->deleteLater();
     _isFetching = false;
 
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         emit error(tr("Failed to fetch CDN list: %1").arg(reply->errorString()));
         return;
     }
@@ -53,7 +59,8 @@ void LaerdalCdnSource::onNetworkReply(QNetworkReply *reply)
     QByteArray responseData = reply->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(responseData);
 
-    if (doc.isNull() || !doc.isObject()) {
+    if (doc.isNull() || !doc.isObject())
+    {
         emit error(tr("Invalid JSON response from CDN"));
         return;
     }
@@ -65,14 +72,15 @@ void LaerdalCdnSource::onNetworkReply(QNetworkReply *reply)
     emit listReady(osList);
 }
 
-QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson)
+QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject& laerdalJson)
 {
     QJsonArray osList;
 
     // The Laerdal format has an "updates" array
     QJsonArray updates = laerdalJson["updates"].toArray();
 
-    for (const auto &updateValue : updates) {
+    for (const auto& updateValue : updates)
+    {
         QJsonObject update = updateValue.toObject();
 
         QString simpadType = update["simpadtype"].toString();
@@ -93,10 +101,12 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
 
         // Name with device type and version
         QString deviceName = DeviceDetection::getDisplayName(deviceType);
-        if (deviceName.isEmpty()) {
+        if (deviceName.isEmpty())
+        {
             // Unknown type: capitalize first letter as fallback
             deviceName = simpadType;
-            if (!deviceName.isEmpty()) {
+            if (!deviceName.isEmpty())
+            {
                 deviceName[0] = deviceName[0].toUpper();
             }
         }
@@ -130,7 +140,8 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
         osEntry["source"] = "laerdal_cdn";
 
         // Full release notes if available
-        if (!releaseNotes.isEmpty()) {
+        if (!releaseNotes.isEmpty())
+        {
             osEntry["release_notes"] = releaseNotes;
         }
 
@@ -139,4 +150,3 @@ QJsonArray LaerdalCdnSource::convertLaerdalFormat(const QJsonObject &laerdalJson
 
     return osList;
 }
-

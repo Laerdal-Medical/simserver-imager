@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (C) 2026 Laerdal Medical
  */
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_session.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <QCoreApplication>
 #include <QDeadlineTimer>
@@ -17,104 +17,123 @@
 #include <QSet>
 #include <QSettings>
 #include <QTemporaryDir>
-#include <QUrl>
 #include <QtNetwork>
-
+#include <QUrl>
 
 #include "../github/githubclient.h"
 #include "../repository/githubsource.h"
 #include "../repository/laerdalcdnsource.h"
 #include "../repository/repositorymanager.h"
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     QCoreApplication application(argc, argv);
     return Catch::Session().run(argc, argv);
 }
 
-namespace {
+namespace
+{
 
-// Redirects every QSettings() created afterwards into a throw-away directory.
-struct IsolatedSettings {
-    QTemporaryDir dir;
-    IsolatedSettings()
+    // Redirects every QSettings() created afterwards into a throw-away directory.
+    struct IsolatedSettings
     {
-        REQUIRE(dir.isValid());
-        QCoreApplication::setOrganizationName(QStringLiteral("LaerdalImagerTest"));
-        QCoreApplication::setApplicationName(QStringLiteral("repository_github_test"));
-        QSettings::setDefaultFormat(QSettings::IniFormat);
-        for (auto format : {QSettings::NativeFormat, QSettings::IniFormat})
-            for (auto scope : {QSettings::UserScope, QSettings::SystemScope})
-                QSettings::setPath(format, scope, dir.path());
-    }
-};
+        QTemporaryDir dir;
 
-bool waitFor(const std::function<bool()> &predicate, int timeoutMs = 5000)
-{
-    QDeadlineTimer deadline(timeoutMs);
-    while (!predicate() && !deadline.hasExpired()) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-    }
-    return predicate();
-}
+        IsolatedSettings()
+        {
+            REQUIRE(dir.isValid());
+            QCoreApplication::setOrganizationName(QStringLiteral("LaerdalImagerTest"));
+            QCoreApplication::setApplicationName(QStringLiteral("repository_github_test"));
+            QSettings::setDefaultFormat(QSettings::IniFormat);
+            for (auto format : {QSettings::NativeFormat, QSettings::IniFormat})
+            {
+                for (auto scope : {QSettings::UserScope, QSettings::SystemScope})
+                {
+                    QSettings::setPath(format, scope, dir.path());
+                }
+            }
+        }
+    };
 
-QString writeFile(const QTemporaryDir &dir, const QString &name, const QByteArray &data)
-{
-    const QString path = dir.filePath(name);
-    QFile f(path);
-    REQUIRE(f.open(QIODevice::WriteOnly));
-    REQUIRE(f.write(data) == data.size());
-    return path;
-}
-
-QStringList strings(const QJsonArray &array)
-{
-    QStringList out;
-    for (const auto &v : array) out << v.toString();
-    return out;
-}
-
-QStringList sorted(QStringList l)
-{
-    l.sort();
-    return l;
-}
-
-QJsonObject asset(const QString &name, qint64 id = 1)
-{
-    return QJsonObject{{"name", name}, {"asset_id", id}, {"size", 10}, {"type", "wic"}};
-}
-
-QJsonObject releaseGroup(const QString &tag, const QString &releaseName, const QJsonArray &assets,
-                         const QString &published = QStringLiteral("2025-05-01T00:00:00Z"))
-{
-    return QJsonObject{{"tag", tag}, {"release_name", releaseName}, {"owner", "Laerdal-Medical"},
-                       {"repo", "simpad"}, {"published_at", published}, {"prerelease", false},
-                       {"assets", assets}};
-}
-
-QJsonObject artifactFile(qint64 id, const QString &name, const QString &branch, const QString &created)
-{
-    return QJsonObject{{"name", name}, {"artifact_id", id}, {"size", 2048}, {"branch", branch},
-                       {"created_at", created}, {"owner", "Laerdal-Medical"}, {"repo", "simpad"},
-                       {"run_id", 77}, {"download_url", QStringLiteral("https://api.example/zip/%1").arg(id)}};
-}
-
-struct Spy {
-    int count = 0;
-    template<typename Obj, typename Signal>
-    Spy(Obj *obj, Signal signal)
+    bool waitFor(const std::function<bool()>& predicate, int timeoutMs = 5000)
     {
-        QObject::connect(obj, signal, obj, [this] { ++count; });
+        QDeadlineTimer deadline(timeoutMs);
+        while (!predicate() && !deadline.hasExpired())
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        }
+        return predicate();
     }
-};
 
-const QJsonArray kDefaultRepos = QJsonArray{
-    QJsonObject{{"owner", "Laerdal-Medical"}, {"repo", "simpad"}, {"defaultBranch", "develop"}},
-    QJsonObject{{"owner", "Laerdal-Medical"}, {"repo", "linkbox"}, {"defaultBranch", "main"}},
-};
+    QString writeFile(const QTemporaryDir& dir, const QString& name, const QByteArray& data)
+    {
+        const QString path = dir.filePath(name);
+        QFile f(path);
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        REQUIRE(f.write(data) == data.size());
+        return path;
+    }
 
-QString json(const QJsonArray &a) { return QString::fromUtf8(QJsonDocument(a).toJson(QJsonDocument::Compact)); }
+    QStringList strings(const QJsonArray& array)
+    {
+        QStringList out;
+        for (const auto& v : array)
+        {
+            out << v.toString();
+        }
+        return out;
+    }
+
+    QStringList sorted(QStringList l)
+    {
+        l.sort();
+        return l;
+    }
+
+    QJsonObject asset(const QString& name, qint64 id = 1)
+    {
+        return QJsonObject {{"name", name}, {"asset_id", id}, {"size", 10}, {"type", "wic"}};
+    }
+
+    QJsonObject releaseGroup(const QString& tag, const QString& releaseName, const QJsonArray& assets,
+                             const QString& published = QStringLiteral("2025-05-01T00:00:00Z"))
+    {
+        return QJsonObject {{"tag", tag},       {"release_name", releaseName}, {"owner", "Laerdal-Medical"},
+                            {"repo", "simpad"}, {"published_at", published},   {"prerelease", false},
+                            {"assets", assets}};
+    }
+
+    QJsonObject artifactFile(qint64 id, const QString& name, const QString& branch, const QString& created)
+    {
+        return QJsonObject {
+            {"name", name},     {"artifact_id", id},     {"size", 2048},
+            {"branch", branch}, {"created_at", created}, {"owner", "Laerdal-Medical"},
+            {"repo", "simpad"}, {"run_id", 77},          {"download_url", QStringLiteral("https://api.example/zip/%1").arg(id)}};
+    }
+
+    struct Spy
+    {
+        int count = 0;
+
+        template<typename Obj, typename Signal> Spy(Obj* obj, Signal signal)
+        {
+            QObject::connect(obj, signal, obj,
+                             [this]
+                             {
+                                 ++count;
+                             });
+        }
+    };
+
+    const QJsonArray kDefaultRepos = QJsonArray {
+        QJsonObject {{"owner", "Laerdal-Medical"}, {"repo", "simpad"}, {"defaultBranch", "develop"}},
+        QJsonObject {{"owner", "Laerdal-Medical"}, {"repo", "linkbox"}, {"defaultBranch", "main"}},
+    };
+
+    QString json(const QJsonArray& a)
+    {
+        return QString::fromUtf8(QJsonDocument(a).toJson(QJsonDocument::Compact));
+    }
 
 } // namespace
 
@@ -198,10 +217,10 @@ TEST_CASE("RepositoryManager parses repository JSON defensively", "[repository][
     Spy changed(&mgr, &RepositoryManager::reposChanged);
 
     mgr.loadReposFromJson(json({
-        QJsonObject{{"owner", "a"}, {"repo", "b"}},
-        QJsonObject{{"owner", ""}, {"repo", "skipped"}},
-        QJsonObject{{"owner", "skipped"}},
-        QJsonObject{{"owner", "c"}, {"repo", "d"}, {"defaultBranch", "dev"}},
+        QJsonObject {{"owner", "a"}, {"repo", "b"}},
+        QJsonObject {{"owner", ""}, {"repo", "skipped"}},
+        QJsonObject {{"owner", "skipped"}},
+        QJsonObject {{"owner", "c"}, {"repo", "d"}, {"defaultBranch", "dev"}},
     }));
     const QJsonArray repos = mgr.githubRepos();
     REQUIRE(repos.size() == 2);
@@ -253,16 +272,18 @@ TEST_CASE("RepositoryManager keeps custom repositories and de-duplicates default
     IsolatedSettings iso;
     {
         QSettings s;
-        s.setValue("laerdal/github_repos",
-                   json({QJsonObject{{"owner", "laerdal-medical"}, {"repo", "SIMPAD"}, {"defaultBranch", "mine"}},
-                         QJsonObject{{"owner", "custom"}, {"repo", "thing"}}}));
+        s.setValue("laerdal/github_repos", json({QJsonObject {{"owner", "laerdal-medical"}, {"repo", "SIMPAD"}, {"defaultBranch", "mine"}},
+                                                 QJsonObject {{"owner", "custom"}, {"repo", "thing"}}}));
     }
     RepositoryManager mgr;
     mgr.loadReposFromJson(json(kDefaultRepos));
     mgr.loadSettings();
 
     QStringList full;
-    for (const auto &r : mgr.githubRepos()) full << r.toObject()["fullName"].toString();
+    for (const auto& r : mgr.githubRepos())
+    {
+        full << r.toObject()["fullName"].toString();
+    }
     REQUIRE(sorted(full) == sorted({"laerdal-medical/SIMPAD", "custom/thing", "Laerdal-Medical/linkbox"}));
 }
 
@@ -275,9 +296,8 @@ TEST_CASE("RepositoryManager converts release groups into device-tagged OS entri
     Spy ready(&mgr, &RepositoryManager::osListReady);
     Spy github(&mgr, &RepositoryManager::githubListReady);
 
-    emit client.wicFilesReady(QJsonArray{
-        releaseGroup("v9.3.0", "SimPad Plus 9.3.0",
-                     {asset("simpad-plus-9.3.0.wic.xz", 11), asset("simpad-plus-9.3.0.vsi", 12)}),
+    emit client.wicFilesReady(QJsonArray {
+        releaseGroup("v9.3.0", "SimPad Plus 9.3.0", {asset("simpad-plus-9.3.0.wic.xz", 11), asset("simpad-plus-9.3.0.vsi", 12)}),
         releaseGroup("v1.0.0-rc1", "Generic image", {asset("rootfs.wic", 13)}, "2025-01-01T00:00:00Z"),
         releaseGroup("simpad-plus2-v2.0.0", "Plus2 drop", {asset("rootfs.wic.gz", 14)}, "2025-03-01T00:00:00Z"),
     });
@@ -324,31 +344,32 @@ TEST_CASE("RepositoryManager shows full asset versions below release selection n
 
     QString expectedBuildLine;
     QJsonArray assets;
-    SECTION("Repeated build versions are displayed once") {
-        assets = {asset("simpad-plus-9.2.0.127.wic.xz"),
-                  asset("simpad-plus-9.2.0.127.spu")};
+    SECTION("Repeated build versions are displayed once")
+    {
+        assets = {asset("simpad-plus-9.2.0.127.wic.xz"), asset("simpad-plus-9.2.0.127.spu")};
         expectedBuildLine = "[9.2.0.127]\n";
     }
-    SECTION("Distinct build versions are all displayed") {
-        assets = {asset("simpad-plus-9.2.0.128.wic.xz"),
-                  asset("simpad-plus-9.2.0.127.spu")};
+    SECTION("Distinct build versions are all displayed")
+    {
+        assets = {asset("simpad-plus-9.2.0.128.wic.xz"), asset("simpad-plus-9.2.0.127.spu")};
         expectedBuildLine = "[9.2.0.127, 9.2.0.128]\n";
     }
-    SECTION("Versions already in the title are not duplicated") {
+    SECTION("Versions already in the title are not duplicated")
+    {
         assets = {asset("simpad-plus-9.2.0.wic.xz")};
     }
-    SECTION("Unversioned assets leave the title unchanged") {
+    SECTION("Unversioned assets leave the title unchanged")
+    {
         assets = {asset("factory-image.wic.xz")};
     }
 
-    emit client.wicFilesReady(QJsonArray{releaseGroup("v9.2.0", "SimPad Plus 9.2.0", assets)});
+    emit client.wicFilesReady(QJsonArray {releaseGroup("v9.2.0", "SimPad Plus 9.2.0", assets)});
     mgr.setGitHubClient(nullptr);
     mgr.setSelectedSourceType("github-releases");
     const QJsonArray list = mgr.getMergedOsList();
     REQUIRE(list.size() == 1);
     REQUIRE(list[0].toObject()["name"].toString() == "SimPad Plus v9.2.0");
-    REQUIRE(list[0].toObject()["description"].toString()
-            == expectedBuildLine + "Laerdal-Medical/simpad - Release: SimPad Plus 9.2.0");
+    REQUIRE(list[0].toObject()["description"].toString() == expectedBuildLine + "Laerdal-Medical/simpad - Release: SimPad Plus 9.2.0");
     REQUIRE(list[0].toObject()["release_tag"].toString() == "v9.2.0");
     REQUIRE(list[0].toObject()["release_assets"].toArray() == assets);
 }
@@ -361,7 +382,7 @@ TEST_CASE("RepositoryManager de-duplicates CI artifacts across incremental batch
     mgr.setGitHubClient(&client);
     Spy ready(&mgr, &RepositoryManager::osListReady);
 
-    const QJsonArray first{
+    const QJsonArray first {
         artifactFile(1, "wic-simpad-plus-9.3.0", "main", "2025-02-01T00:00:00Z"),
         artifactFile(0, "invalid-id", "main", "2025-02-02T00:00:00Z"),
         artifactFile(2, "wic-simpad-plus2-9.3.1", "develop", "2025-02-03T00:00:00Z"),
@@ -370,11 +391,11 @@ TEST_CASE("RepositoryManager de-duplicates CI artifacts across incremental batch
     REQUIRE(ready.count == 1);
 
     // A page that only repeats known artifacts does not notify.
-    emit client.artifactWicFilesBatchReady(QJsonArray{first[0]});
+    emit client.artifactWicFilesBatchReady(QJsonArray {first[0]});
     REQUIRE(ready.count == 1);
 
     // The completion signal adds only what the batches missed.
-    emit client.artifactWicFilesReady(QJsonArray{first[0], first[2], artifactFile(3, "build-wic", "main", "2025-02-04T00:00:00Z")});
+    emit client.artifactWicFilesReady(QJsonArray {first[0], first[2], artifactFile(3, "build-wic", "main", "2025-02-04T00:00:00Z")});
 
     mgr.setGitHubClient(nullptr);
     mgr.setSelectedSourceType("github-ci");
@@ -406,10 +427,10 @@ TEST_CASE("RepositoryManager separates CDN, release and CI lists by selected sou
     GitHubClient client;
     mgr.setGitHubClient(&client);
 
-    const QJsonArray cdn{QJsonObject{{"name", "CDN v1.0.0"}}};
+    const QJsonArray cdn {QJsonObject {{"name", "CDN v1.0.0"}}};
     REQUIRE(QMetaObject::invokeMethod(&mgr, "onCdnListReady", Qt::DirectConnection, Q_ARG(QJsonArray, cdn)));
-    emit client.wicFilesReady(QJsonArray{releaseGroup("v2.0.0", "SimPad Plus 2.0.0", {asset("simpad-plus.wic")})});
-    emit client.artifactWicFilesBatchReady(QJsonArray{artifactFile(5, "simpad-plus-wic", "main", "2025-02-01T00:00:00Z")});
+    emit client.wicFilesReady(QJsonArray {releaseGroup("v2.0.0", "SimPad Plus 2.0.0", {asset("simpad-plus.wic")})});
+    emit client.artifactWicFilesBatchReady(QJsonArray {artifactFile(5, "simpad-plus-wic", "main", "2025-02-01T00:00:00Z")});
     mgr.setGitHubClient(nullptr);
 
     REQUIRE(mgr.selectedSourceType() == "cdn");
@@ -438,12 +459,12 @@ TEST_CASE("RepositoryManager aggregates branch and tag names without duplicates"
     mgr.setGitHubClient(&client);
     Spy changed(&mgr, &RepositoryManager::availableBranchesChanged);
 
-    emit client.branchesReady(QJsonArray{"main", "develop", "", "main"});
-    REQUIRE(mgr.availableBranches() == QStringList{"develop", "main"});
+    emit client.branchesReady(QJsonArray {"main", "develop", "", "main"});
+    REQUIRE(mgr.availableBranches() == QStringList {"develop", "main"});
     REQUIRE(changed.count == 1);
 
-    emit client.tagsReady(QJsonArray{"v1.0.0", "develop"});
-    REQUIRE(mgr.availableBranches() == QStringList{"develop", "main", "v1.0.0"});
+    emit client.tagsReady(QJsonArray {"v1.0.0", "develop"});
+    REQUIRE(mgr.availableBranches() == QStringList {"develop", "main", "v1.0.0"});
 }
 
 TEST_CASE("LaerdalCdnSource converts an updates manifest to OS list entries", "[cdn]")
@@ -461,12 +482,25 @@ TEST_CASE("LaerdalCdnSource converts an updates manifest to OS list entries", "[
     QJsonArray list;
     QString error;
     bool gotList = false;
-    QObject::connect(&source, &LaerdalCdnSource::listReady, &source, [&](const QJsonArray &l) { list = l; gotList = true; });
-    QObject::connect(&source, &LaerdalCdnSource::error, &source, [&](const QString &m) { error = m; });
+    QObject::connect(&source, &LaerdalCdnSource::listReady, &source,
+                     [&](const QJsonArray& l)
+                     {
+                         list = l;
+                         gotList = true;
+                     });
+    QObject::connect(&source, &LaerdalCdnSource::error, &source,
+                     [&](const QString& m)
+                     {
+                         error = m;
+                     });
 
     source.fetchList(QUrl::fromLocalFile(path));
     REQUIRE(source.isFetching());
-    REQUIRE(waitFor([&] { return gotList; }));
+    REQUIRE(waitFor(
+        [&]
+        {
+            return gotList;
+        }));
     REQUIRE(error.isEmpty());
     REQUIRE_FALSE(source.isFetching());
     REQUIRE(list.size() == 3);
@@ -486,7 +520,7 @@ TEST_CASE("LaerdalCdnSource converts an updates manifest to OS list entries", "[
     const QJsonObject b = list[1].toObject();
     REQUIRE(b["description"].toString() == "Info text");
     REQUIRE_FALSE(b.contains("release_notes"));
-    REQUIRE(strings(b["devices"].toArray()) == QStringList{"imx8"});
+    REQUIRE(strings(b["devices"].toArray()) == QStringList {"imx8"});
 
     const QJsonObject c = list[2].toObject();
     REQUIRE(c["name"].toString() == "Mystery v1.0.0");
@@ -498,17 +532,38 @@ TEST_CASE("LaerdalCdnSource reports malformed and missing manifests", "[cdn]")
     IsolatedSettings iso;
     QTemporaryDir files;
     QString path;
-    SECTION("not JSON") { path = writeFile(files, "images.json", "<html>"); }
-    SECTION("JSON array root") { path = writeFile(files, "images.json", "[]"); }
-    SECTION("missing file") { path = files.filePath("absent.json"); }
+    SECTION("not JSON")
+    {
+        path = writeFile(files, "images.json", "<html>");
+    }
+    SECTION("JSON array root")
+    {
+        path = writeFile(files, "images.json", "[]");
+    }
+    SECTION("missing file")
+    {
+        path = files.filePath("absent.json");
+    }
 
     LaerdalCdnSource source;
     int errors = 0;
     int lists = 0;
-    QObject::connect(&source, &LaerdalCdnSource::error, &source, [&](const QString &) { ++errors; });
-    QObject::connect(&source, &LaerdalCdnSource::listReady, &source, [&](const QJsonArray &) { ++lists; });
+    QObject::connect(&source, &LaerdalCdnSource::error, &source,
+                     [&](const QString&)
+                     {
+                         ++errors;
+                     });
+    QObject::connect(&source, &LaerdalCdnSource::listReady, &source,
+                     [&](const QJsonArray&)
+                     {
+                         ++lists;
+                     });
     source.fetchList(QUrl::fromLocalFile(path));
-    REQUIRE(waitFor([&] { return errors + lists > 0; }));
+    REQUIRE(waitFor(
+        [&]
+        {
+            return errors + lists > 0;
+        }));
     REQUIRE(errors == 1);
     REQUIRE(lists == 0);
     REQUIRE_FALSE(source.isFetching());
@@ -521,9 +576,18 @@ TEST_CASE("LaerdalCdnSource treats a manifest without updates as an empty list",
     LaerdalCdnSource source;
     bool done = false;
     qsizetype size = -1;
-    QObject::connect(&source, &LaerdalCdnSource::listReady, &source, [&](const QJsonArray &l) { size = l.size(); done = true; });
+    QObject::connect(&source, &LaerdalCdnSource::listReady, &source,
+                     [&](const QJsonArray& l)
+                     {
+                         size = l.size();
+                         done = true;
+                     });
     source.fetchList(QUrl::fromLocalFile(writeFile(files, "images.json", "{}")));
-    REQUIRE(waitFor([&] { return done; }));
+    REQUIRE(waitFor(
+        [&]
+        {
+            return done;
+        }));
     REQUIRE(size == 0);
 }
 
@@ -538,12 +602,29 @@ TEST_CASE("GitHubSource tags results with their origin and forwards client event
 
     QJsonArray releases, artifacts;
     QString url, file, error;
-    QObject::connect(&source, &GitHubSource::wicFilesReady, &source, [&](const QJsonArray &a) { releases = a; });
-    QObject::connect(&source, &GitHubSource::artifactWicFilesReady, &source, [&](const QJsonArray &a) { artifacts = a; });
-    QObject::connect(&source, &GitHubSource::fileReady, &source, [&](const QString &u, const QString &f) { url = u; file = f; });
-    QObject::connect(&source, &GitHubSource::error, &source, [&](const QString &m) { error = m; });
+    QObject::connect(&source, &GitHubSource::wicFilesReady, &source,
+                     [&](const QJsonArray& a)
+                     {
+                         releases = a;
+                     });
+    QObject::connect(&source, &GitHubSource::artifactWicFilesReady, &source,
+                     [&](const QJsonArray& a)
+                     {
+                         artifacts = a;
+                     });
+    QObject::connect(&source, &GitHubSource::fileReady, &source,
+                     [&](const QString& u, const QString& f)
+                     {
+                         url = u;
+                         file = f;
+                     });
+    QObject::connect(&source, &GitHubSource::error, &source,
+                     [&](const QString& m)
+                     {
+                         error = m;
+                     });
 
-    emit client.wicFilesReady(QJsonArray{QJsonObject{{"tag", "v1"}}});
+    emit client.wicFilesReady(QJsonArray {QJsonObject {{"tag", "v1"}}});
     REQUIRE(releases.size() == 1);
     const QJsonObject r = releases[0].toObject();
     REQUIRE(r["source_type"].toString() == "release");
@@ -552,7 +633,7 @@ TEST_CASE("GitHubSource tags results with their origin and forwards client event
     REQUIRE(r["source_repo"].toString() == "Laerdal-Medical/simpad");
     REQUIRE(source.getWicFiles().size() == 1);
 
-    emit client.artifactWicFilesReady(QJsonArray{QJsonObject{{"artifact_id", 1}}});
+    emit client.artifactWicFilesReady(QJsonArray {QJsonObject {{"artifact_id", 1}}});
     REQUIRE(artifacts[0].toObject()["source_type"].toString() == "artifact");
 
     emit client.fileUrlReady("https://x/y", "y.wic");
@@ -565,9 +646,9 @@ TEST_CASE("GitHubSource tags results with their origin and forwards client event
     GitHubClient replacement;
     source.setGitHubClient(&replacement);
     releases = QJsonArray();
-    emit client.wicFilesReady(QJsonArray{QJsonObject{{"tag", "stale"}}});
+    emit client.wicFilesReady(QJsonArray {QJsonObject {{"tag", "stale"}}});
     REQUIRE(releases.isEmpty());
-    emit replacement.wicFilesReady(QJsonArray{QJsonObject{{"tag", "fresh"}}});
+    emit replacement.wicFilesReady(QJsonArray {QJsonObject {{"tag", "fresh"}}});
     REQUIRE(releases.size() == 1);
 }
 
@@ -576,7 +657,11 @@ TEST_CASE("GitHubSource reports a missing client and skips disabled repositories
     IsolatedSettings iso;
     GitHubSource source("o", "r");
     QStringList errors;
-    QObject::connect(&source, &GitHubSource::error, &source, [&](const QString &m) { errors << m; });
+    QObject::connect(&source, &GitHubSource::error, &source,
+                     [&](const QString& m)
+                     {
+                         errors << m;
+                     });
 
     source.searchReleasesForWicFiles();
     source.searchArtifactsForWicFiles("main");

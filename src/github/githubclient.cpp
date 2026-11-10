@@ -4,23 +4,26 @@
  */
 
 #include "githubclient.h"
-#include "../artifact_cache_name.h"
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QDebug>
-#include <QDateTime>
-#include <QFile>
-#include <QFileInfo>
-#include <QStandardPaths>
-#include <QDir>
-#include <QSettings>
-#include <QUrlQuery>
+
 #include <archive.h>
 #include <archive_entry.h>
 
-GitHubClient::GitHubClient(QObject *parent)
-    : QObject(parent)
+#include <QDateTime>
+#include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QUrlQuery>
+
+#include "../artifact_cache_name.h"
+
+GitHubClient::GitHubClient(QObject* parent):
+    QObject(parent)
 {
     loadPartialArtifactDownload();
 }
@@ -29,7 +32,8 @@ GitHubClient::~GitHubClient()
 {
     // Cancel any pending requests - disconnect signals first to prevent
     // handlers from firing on already-destroyed QML objects
-    for (auto reply : _pendingRequests.keys()) {
+    for (auto reply : _pendingRequests.keys())
+    {
         reply->disconnect();
         reply->abort();
         reply->deleteLater();
@@ -37,7 +41,8 @@ GitHubClient::~GitHubClient()
     _pendingRequests.clear();
 
     // Cancel active inspection reply - disconnect before abort to prevent segfault
-    if (_activeInspectionReply) {
+    if (_activeInspectionReply)
+    {
         _activeInspectionReply->disconnect();
         _activeInspectionReply->abort();
         _activeInspectionReply->deleteLater();
@@ -45,7 +50,8 @@ GitHubClient::~GitHubClient()
     }
 
     // Clean up file handle
-    if (_activeInspectionFile) {
+    if (_activeInspectionFile)
+    {
         _activeInspectionFile->close();
         delete _activeInspectionFile;
         _activeInspectionFile = nullptr;
@@ -57,27 +63,32 @@ void GitHubClient::cancelArtifactInspection(bool preserveForResume)
     // Set flag first — prevents the redirect handler from starting a new download
     _inspectionCancelled = true;
 
-    if (_activeInspectionReply) {
+    if (_activeInspectionReply)
+    {
         qDebug() << "GitHubClient: Cancelling artifact inspection download, preserveForResume:" << preserveForResume;
 
         // Close and clean up the file handle
-        if (_activeInspectionFile) {
+        if (_activeInspectionFile)
+        {
             _activeInspectionFile->flush();
             _activeInspectionFile->close();
             delete _activeInspectionFile;
             _activeInspectionFile = nullptr;
         }
 
-        if (preserveForResume && _activeInspectionBytesWritten > 0) {
+        if (preserveForResume && _activeInspectionBytesWritten > 0)
+        {
             // Save partial download state for resume
             _partialArtifactDownload.bytesDownloaded = _activeInspectionBytesWritten;
             _partialArtifactDownload.isValid = true;
             savePartialArtifactDownload();
-            qDebug() << "GitHubClient: Preserved partial artifact download:"
-                     << _activeInspectionBytesWritten << "bytes";
-        } else {
+            qDebug() << "GitHubClient: Preserved partial artifact download:" << _activeInspectionBytesWritten << "bytes";
+        }
+        else
+        {
             // Delete the partial file
-            if (!_activeInspectionPartialPath.isEmpty() && QFile::exists(_activeInspectionPartialPath)) {
+            if (!_activeInspectionPartialPath.isEmpty() && QFile::exists(_activeInspectionPartialPath))
+            {
                 qDebug() << "GitHubClient: Deleting partial cache file:" << _activeInspectionPartialPath;
                 QFile::remove(_activeInspectionPartialPath);
             }
@@ -93,7 +104,9 @@ void GitHubClient::cancelArtifactInspection(bool preserveForResume)
         _activeInspectionReply->abort();
         // Don't deleteLater here - the finished signal handler does that
         // Don't set to nullptr here - the finished handler does that
-    } else {
+    }
+    else
+    {
         qDebug() << "GitHubClient: cancelArtifactInspection called but no active reply"
                  << "(may be between redirect and download start)";
     }
@@ -101,209 +114,219 @@ void GitHubClient::cancelArtifactInspection(bool preserveForResume)
     emit artifactInspectionCancelled();
 }
 
-void GitHubClient::setAuthToken(const QString &token)
+void GitHubClient::setAuthToken(const QString& token)
 {
     _authToken = token;
 }
 
-void GitHubClient::fetchReleases(const QString &owner, const QString &repo)
+void GitHubClient::fetchReleases(const QString& owner, const QString& repo)
 {
-    QString urlStr = QString("%1/repos/%2/%3/releases")
-                         .arg(API_BASE_URL, owner, repo);
+    QString urlStr = QString("%1/repos/%2/%3/releases").arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestReleases;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Fetching releases for" << owner << "/" << repo;
 }
 
-void GitHubClient::fetchBranchFile(const QString &owner, const QString &repo,
-                                    const QString &branch, const QString &path)
+void GitHubClient::fetchBranchFile(const QString& owner, const QString& repo, const QString& branch, const QString& path)
 {
     // Use raw.githubusercontent.com for direct file access
-    QString urlStr = QString("%1/%2/%3/%4/%5")
-                         .arg(RAW_BASE_URL, owner, repo, branch, path);
+    QString urlStr = QString("%1/%2/%3/%4/%5").arg(RAW_BASE_URL, owner, repo, branch, path);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestFile;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, path]() {
-        reply->deleteLater();
-        _pendingRequests.remove(reply);
-        _requestMetadata.remove(reply);
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, path]()
+            {
+                reply->deleteLater();
+                _pendingRequests.remove(reply);
+                _requestMetadata.remove(reply);
 
-        if (reply->error() != QNetworkReply::NoError) {
-            emit error(tr("Failed to fetch file: %1").arg(reply->errorString()));
-            return;
-        }
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    emit error(tr("Failed to fetch file: %1").arg(reply->errorString()));
+                    return;
+                }
 
-        checkRateLimitHeaders(reply);
+                checkRateLimitHeaders(reply);
 
-        // For raw file downloads, the URL is the download URL
-        QString downloadUrl = reply->url().toString();
-        QString fileName = path.split('/').last();
+                // For raw file downloads, the URL is the download URL
+                QString downloadUrl = reply->url().toString();
+                QString fileName = path.split('/').last();
 
-        emit fileUrlReady(downloadUrl, fileName);
-    });
+                emit fileUrlReady(downloadUrl, fileName);
+            });
 
     qDebug() << "GitHubClient: Fetching file" << path << "from branch" << branch;
 }
 
-void GitHubClient::fetchTagFile(const QString &owner, const QString &repo,
-                                 const QString &tag, const QString &path)
+void GitHubClient::fetchTagFile(const QString& owner, const QString& repo, const QString& tag, const QString& path)
 {
     // Tags work the same as branches for raw file access
     fetchBranchFile(owner, repo, tag, path);
 }
 
-void GitHubClient::fetchRepoInfo(const QString &owner, const QString &repo)
+void GitHubClient::fetchRepoInfo(const QString& owner, const QString& repo)
 {
-    QString urlStr = QString("%1/repos/%2/%3")
-                         .arg(API_BASE_URL, owner, repo);
+    QString urlStr = QString("%1/repos/%2/%3").arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestRepoInfo;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Fetching repo info for" << owner << "/" << repo;
 }
 
-void GitHubClient::fetchBranches(const QString &owner, const QString &repo)
+void GitHubClient::fetchBranches(const QString& owner, const QString& repo)
 {
     // Use per_page=100 to get more branches (GitHub default is 30)
     // This helps avoid missing branches like 'main' when repos have many branches
-    QString urlStr = QString("%1/repos/%2/%3/branches?per_page=100")
-                         .arg(API_BASE_URL, owner, repo);
+    QString urlStr = QString("%1/repos/%2/%3/branches?per_page=100").arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestBranches;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Fetching branches for" << owner << "/" << repo;
 }
 
-void GitHubClient::fetchTags(const QString &owner, const QString &repo)
+void GitHubClient::fetchTags(const QString& owner, const QString& repo)
 {
     // Use per_page=100 to get more tags (GitHub default is 30)
-    QString urlStr = QString("%1/repos/%2/%3/tags?per_page=100")
-                         .arg(API_BASE_URL, owner, repo);
+    QString urlStr = QString("%1/repos/%2/%3/tags?per_page=100").arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestTags;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Fetching tags for" << owner << "/" << repo;
 }
 
-void GitHubClient::searchWicFilesInReleases(const QString &owner, const QString &repo)
+void GitHubClient::searchWicFilesInReleases(const QString& owner, const QString& repo)
 {
-    QString urlStr = QString("%1/repos/%2/%3/releases")
-                         .arg(API_BASE_URL, owner, repo);
+    QString urlStr = QString("%1/repos/%2/%3/releases").arg(API_BASE_URL, owner, repo);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestWicSearch;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Searching WIC files in" << owner << "/" << repo;
 }
 
-QString GitHubClient::getAssetDownloadUrl(const QString &owner, const QString &repo, qint64 assetId)
+QString GitHubClient::getAssetDownloadUrl(const QString& owner, const QString& repo, qint64 assetId)
 {
     // For private repos, we need to use the API endpoint with authentication
     // For public repos, the browser_download_url works directly
-    QString urlStr = QString("%1/repos/%2/%3/releases/assets/%4")
-                         .arg(API_BASE_URL, owner, repo, QString::number(assetId));
+    QString urlStr = QString("%1/repos/%2/%3/releases/assets/%4").arg(API_BASE_URL, owner, repo, QString::number(assetId));
 
     return urlStr;
 }
 
-void GitHubClient::fetchWorkflowRuns(const QString &owner, const QString &repo,
-                                      const QString &branch, const QString &status)
+void GitHubClient::fetchWorkflowRuns(const QString& owner, const QString& repo, const QString& branch, const QString& status)
 {
-    QString urlStr = QString("%1/repos/%2/%3/actions/runs?per_page=20")
-                         .arg(API_BASE_URL, owner, repo);
+    QString urlStr = QString("%1/repos/%2/%3/actions/runs?per_page=20").arg(API_BASE_URL, owner, repo);
 
-    if (!branch.isEmpty()) {
+    if (!branch.isEmpty())
+    {
         urlStr += QString("&branch=%1").arg(branch);
     }
-    if (!status.isEmpty()) {
+    if (!status.isEmpty())
+    {
         urlStr += QString("&status=%1").arg(status);
     }
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestWorkflowRuns;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Fetching workflow runs for" << owner << "/" << repo;
 }
 
-void GitHubClient::fetchWorkflowArtifacts(const QString &owner, const QString &repo, qint64 runId)
+void GitHubClient::fetchWorkflowArtifacts(const QString& owner, const QString& repo, qint64 runId)
 {
-    QString urlStr = QString("%1/repos/%2/%3/actions/runs/%4/artifacts")
-                         .arg(API_BASE_URL, owner, repo, QString::number(runId));
+    QString urlStr = QString("%1/repos/%2/%3/actions/runs/%4/artifacts").arg(API_BASE_URL, owner, repo, QString::number(runId));
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestWorkflowArtifacts;
     _requestMetadata[reply] = qMakePair(owner, repo);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 
     qDebug() << "GitHubClient: Fetching artifacts for run" << runId;
 }
 
-void GitHubClient::searchWicFilesInArtifacts(const QString &owner, const QString &repo,
-                                              const QString &branch)
+void GitHubClient::searchWicFilesInArtifacts(const QString& owner, const QString& repo, const QString& branch)
 {
     const QString repoKey = QString("%1/%2").arg(owner, repo);
     const QString key = QString("%1#%2").arg(repoKey).arg(++_artifactSearchSequence);
-    for (auto it = _artifactSearchStates.begin(); it != _artifactSearchStates.end();) {
-        if (it->owner == owner && it->repo == repo) {
+    for (auto it = _artifactSearchStates.begin(); it != _artifactSearchStates.end();)
+    {
+        if (it->owner == owner && it->repo == repo)
+        {
             it = _artifactSearchStates.erase(it);
-        } else {
+        }
+        else
+        {
             ++it;
         }
     }
@@ -319,77 +342,84 @@ void GitHubClient::searchWicFilesInArtifacts(const QString &owner, const QString
     qDebug() << "GitHubClient: Searching WIC artifacts in" << owner << "/" << repo;
 }
 
-void GitHubClient::fetchArtifactWorkflowRunsPage(const QString &searchKey, int page)
+void GitHubClient::fetchArtifactWorkflowRunsPage(const QString& searchKey, int page)
 {
     const auto state = _artifactSearchStates.constFind(searchKey);
-    if (state == _artifactSearchStates.cend()) {
+    if (state == _artifactSearchStates.cend())
+    {
         return;
     }
 
-    QUrl url(QString("%1/repos/%2/%3/actions/runs")
-                 .arg(API_BASE_URL, state->owner, state->repo));
+    QUrl url(QString("%1/repos/%2/%3/actions/runs").arg(API_BASE_URL, state->owner, state->repo));
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("per_page"), QStringLiteral("30"));
     query.addQueryItem(QStringLiteral("page"), QString::number(page));
     query.addQueryItem(QStringLiteral("status"), QStringLiteral("success"));
-    if (!state->branch.isEmpty()) {
+    if (!state->branch.isEmpty())
+    {
         query.addQueryItem(QStringLiteral("branch"), state->branch);
     }
     url.setQuery(query);
 
     QNetworkRequest request = createAuthenticatedRequest(url);
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestArtifactWicSearch;
     _requestMetadata[reply] = qMakePair(state->owner, state->repo);
     _artifactSearchKeyByReply[reply] = searchKey;
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 }
 
-void GitHubClient::fetchArtifactRunFiles(const QString &searchKey, const QJsonObject &run)
+void GitHubClient::fetchArtifactRunFiles(const QString& searchKey, const QJsonObject& run)
 {
     auto state = _artifactSearchStates.find(searchKey);
-    if (state == _artifactSearchStates.cend()) {
+    if (state == _artifactSearchStates.cend())
+    {
         return;
     }
 
     const qint64 runId = run["id"].toVariant().toLongLong();
-    if (runId <= 0) {
+    if (runId <= 0)
+    {
         return;
     }
 
     const QString runBranch = run["head_branch"].toString();
     const QString runCreatedAt = run["created_at"].toString();
-    QUrl url(QString("%1/repos/%2/%3/actions/runs/%4/artifacts")
-                 .arg(API_BASE_URL, state->owner, state->repo, QString::number(runId)));
+    QUrl url(QString("%1/repos/%2/%3/actions/runs/%4/artifacts").arg(API_BASE_URL, state->owner, state->repo, QString::number(runId)));
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("per_page"), QStringLiteral("100"));
     url.setQuery(query);
 
-    QNetworkReply *reply = _networkManager.get(createAuthenticatedRequest(url));
+    QNetworkReply* reply = _networkManager.get(createAuthenticatedRequest(url));
     _pendingRequests[reply] = RequestArtifactRunWicSearch;
     _requestMetadata[reply] = qMakePair(state->owner, state->repo);
     _artifactSearchKeyByReply[reply] = searchKey;
     _artifactRunInfo[reply] = {runBranch, runCreatedAt, runId};
     ++state->pendingArtifactRequests;
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 }
 
-void GitHubClient::advanceArtifactSearch(const QString &key)
+void GitHubClient::advanceArtifactSearch(const QString& key)
 {
     auto it = _artifactSearchStates.find(key);
-    if (it == _artifactSearchStates.end()
-        || it->pendingWorkflowPages > 0 || it->pendingArtifactRequests > 0) {
+    if (it == _artifactSearchStates.end() || it->pendingWorkflowPages > 0 || it->pendingArtifactRequests > 0)
+    {
         return;
     }
 
-    if (it->nextWorkflowPage <= it->totalWorkflowPages) {
+    if (it->nextWorkflowPage <= it->totalWorkflowPages)
+    {
         const int nextPage = it->nextWorkflowPage++;
         ++it->pendingWorkflowPages;
         fetchArtifactWorkflowRunsPage(key, nextPage);
@@ -401,87 +431,93 @@ void GitHubClient::advanceArtifactSearch(const QString &key)
     emit artifactWicFilesReady(artifacts);
 }
 
-void GitHubClient::failArtifactSearch(const QString &key)
+void GitHubClient::failArtifactSearch(const QString& key)
 {
-    if (_artifactSearchStates.remove(key) > 0) {
+    if (_artifactSearchStates.remove(key) > 0)
+    {
         qWarning() << "GitHubClient: Stopping artifact search after request failure:" << key;
     }
 }
 
-QString GitHubClient::getArtifactDownloadUrl(const QString &owner, const QString &repo, qint64 artifactId)
+QString GitHubClient::getArtifactDownloadUrl(const QString& owner, const QString& repo, qint64 artifactId)
 {
     // Artifact download requires authentication
-    QString urlStr = QString("%1/repos/%2/%3/actions/artifacts/%4/zip")
-                         .arg(API_BASE_URL, owner, repo, QString::number(artifactId));
+    QString urlStr = QString("%1/repos/%2/%3/actions/artifacts/%4/zip").arg(API_BASE_URL, owner, repo, QString::number(artifactId));
 
     return urlStr;
 }
 
-void GitHubClient::downloadArtifact(const QString &owner, const QString &repo,
-                                     qint64 artifactId, const QString &destinationPath)
+void GitHubClient::downloadArtifact(const QString& owner, const QString& repo, qint64 artifactId, const QString& destinationPath)
 {
     QString urlStr = getArtifactDownloadUrl(owner, repo, artifactId);
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
 
     // Don't auto-follow redirects - we need to manually handle them to add auth headers
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::ManualRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
 
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
     _activeInspectionReply = reply;
 
     qDebug() << "GitHubClient: Starting artifact download from" << urlStr << "to" << destinationPath;
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, destinationPath]() {
-        _activeInspectionReply = nullptr;
-        reply->deleteLater();
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, destinationPath]()
+            {
+                _activeInspectionReply = nullptr;
+                reply->deleteLater();
 
-        // Check for redirect (302)
-        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (statusCode == 302 || statusCode == 301 || statusCode == 307 || statusCode == 308) {
-            QUrl redirectUrl = reply->header(QNetworkRequest::LocationHeader).toUrl();
-            if (redirectUrl.isValid()) {
-                qDebug() << "GitHubClient: Following redirect to" << redirectUrl.toString();
-                downloadArtifactFromUrl(redirectUrl, destinationPath);
-                return;
-            }
-        }
+                // Check for redirect (302)
+                int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                if (statusCode == 302 || statusCode == 301 || statusCode == 307 || statusCode == 308)
+                {
+                    QUrl redirectUrl = reply->header(QNetworkRequest::LocationHeader).toUrl();
+                    if (redirectUrl.isValid())
+                    {
+                        qDebug() << "GitHubClient: Following redirect to" << redirectUrl.toString();
+                        downloadArtifactFromUrl(redirectUrl, destinationPath);
+                        return;
+                    }
+                }
 
-        if (reply->error() != QNetworkReply::NoError) {
-            qWarning() << "GitHubClient: Artifact download failed:" << reply->errorString();
-            emit error(tr("Failed to download artifact: %1").arg(reply->errorString()));
-            return;
-        }
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    qWarning() << "GitHubClient: Artifact download failed:" << reply->errorString();
+                    emit error(tr("Failed to download artifact: %1").arg(reply->errorString()));
+                    return;
+                }
 
-        // Save the downloaded data to the destination file
-        QFile file(destinationPath);
-        if (!file.open(QIODevice::WriteOnly)) {
-            qWarning() << "GitHubClient: Failed to open destination file:" << destinationPath;
-            emit error(tr("Failed to save artifact: %1").arg(file.errorString()));
-            return;
-        }
+                // Save the downloaded data to the destination file
+                QFile file(destinationPath);
+                if (!file.open(QIODevice::WriteOnly))
+                {
+                    qWarning() << "GitHubClient: Failed to open destination file:" << destinationPath;
+                    emit error(tr("Failed to save artifact: %1").arg(file.errorString()));
+                    return;
+                }
 
-        QByteArray data = reply->readAll();
-        file.write(data);
-        file.close();
+                QByteArray data = reply->readAll();
+                file.write(data);
+                file.close();
 
-        qDebug() << "GitHubClient: Artifact downloaded successfully to" << destinationPath
-                 << "size:" << data.size();
+                qDebug() << "GitHubClient: Artifact downloaded successfully to" << destinationPath << "size:" << data.size();
 
-        emit artifactDownloadComplete(destinationPath);
-    });
+                emit artifactDownloadComplete(destinationPath);
+            });
 }
 
-void GitHubClient::downloadArtifactFromUrl(const QUrl &url, const QString &destinationPath)
+void GitHubClient::downloadArtifactFromUrl(const QUrl& url, const QString& destinationPath)
 {
     // Check if this is a GitHub URL or an external URL (like Azure blob storage)
     // External URLs (like Azure) use SAS tokens in the query string and don't need/want our GitHub auth header
     bool isGitHubUrl = url.host().endsWith("github.com") || url.host().endsWith("githubusercontent.com");
 
     QNetworkRequest request;
-    if (isGitHubUrl) {
+    if (isGitHubUrl)
+    {
         request = createAuthenticatedRequest(url);
-    } else {
+    }
+    else
+    {
         // External URL (Azure blob, etc) - don't add auth header, the URL has its own auth
         request.setUrl(url);
         request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
@@ -490,48 +526,51 @@ void GitHubClient::downloadArtifactFromUrl(const QUrl &url, const QString &desti
     request.setTransferTimeout(0);
 
     // Allow redirects from here (the blob storage URL shouldn't redirect further)
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     qDebug() << "GitHubClient: Downloading artifact from redirect URL (isGitHubUrl:" << isGitHubUrl << ")";
 
-    connect(reply, &QNetworkReply::downloadProgress, this, [this](qint64 bytesReceived, qint64 bytesTotal) {
-        emit artifactDownloadProgress(bytesReceived, bytesTotal);
-    });
+    connect(reply, &QNetworkReply::downloadProgress, this,
+            [this](qint64 bytesReceived, qint64 bytesTotal)
+            {
+                emit artifactDownloadProgress(bytesReceived, bytesTotal);
+            });
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, destinationPath]() {
-        reply->deleteLater();
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, destinationPath]()
+            {
+                reply->deleteLater();
 
-        if (reply->error() != QNetworkReply::NoError) {
-            qWarning() << "GitHubClient: Artifact download from redirect failed:" << reply->errorString();
-            emit error(tr("Failed to download artifact: %1").arg(reply->errorString()));
-            return;
-        }
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    qWarning() << "GitHubClient: Artifact download from redirect failed:" << reply->errorString();
+                    emit error(tr("Failed to download artifact: %1").arg(reply->errorString()));
+                    return;
+                }
 
-        // Save the downloaded data to the destination file
-        QFile file(destinationPath);
-        if (!file.open(QIODevice::WriteOnly)) {
-            qWarning() << "GitHubClient: Failed to open destination file:" << destinationPath;
-            emit error(tr("Failed to save artifact: %1").arg(file.errorString()));
-            return;
-        }
+                // Save the downloaded data to the destination file
+                QFile file(destinationPath);
+                if (!file.open(QIODevice::WriteOnly))
+                {
+                    qWarning() << "GitHubClient: Failed to open destination file:" << destinationPath;
+                    emit error(tr("Failed to save artifact: %1").arg(file.errorString()));
+                    return;
+                }
 
-        QByteArray data = reply->readAll();
-        file.write(data);
-        file.close();
+                QByteArray data = reply->readAll();
+                file.write(data);
+                file.close();
 
-        qDebug() << "GitHubClient: Artifact downloaded successfully to" << destinationPath
-                 << "size:" << data.size();
+                qDebug() << "GitHubClient: Artifact downloaded successfully to" << destinationPath << "size:" << data.size();
 
-        emit artifactDownloadComplete(destinationPath);
-    });
+                emit artifactDownloadComplete(destinationPath);
+            });
 }
 
-void GitHubClient::inspectArtifactContents(const QString &owner, const QString &repo,
-                                            qint64 artifactId, const QString &artifactName,
-                                            const QString &branch)
+void GitHubClient::inspectArtifactContents(const QString& owner, const QString& repo, qint64 artifactId, const QString& artifactName,
+                                           const QString& branch)
 {
     qDebug() << "GitHubClient: Inspecting artifact contents for" << artifactName << "id:" << artifactId;
 
@@ -544,14 +583,18 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
     QString zipPath = artifactCacheDir + "/" + artifactCacheFileName(artifactId, artifactName);
 
     // Check if artifact is already cached and valid
-    if (QFile::exists(zipPath)) {
+    if (QFile::exists(zipPath))
+    {
         qDebug() << "GitHubClient: Checking cached artifact:" << zipPath;
         QJsonArray imageFiles = listImageFilesInZip(zipPath);
-        if (!imageFiles.isEmpty()) {
+        if (!imageFiles.isEmpty())
+        {
             qDebug() << "GitHubClient: Using valid cached artifact:" << zipPath;
             emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
             return;
-        } else {
+        }
+        else
+        {
             // Cached file is invalid or corrupt - delete it and re-download
             qDebug() << "GitHubClient: Cached artifact is invalid, deleting:" << zipPath;
             QFile::remove(zipPath);
@@ -563,63 +606,69 @@ void GitHubClient::inspectArtifactContents(const QString &owner, const QString &
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
 
     // Don't auto-follow redirects - we need to manually handle them to add auth headers
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::ManualRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
 
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
     _activeInspectionReply = reply;
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
-        _activeInspectionReply = nullptr;
-        reply->deleteLater();
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]()
+            {
+                _activeInspectionReply = nullptr;
+                reply->deleteLater();
 
-        // Don't start the redirect download if inspection was cancelled
-        if (_inspectionCancelled) {
-            qDebug() << "GitHubClient: Inspection cancelled, not following redirect";
-            return;
-        }
+                // Don't start the redirect download if inspection was cancelled
+                if (_inspectionCancelled)
+                {
+                    qDebug() << "GitHubClient: Inspection cancelled, not following redirect";
+                    return;
+                }
 
-        // Check for redirect (302)
-        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (statusCode == 302 || statusCode == 301 || statusCode == 307 || statusCode == 308) {
-            QUrl redirectUrl = reply->header(QNetworkRequest::LocationHeader).toUrl();
-            if (redirectUrl.isValid()) {
-                qDebug() << "GitHubClient: Following redirect for artifact inspection";
-                inspectArtifactFromUrl(redirectUrl, owner, repo, artifactId, artifactName, branch, zipPath);
-                return;
-            }
-        }
+                // Check for redirect (302)
+                int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                if (statusCode == 302 || statusCode == 301 || statusCode == 307 || statusCode == 308)
+                {
+                    QUrl redirectUrl = reply->header(QNetworkRequest::LocationHeader).toUrl();
+                    if (redirectUrl.isValid())
+                    {
+                        qDebug() << "GitHubClient: Following redirect for artifact inspection";
+                        inspectArtifactFromUrl(redirectUrl, owner, repo, artifactId, artifactName, branch, zipPath);
+                        return;
+                    }
+                }
 
-        if (reply->error() != QNetworkReply::NoError) {
-            qWarning() << "GitHubClient: Artifact inspection download failed:" << reply->errorString();
-            emit error(tr("Failed to inspect artifact: %1").arg(reply->errorString()));
-            return;
-        }
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    qWarning() << "GitHubClient: Artifact inspection download failed:" << reply->errorString();
+                    emit error(tr("Failed to inspect artifact: %1").arg(reply->errorString()));
+                    return;
+                }
 
-        // Save and inspect
-        QFile file(zipPath);
-        if (!file.open(QIODevice::WriteOnly)) {
-            emit error(tr("Failed to save artifact for inspection: %1").arg(file.errorString()));
-            return;
-        }
+                // Save and inspect
+                QFile file(zipPath);
+                if (!file.open(QIODevice::WriteOnly))
+                {
+                    emit error(tr("Failed to save artifact for inspection: %1").arg(file.errorString()));
+                    return;
+                }
 
-        QByteArray data = reply->readAll();
-        file.write(data);
-        file.close();
+                QByteArray data = reply->readAll();
+                file.write(data);
+                file.close();
 
-        qDebug() << "GitHubClient: Artifact cached to:" << zipPath;
+                qDebug() << "GitHubClient: Artifact cached to:" << zipPath;
 
-        // Now scan the ZIP for all image files (WIC + SPU)
-        QJsonArray imageFiles = listImageFilesInZip(zipPath);
-        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
-    });
+                // Now scan the ZIP for all image files (WIC + SPU)
+                QJsonArray imageFiles = listImageFilesInZip(zipPath);
+                emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
+            });
 }
 
-void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner, const QString &repo,
-                                           qint64 artifactId, const QString &artifactName,
-                                           const QString &branch, const QString &zipPath)
+void GitHubClient::inspectArtifactFromUrl(const QUrl& url, const QString& owner, const QString& repo, qint64 artifactId,
+                                          const QString& artifactName, const QString& branch, const QString& zipPath)
 {
-    if (_inspectionCancelled) {
+    if (_inspectionCancelled)
+    {
         qDebug() << "GitHubClient: inspectArtifactFromUrl skipped - inspection was cancelled";
         return;
     }
@@ -628,9 +677,9 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
 
     // Check if we're resuming a partial download
     qint64 startOffset = 0;
-    if (_partialArtifactDownload.isValid &&
-        _partialArtifactDownload.artifactId == artifactId &&
-        QFile::exists(_partialArtifactDownload.partialPath)) {
+    if (_partialArtifactDownload.isValid && _partialArtifactDownload.artifactId == artifactId &&
+        QFile::exists(_partialArtifactDownload.partialPath))
+    {
         startOffset = _partialArtifactDownload.bytesDownloaded;
         partialPath = _partialArtifactDownload.partialPath;
         qDebug() << "GitHubClient: Resuming artifact download from offset:" << startOffset;
@@ -640,9 +689,12 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
     bool isGitHubUrl = url.host().endsWith("github.com") || url.host().endsWith("githubusercontent.com");
 
     QNetworkRequest request;
-    if (isGitHubUrl) {
+    if (isGitHubUrl)
+    {
         request = createAuthenticatedRequest(url);
-    } else {
+    }
+    else
+    {
         request.setUrl(url);
         request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
     }
@@ -650,12 +702,12 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
     request.setTransferTimeout(0);
 
     // Add Range header for resume support
-    if (startOffset > 0) {
+    if (startOffset > 0)
+    {
         request.setRawHeader("Range", QString("bytes=%1-").arg(startOffset).toUtf8());
     }
 
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
     // Store metadata for partial download tracking
     _partialArtifactDownload.partialPath = partialPath;
@@ -669,9 +721,9 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
 
     // Open the file for writing (append if resuming)
     _activeInspectionFile = new QFile(partialPath);
-    QIODevice::OpenMode mode = startOffset > 0 ? (QIODevice::WriteOnly | QIODevice::Append)
-                                                : QIODevice::WriteOnly;
-    if (!_activeInspectionFile->open(mode)) {
+    QIODevice::OpenMode mode = startOffset > 0 ? (QIODevice::WriteOnly | QIODevice::Append) : QIODevice::WriteOnly;
+    if (!_activeInspectionFile->open(mode))
+    {
         emit error(tr("Failed to open file for writing: %1").arg(_activeInspectionFile->errorString()));
         delete _activeInspectionFile;
         _activeInspectionFile = nullptr;
@@ -679,97 +731,112 @@ void GitHubClient::inspectArtifactFromUrl(const QUrl &url, const QString &owner,
     }
     _activeInspectionBytesWritten = startOffset;
 
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
     _activeInspectionReply = reply;
     _activeInspectionZipPath = zipPath;
     _activeInspectionPartialPath = partialPath;
 
     // Write data incrementally as it arrives
-    connect(reply, &QNetworkReply::readyRead, this, [this, reply]() {
-        if (this->_activeInspectionFile && this->_activeInspectionFile->isOpen()) {
-            QByteArray data = reply->readAll();
-            qint64 written = this->_activeInspectionFile->write(data);
-            if (written > 0) {
-                this->_activeInspectionBytesWritten += written;
-            }
-        }
-    });
+    connect(reply, &QNetworkReply::readyRead, this,
+            [this, reply]()
+            {
+                if (this->_activeInspectionFile && this->_activeInspectionFile->isOpen())
+                {
+                    QByteArray data = reply->readAll();
+                    qint64 written = this->_activeInspectionFile->write(data);
+                    if (written > 0)
+                    {
+                        this->_activeInspectionBytesWritten += written;
+                    }
+                }
+            });
 
-    connect(reply, &QNetworkReply::downloadProgress, this, [this, startOffset](qint64 bytesReceived, qint64 bytesTotal) {
-        // Adjust for resume offset
-        qint64 totalReceived = startOffset + bytesReceived;
-        qint64 totalSize = (bytesTotal > 0) ? (startOffset + bytesTotal) : 0;
+    connect(reply, &QNetworkReply::downloadProgress, this,
+            [this, startOffset](qint64 bytesReceived, qint64 bytesTotal)
+            {
+                // Adjust for resume offset
+                qint64 totalReceived = startOffset + bytesReceived;
+                qint64 totalSize = (bytesTotal > 0) ? (startOffset + bytesTotal) : 0;
 
-        // Store total size for partial download info
-        if (totalSize > 0) {
-            _partialArtifactDownload.totalSize = totalSize;
-        }
+                // Store total size for partial download info
+                if (totalSize > 0)
+                {
+                    _partialArtifactDownload.totalSize = totalSize;
+                }
 
-        emit artifactDownloadProgress(totalReceived, totalSize);
-    });
+                emit artifactDownloadProgress(totalReceived, totalSize);
+            });
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath, partialPath]() {
-        this->_activeInspectionReply = nullptr;
-        this->_activeInspectionZipPath.clear();
-        this->_activeInspectionPartialPath.clear();
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, owner, repo, artifactId, artifactName, branch, zipPath, partialPath]()
+            {
+                this->_activeInspectionReply = nullptr;
+                this->_activeInspectionZipPath.clear();
+                this->_activeInspectionPartialPath.clear();
 
-        // Close and clean up the file
-        if (this->_activeInspectionFile) {
-            this->_activeInspectionFile->flush();
-            this->_activeInspectionFile->close();
-            delete this->_activeInspectionFile;
-            this->_activeInspectionFile = nullptr;
-        }
+                // Close and clean up the file
+                if (this->_activeInspectionFile)
+                {
+                    this->_activeInspectionFile->flush();
+                    this->_activeInspectionFile->close();
+                    delete this->_activeInspectionFile;
+                    this->_activeInspectionFile = nullptr;
+                }
 
-        reply->deleteLater();
+                reply->deleteLater();
 
-        // Check if cancelled (OperationCanceledError)
-        if (reply->error() == QNetworkReply::OperationCanceledError) {
-            qDebug() << "GitHubClient: Artifact inspection cancelled by user";
-            return;
-        }
+                // Check if cancelled (OperationCanceledError)
+                if (reply->error() == QNetworkReply::OperationCanceledError)
+                {
+                    qDebug() << "GitHubClient: Artifact inspection cancelled by user";
+                    return;
+                }
 
-        if (reply->error() != QNetworkReply::NoError) {
-            emit error(tr("Failed to download artifact for inspection: %1").arg(reply->errorString()));
-            // Clean up partial file on error
-            QFile::remove(partialPath);
-            clearPartialArtifactDownload();
-            return;
-        }
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    emit error(tr("Failed to download artifact for inspection: %1").arg(reply->errorString()));
+                    // Clean up partial file on error
+                    QFile::remove(partialPath);
+                    clearPartialArtifactDownload();
+                    return;
+                }
 
-        // Rename partial file to final path
-        if (QFile::exists(zipPath)) {
-            QFile::remove(zipPath);
-        }
-        if (!QFile::rename(partialPath, zipPath)) {
-            emit error(tr("Failed to finalize artifact download"));
-            return;
-        }
+                // Rename partial file to final path
+                if (QFile::exists(zipPath))
+                {
+                    QFile::remove(zipPath);
+                }
+                if (!QFile::rename(partialPath, zipPath))
+                {
+                    emit error(tr("Failed to finalize artifact download"));
+                    return;
+                }
 
-        qDebug() << "GitHubClient: Artifact downloaded for inspection, size:" << _activeInspectionBytesWritten;
-        _activeInspectionBytesWritten = 0;
+                qDebug() << "GitHubClient: Artifact downloaded for inspection, size:" << _activeInspectionBytesWritten;
+                _activeInspectionBytesWritten = 0;
 
-        // Clear partial download state since we completed successfully
-        clearPartialArtifactDownload();
+                // Clear partial download state since we completed successfully
+                clearPartialArtifactDownload();
 
-        // Scan the ZIP for all image files (WIC + SPU)
-        QJsonArray imageFiles = listImageFilesInZip(zipPath);
-        emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
-    });
+                // Scan the ZIP for all image files (WIC + SPU)
+                QJsonArray imageFiles = listImageFilesInZip(zipPath);
+                emit artifactContentsReady(artifactId, artifactName, owner, repo, branch, imageFiles, zipPath);
+            });
 }
 
-QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
+QJsonArray GitHubClient::listWicFilesInZip(const QString& zipPath)
 {
     qDebug() << "GitHubClient: Listing WIC files in ZIP:" << zipPath;
     QJsonArray wicFiles;
 
-    struct archive *a = archive_read_new();
-    struct archive_entry *entry;
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
 
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
 
-    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK)
+    {
         qWarning() << "GitHubClient: Failed to open ZIP for listing:" << archive_error_string(a);
         archive_read_free(a);
         return wicFiles;
@@ -778,13 +845,16 @@ QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
     // WIC file extensions only
     QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
 
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+    {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
         qint64 entrySize = archive_entry_size(entry);
 
         // Check if this is a WIC file
-        for (const QString &ext : wicExtensions) {
-            if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+        for (const QString& ext : wicExtensions)
+        {
+            if (entryName.endsWith(ext, Qt::CaseInsensitive))
+            {
                 QJsonObject wicFile;
                 wicFile["filename"] = entryName;
                 wicFile["size"] = entrySize;
@@ -808,29 +878,32 @@ QJsonArray GitHubClient::listWicFilesInZip(const QString &zipPath)
     return wicFiles;
 }
 
-QJsonArray GitHubClient::listSpuFilesInZip(const QString &zipPath)
+QJsonArray GitHubClient::listSpuFilesInZip(const QString& zipPath)
 {
     qDebug() << "GitHubClient: Listing SPU files in ZIP:" << zipPath;
     QJsonArray spuFiles;
 
-    struct archive *a = archive_read_new();
-    struct archive_entry *entry;
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
 
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
 
-    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK)
+    {
         qWarning() << "GitHubClient: Failed to open ZIP for SPU listing:" << archive_error_string(a);
         archive_read_free(a);
         return spuFiles;
     }
 
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+    {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
         qint64 entrySize = archive_entry_size(entry);
 
         // Check if this is an SPU file
-        if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
+        if (entryName.endsWith(".spu", Qt::CaseInsensitive))
+        {
             QJsonObject spuFile;
             spuFile["filename"] = entryName;
             spuFile["size"] = entrySize;
@@ -852,18 +925,19 @@ QJsonArray GitHubClient::listSpuFilesInZip(const QString &zipPath)
     return spuFiles;
 }
 
-QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
+QJsonArray GitHubClient::listImageFilesInZip(const QString& zipPath)
 {
     qDebug() << "GitHubClient: Listing all image files (WIC + SPU) in ZIP:" << zipPath;
     QJsonArray imageFiles;
 
-    struct archive *a = archive_read_new();
-    struct archive_entry *entry;
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
 
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
 
-    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+    if (archive_read_open_filename(a, zipPath.toUtf8().constData(), 10240) != ARCHIVE_OK)
+    {
         qWarning() << "GitHubClient: Failed to open ZIP for listing:" << archive_error_string(a);
         archive_read_free(a);
         return imageFiles;
@@ -872,27 +946,36 @@ QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
     // Image file extensions to look for
     QStringList wicExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2"};
 
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+    {
         QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
         qint64 entrySize = archive_entry_size(entry);
         QString displayName = QFileInfo(entryName).fileName();
 
         // Determine the image type from extension
         QString type;
-        if (entryName.endsWith(".spu", Qt::CaseInsensitive)) {
+        if (entryName.endsWith(".spu", Qt::CaseInsensitive))
+        {
             type = "spu";
-        } else if (entryName.endsWith(".vsi", Qt::CaseInsensitive)) {
+        }
+        else if (entryName.endsWith(".vsi", Qt::CaseInsensitive))
+        {
             type = "vsi";
-        } else {
-            for (const QString &ext : wicExtensions) {
-                if (entryName.endsWith(ext, Qt::CaseInsensitive)) {
+        }
+        else
+        {
+            for (const QString& ext : wicExtensions)
+            {
+                if (entryName.endsWith(ext, Qt::CaseInsensitive))
+                {
                     type = "wic";
                     break;
                 }
             }
         }
 
-        if (!type.isEmpty()) {
+        if (!type.isEmpty())
+        {
             QJsonObject imageFile;
             imageFile["filename"] = entryName;
             imageFile["size"] = entrySize;
@@ -912,9 +995,8 @@ QJsonArray GitHubClient::listImageFilesInZip(const QString &zipPath)
     return imageFiles;
 }
 
-void GitHubClient::inspectArtifactSpuContents(const QString &owner, const QString &repo,
-                                               qint64 artifactId, const QString &artifactName,
-                                               const QString &branch)
+void GitHubClient::inspectArtifactSpuContents(const QString& owner, const QString& repo, qint64 artifactId, const QString& artifactName,
+                                              const QString& branch)
 {
     qDebug() << "GitHubClient: Inspecting artifact for SPU contents:" << artifactName;
 
@@ -930,14 +1012,18 @@ void GitHubClient::inspectArtifactSpuContents(const QString &owner, const QStrin
     QString zipPath = artifactCacheDir + "/" + artifactCacheFileName(artifactId, artifactName);
 
     // Check if artifact is already cached and valid
-    if (QFile::exists(zipPath)) {
+    if (QFile::exists(zipPath))
+    {
         qDebug() << "GitHubClient: Checking cached artifact for SPU:" << zipPath;
         QJsonArray spuFiles = listSpuFilesInZip(zipPath);
-        if (!spuFiles.isEmpty()) {
+        if (!spuFiles.isEmpty())
+        {
             qDebug() << "GitHubClient: Using valid cached artifact for SPU:" << zipPath;
             emit artifactSpuContentsReady(artifactId, artifactName, owner, repo, branch, spuFiles, zipPath);
             return;
-        } else {
+        }
+        else
+        {
             qDebug() << "GitHubClient: Cached artifact has no SPU files or is invalid, re-downloading";
             QFile::remove(zipPath);
         }
@@ -947,9 +1033,8 @@ void GitHubClient::inspectArtifactSpuContents(const QString &owner, const QStrin
     inspectArtifactSpuFromUrl(QUrl(downloadUrl), owner, repo, artifactId, artifactName, branch, zipPath);
 }
 
-void GitHubClient::inspectArtifactSpuFromUrl(const QUrl &url, const QString &owner, const QString &repo,
-                                              qint64 artifactId, const QString &artifactName,
-                                              const QString &branch, const QString &zipPath)
+void GitHubClient::inspectArtifactSpuFromUrl(const QUrl& url, const QString& owner, const QString& repo, qint64 artifactId,
+                                             const QString& artifactName, const QString& branch, const QString& zipPath)
 {
     qDebug() << "GitHubClient: Downloading artifact for SPU inspection:" << url.toString();
 
@@ -957,58 +1042,67 @@ void GitHubClient::inspectArtifactSpuFromUrl(const QUrl &url, const QString &own
     bool isGitHubUrl = url.host().endsWith("github.com") || url.host().endsWith("githubusercontent.com");
 
     QNetworkRequest request;
-    if (isGitHubUrl) {
+    if (isGitHubUrl)
+    {
         request = createAuthenticatedRequest(url);
-    } else {
+    }
+    else
+    {
         request.setUrl(url);
         request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager/1.0");
     }
     // No timeout for downloads - they can take a long time for large files
     request.setTransferTimeout(0);
 
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
     _activeInspectionReply = reply;
     _activeInspectionZipPath = zipPath;
 
-    connect(reply, &QNetworkReply::downloadProgress, this, [this](qint64 bytesReceived, qint64 bytesTotal) {
-        emit artifactDownloadProgress(bytesReceived, bytesTotal);
-    });
+    connect(reply, &QNetworkReply::downloadProgress, this,
+            [this](qint64 bytesReceived, qint64 bytesTotal)
+            {
+                emit artifactDownloadProgress(bytesReceived, bytesTotal);
+            });
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]() {
-        _activeInspectionReply = nullptr;
-        _activeInspectionZipPath.clear();
-        reply->deleteLater();
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, owner, repo, artifactId, artifactName, branch, zipPath]()
+            {
+                _activeInspectionReply = nullptr;
+                _activeInspectionZipPath.clear();
+                reply->deleteLater();
 
-        // Check if cancelled (OperationCanceledError)
-        if (reply->error() == QNetworkReply::OperationCanceledError) {
-            qDebug() << "GitHubClient: SPU artifact inspection cancelled by user";
-            return;
-        }
+                // Check if cancelled (OperationCanceledError)
+                if (reply->error() == QNetworkReply::OperationCanceledError)
+                {
+                    qDebug() << "GitHubClient: SPU artifact inspection cancelled by user";
+                    return;
+                }
 
-        if (reply->error() != QNetworkReply::NoError) {
-            emit error(tr("Failed to download artifact for SPU inspection: %1").arg(reply->errorString()));
-            return;
-        }
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    emit error(tr("Failed to download artifact for SPU inspection: %1").arg(reply->errorString()));
+                    return;
+                }
 
-        QFile file(zipPath);
-        if (!file.open(QIODevice::WriteOnly)) {
-            emit error(tr("Failed to save artifact for SPU inspection: %1").arg(file.errorString()));
-            return;
-        }
+                QFile file(zipPath);
+                if (!file.open(QIODevice::WriteOnly))
+                {
+                    emit error(tr("Failed to save artifact for SPU inspection: %1").arg(file.errorString()));
+                    return;
+                }
 
-        QByteArray data = reply->readAll();
-        file.write(data);
-        file.close();
+                QByteArray data = reply->readAll();
+                file.write(data);
+                file.close();
 
-        qDebug() << "GitHubClient: Artifact downloaded for SPU inspection, size:" << data.size();
+                qDebug() << "GitHubClient: Artifact downloaded for SPU inspection, size:" << data.size();
 
-        // Scan the ZIP for SPU files
-        QJsonArray spuFiles = listSpuFilesInZip(zipPath);
-        emit artifactSpuContentsReady(artifactId, artifactName, owner, repo, branch, spuFiles, zipPath);
-    });
+                // Scan the ZIP for SPU files
+                QJsonArray spuFiles = listSpuFilesInZip(zipPath);
+                emit artifactSpuContentsReady(artifactId, artifactName, owner, repo, branch, spuFiles, zipPath);
+            });
 }
 
 void GitHubClient::checkRateLimit()
@@ -1016,16 +1110,18 @@ void GitHubClient::checkRateLimit()
     QString urlStr = QString("%1/rate_limit").arg(API_BASE_URL);
 
     QNetworkRequest request = createAuthenticatedRequest(QUrl(urlStr));
-    QNetworkReply *reply = _networkManager.get(request);
+    QNetworkReply* reply = _networkManager.get(request);
 
     _pendingRequests[reply] = RequestRateLimit;
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        handleNetworkReply(reply);
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                handleNetworkReply(reply);
+            });
 }
 
-void GitHubClient::handleNetworkReply(QNetworkReply *reply)
+void GitHubClient::handleNetworkReply(QNetworkReply* reply)
 {
     reply->deleteLater();
 
@@ -1033,11 +1129,11 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     QPair<QString, QString> metadata = _requestMetadata.take(reply);
     const QString artifactSearchKey = _artifactSearchKeyByReply.take(reply);
     const ArtifactRunInfo artifactRunInfo = _artifactRunInfo.take(reply);
-    auto finishFailedArtifactRequest = [this, requestType, artifactSearchKey]() {
-        if ((requestType != RequestArtifactWicSearch
-             && requestType != RequestArtifactRunWicSearch)
-            || artifactSearchKey.isEmpty()
-            || !_artifactSearchStates.contains(artifactSearchKey)) {
+    auto finishFailedArtifactRequest = [this, requestType, artifactSearchKey]()
+    {
+        if ((requestType != RequestArtifactWicSearch && requestType != RequestArtifactRunWicSearch) || artifactSearchKey.isEmpty() ||
+            !_artifactSearchStates.contains(artifactSearchKey))
+        {
             return false;
         }
         failArtifactSearch(artifactSearchKey);
@@ -1047,18 +1143,22 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     // Check for rate limiting
     checkRateLimitHeaders(reply);
 
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-        if (statusCode == 403) {
+        if (statusCode == 403)
+        {
             // Might be rate limited
             QString rateLimitRemaining = reply->rawHeader("X-RateLimit-Remaining");
-            if (rateLimitRemaining == "0") {
+            if (rateLimitRemaining == "0")
+            {
                 qint64 resetTime = reply->rawHeader("X-RateLimit-Reset").toLongLong();
                 const bool activeArtifactSearch = finishFailedArtifactRequest();
-                if (requestType == RequestArtifactWicSearch
-                    || requestType == RequestArtifactRunWicSearch) {
-                    if (activeArtifactSearch) {
+                if (requestType == RequestArtifactWicSearch || requestType == RequestArtifactRunWicSearch)
+                {
+                    if (activeArtifactSearch)
+                    {
                         emit error(tr("GitHub API rate limit exceeded"));
                     }
                 }
@@ -1068,14 +1168,16 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
         }
 
         const bool activeArtifactSearch = finishFailedArtifactRequest();
-        if ((requestType == RequestArtifactWicSearch
-             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) {
+        if ((requestType == RequestArtifactWicSearch || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch)
+        {
             return;
         }
-        if (statusCode == 404) {
-            emit error(tr("Repository not found or not accessible: %1/%2")
-                           .arg(metadata.first, metadata.second));
-        } else {
+        if (statusCode == 404)
+        {
+            emit error(tr("Repository not found or not accessible: %1/%2").arg(metadata.first, metadata.second));
+        }
+        else
+        {
             emit error(tr("GitHub API error: %1").arg(reply->errorString()));
         }
         return;
@@ -1084,172 +1186,206 @@ void GitHubClient::handleNetworkReply(QNetworkReply *reply)
     QByteArray responseData = reply->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(responseData);
 
-    if (doc.isNull()) {
+    if (doc.isNull())
+    {
         const bool activeArtifactSearch = finishFailedArtifactRequest();
-        if ((requestType == RequestArtifactWicSearch
-             || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch) {
+        if ((requestType == RequestArtifactWicSearch || requestType == RequestArtifactRunWicSearch) && !activeArtifactSearch)
+        {
             return;
         }
         emit error(tr("Invalid JSON response from GitHub"));
         return;
     }
 
-    switch (requestType) {
-    case RequestReleases: {
-        if (doc.isArray()) {
-            emit releasesReady(doc.array());
-        } else {
-            emit error(tr("Unexpected response format for releases"));
-        }
-        break;
-    }
-
-    case RequestRepoInfo: {
-        if (doc.isObject()) {
-            QJsonObject repoObj = doc.object();
-            QString defaultBranch = repoObj["default_branch"].toString();
-            emit repoInfoReady(metadata.first, metadata.second, defaultBranch);
-            qDebug() << "GitHubClient: Repo" << metadata.first << "/" << metadata.second
-                     << "default branch:" << defaultBranch;
-        } else {
-            emit error(tr("Unexpected response format for repository info"));
-        }
-        break;
-    }
-
-    case RequestBranches: {
-        if (doc.isArray()) {
-            QJsonArray branches;
-            for (const auto &item : doc.array()) {
-                QJsonObject branch = item.toObject();
-                branches.append(branch["name"].toString());
+    switch (requestType)
+    {
+        case RequestReleases:
+        {
+            if (doc.isArray())
+            {
+                emit releasesReady(doc.array());
             }
-            emit branchesReady(branches);
-        }
-        break;
-    }
-
-    case RequestTags: {
-        if (doc.isArray()) {
-            QJsonArray tags;
-            for (const auto &item : doc.array()) {
-                QJsonObject tag = item.toObject();
-                tags.append(tag["name"].toString());
+            else
+            {
+                emit error(tr("Unexpected response format for releases"));
             }
-            emit tagsReady(tags);
+            break;
         }
-        break;
-    }
 
-    case RequestWicSearch: {
-        if (doc.isArray()) {
-            QJsonArray wicFiles = filterWicAssets(doc.array(), metadata.first, metadata.second);
-            emit wicFilesReady(wicFiles);
+        case RequestRepoInfo:
+        {
+            if (doc.isObject())
+            {
+                QJsonObject repoObj = doc.object();
+                QString defaultBranch = repoObj["default_branch"].toString();
+                emit repoInfoReady(metadata.first, metadata.second, defaultBranch);
+                qDebug() << "GitHubClient: Repo" << metadata.first << "/" << metadata.second << "default branch:" << defaultBranch;
+            }
+            else
+            {
+                emit error(tr("Unexpected response format for repository info"));
+            }
+            break;
         }
-        break;
-    }
 
-    case RequestRateLimit: {
-        if (doc.isObject()) {
-            QJsonObject rate = doc.object()["rate"].toObject();
-            int remaining = rate["remaining"].toInt();
-            int limit = rate["limit"].toInt();
-            qint64 reset = rate["reset"].toVariant().toLongLong();
-            emit rateLimitInfo(remaining, limit, reset);
+        case RequestBranches:
+        {
+            if (doc.isArray())
+            {
+                QJsonArray branches;
+                for (const auto& item : doc.array())
+                {
+                    QJsonObject branch = item.toObject();
+                    branches.append(branch["name"].toString());
+                }
+                emit branchesReady(branches);
+            }
+            break;
         }
-        break;
-    }
 
-    case RequestFile:
-        // File requests are handled inline in fetchBranchFile/fetchTagFile
-        break;
-
-    case RequestWorkflowRuns: {
-        if (doc.isObject()) {
-            QJsonArray runs = doc.object()["workflow_runs"].toArray();
-            emit workflowRunsReady(runs);
+        case RequestTags:
+        {
+            if (doc.isArray())
+            {
+                QJsonArray tags;
+                for (const auto& item : doc.array())
+                {
+                    QJsonObject tag = item.toObject();
+                    tags.append(tag["name"].toString());
+                }
+                emit tagsReady(tags);
+            }
+            break;
         }
-        break;
-    }
 
-    case RequestWorkflowArtifacts: {
-        if (doc.isObject()) {
-            QJsonArray artifacts = doc.object()["artifacts"].toArray();
-            emit workflowArtifactsReady(artifacts);
-        } else {
-            emit error(tr("Unexpected response format for workflow artifacts"));
+        case RequestWicSearch:
+        {
+            if (doc.isArray())
+            {
+                QJsonArray wicFiles = filterWicAssets(doc.array(), metadata.first, metadata.second);
+                emit wicFilesReady(wicFiles);
+            }
+            break;
         }
-        break;
-    }
 
-    case RequestArtifactWicSearch: {
-        if (doc.isObject()) {
-            const QJsonObject response = doc.object();
+        case RequestRateLimit:
+        {
+            if (doc.isObject())
+            {
+                QJsonObject rate = doc.object()["rate"].toObject();
+                int remaining = rate["remaining"].toInt();
+                int limit = rate["limit"].toInt();
+                qint64 reset = rate["reset"].toVariant().toLongLong();
+                emit rateLimitInfo(remaining, limit, reset);
+            }
+            break;
+        }
+
+        case RequestFile:
+            // File requests are handled inline in fetchBranchFile/fetchTagFile
+            break;
+
+        case RequestWorkflowRuns:
+        {
+            if (doc.isObject())
+            {
+                QJsonArray runs = doc.object()["workflow_runs"].toArray();
+                emit workflowRunsReady(runs);
+            }
+            break;
+        }
+
+        case RequestWorkflowArtifacts:
+        {
+            if (doc.isObject())
+            {
+                QJsonArray artifacts = doc.object()["artifacts"].toArray();
+                emit workflowArtifactsReady(artifacts);
+            }
+            else
+            {
+                emit error(tr("Unexpected response format for workflow artifacts"));
+            }
+            break;
+        }
+
+        case RequestArtifactWicSearch:
+        {
+            if (doc.isObject())
+            {
+                const QJsonObject response = doc.object();
+                const QString key = artifactSearchKey;
+                auto stateIt = _artifactSearchStates.find(key);
+                if (stateIt == _artifactSearchStates.end())
+                {
+                    break;
+                }
+
+                const int currentPage = QUrlQuery(reply->url()).queryItemValue(QStringLiteral("page")).toInt();
+                const int totalCount = response["total_count"].toInt();
+                stateIt->totalWorkflowPages = (totalCount + 29) / 30;
+                stateIt->nextWorkflowPage = currentPage + 1;
+                --stateIt->pendingWorkflowPages;
+
+                const QJsonArray runs = response["workflow_runs"].toArray();
+                for (const auto& runValue : runs)
+                {
+                    fetchArtifactRunFiles(key, runValue.toObject());
+                }
+
+                qDebug() << "GitHubClient: Processed workflow page" << currentPage << "for" << key << ", runs:" << runs.size()
+                         << ", artifact requests pending:" << stateIt->pendingArtifactRequests;
+                advanceArtifactSearch(key);
+            }
+            else
+            {
+                const bool activeArtifactSearch = finishFailedArtifactRequest();
+                if (activeArtifactSearch)
+                {
+                    emit error(tr("Unexpected response format for workflow runs"));
+                }
+            }
+            break;
+        }
+
+        case RequestArtifactRunWicSearch:
+        {
             const QString key = artifactSearchKey;
             auto stateIt = _artifactSearchStates.find(key);
-            if (stateIt == _artifactSearchStates.end()) {
+            if (stateIt == _artifactSearchStates.end())
+            {
                 break;
             }
 
-            const int currentPage = QUrlQuery(reply->url()).queryItemValue(QStringLiteral("page")).toInt();
-            const int totalCount = response["total_count"].toInt();
-            stateIt->totalWorkflowPages = (totalCount + 29) / 30;
-            stateIt->nextWorkflowPage = currentPage + 1;
-            --stateIt->pendingWorkflowPages;
-
-            const QJsonArray runs = response["workflow_runs"].toArray();
-            for (const auto &runValue : runs) {
-                fetchArtifactRunFiles(key, runValue.toObject());
+            if (!doc.isObject())
+            {
+                failArtifactSearch(key);
+                emit error(tr("Unexpected response format for workflow artifacts"));
+                break;
             }
 
-            qDebug() << "GitHubClient: Processed workflow page" << currentPage << "for" << key
-                     << ", runs:" << runs.size()
-                     << ", artifact requests pending:" << stateIt->pendingArtifactRequests;
+            const QJsonArray artifacts = doc.object()["artifacts"].toArray();
+            const QJsonArray wicArtifacts = filterWicArtifacts(artifacts, metadata.first, metadata.second, artifactRunInfo.branch,
+                                                               artifactRunInfo.createdAt);
+            for (const auto& artifact : wicArtifacts)
+            {
+                stateIt->collectedArtifacts.append(artifact);
+            }
+            if (!wicArtifacts.isEmpty())
+            {
+                emit artifactWicFilesBatchReady(wicArtifacts);
+            }
+
+            --stateIt->pendingArtifactRequests;
+            qDebug() << "GitHubClient: Artifact fetch complete for run" << artifactRunInfo.runId
+                     << ", pending:" << stateIt->pendingArtifactRequests << ", collected:" << stateIt->collectedArtifacts.size();
             advanceArtifactSearch(key);
-        } else {
-            const bool activeArtifactSearch = finishFailedArtifactRequest();
-            if (activeArtifactSearch) {
-                emit error(tr("Unexpected response format for workflow runs"));
-            }
-        }
-        break;
-    }
-
-    case RequestArtifactRunWicSearch: {
-        const QString key = artifactSearchKey;
-        auto stateIt = _artifactSearchStates.find(key);
-        if (stateIt == _artifactSearchStates.end()) {
             break;
         }
-
-        if (!doc.isObject()) {
-            failArtifactSearch(key);
-            emit error(tr("Unexpected response format for workflow artifacts"));
-            break;
-        }
-
-        const QJsonArray artifacts = doc.object()["artifacts"].toArray();
-        const QJsonArray wicArtifacts = filterWicArtifacts(
-            artifacts, metadata.first, metadata.second,
-            artifactRunInfo.branch, artifactRunInfo.createdAt);
-        for (const auto &artifact : wicArtifacts) {
-            stateIt->collectedArtifacts.append(artifact);
-        }
-        if (!wicArtifacts.isEmpty()) {
-            emit artifactWicFilesBatchReady(wicArtifacts);
-        }
-
-        --stateIt->pendingArtifactRequests;
-        qDebug() << "GitHubClient: Artifact fetch complete for run" << artifactRunInfo.runId
-                 << ", pending:" << stateIt->pendingArtifactRequests
-                 << ", collected:" << stateIt->collectedArtifacts.size();
-        advanceArtifactSearch(key);
-        break;
-    }
     }
 }
 
-QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url, int timeoutMs)
+QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl& url, int timeoutMs)
 {
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager");
@@ -1259,29 +1395,33 @@ QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url, int ti
     // Set connection/transfer timeout (covers connection establishment)
     request.setTransferTimeout(timeoutMs);
 
-    if (!_authToken.isEmpty()) {
+    if (!_authToken.isEmpty())
+    {
         request.setRawHeader("Authorization", QString("Bearer %1").arg(_authToken).toUtf8());
     }
 
     return request;
 }
 
-void GitHubClient::checkRateLimitHeaders(QNetworkReply *reply)
+void GitHubClient::checkRateLimitHeaders(QNetworkReply* reply)
 {
     QString remaining = reply->rawHeader("X-RateLimit-Remaining");
     QString limit = reply->rawHeader("X-RateLimit-Limit");
     QString reset = reply->rawHeader("X-RateLimit-Reset");
 
-    if (!remaining.isEmpty() && !limit.isEmpty()) {
+    if (!remaining.isEmpty() && !limit.isEmpty())
+    {
         int remainingInt = remaining.toInt();
         int limitInt = limit.toInt();
         qint64 resetTime = reset.toLongLong();
 
-        if (remainingInt < 10) {
+        if (remainingInt < 10)
+        {
             qWarning() << "GitHubClient: Rate limit low:" << remainingInt << "/" << limitInt;
         }
 
-        if (remainingInt == 0) {
+        if (remainingInt == 0)
+        {
             QDateTime resetDateTime = QDateTime::fromSecsSinceEpoch(resetTime);
             qWarning() << "GitHubClient: Rate limit exceeded, resets at" << resetDateTime.toString();
             emit rateLimitExceeded(resetTime);
@@ -1289,14 +1429,15 @@ void GitHubClient::checkRateLimitHeaders(QNetworkReply *reply)
     }
 }
 
-QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QString &owner, const QString &repo)
+QJsonArray GitHubClient::filterWicAssets(const QJsonArray& releases, const QString& owner, const QString& repo)
 {
     QJsonArray releaseGroups;
 
     // Image file extensions to look for (WIC, VSI, SPU)
     QStringList fileExtensions = {".wic", ".wic.gz", ".wic.xz", ".wic.zst", ".wic.bz2", ".vsi", ".spu"};
 
-    for (const auto &releaseValue : releases) {
+    for (const auto& releaseValue : releases)
+    {
         QJsonObject release = releaseValue.toObject();
         QString tagName = release["tag_name"].toString();
         QString releaseName = release["name"].toString();
@@ -1306,7 +1447,8 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
         QJsonArray assets = release["assets"].toArray();
         QJsonArray assetsInRelease;
 
-        for (const auto &assetValue : assets) {
+        for (const auto& assetValue : assets)
+        {
             QJsonObject asset = assetValue.toObject();
             QString name = asset["name"].toString();
             QString nameLower = name.toLower();
@@ -1314,21 +1456,29 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
             // Check if it's an image file (WIC, VSI, SPU)
             bool isImageFile = false;
             QString fileType;
-            for (const QString &ext : fileExtensions) {
-                if (nameLower.endsWith(ext)) {
+            for (const QString& ext : fileExtensions)
+            {
+                if (nameLower.endsWith(ext))
+                {
                     isImageFile = true;
-                    if (ext == ".spu") {
+                    if (ext == ".spu")
+                    {
                         fileType = "spu";
-                    } else if (ext == ".vsi") {
+                    }
+                    else if (ext == ".vsi")
+                    {
                         fileType = "vsi";
-                    } else {
+                    }
+                    else
+                    {
                         fileType = "wic";
                     }
                     break;
                 }
             }
 
-            if (isImageFile) {
+            if (isImageFile)
+            {
                 QJsonObject assetInfo;
                 assetInfo["name"] = name;
                 assetInfo["size"] = asset["size"].toVariant().toLongLong();
@@ -1340,7 +1490,8 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
         }
 
         // Only add releases that have image assets
-        if (!assetsInRelease.isEmpty()) {
+        if (!assetsInRelease.isEmpty())
+        {
             QJsonObject releaseGroup;
             releaseGroup["tag"] = tagName;
             releaseGroup["release_name"] = releaseName;
@@ -1357,9 +1508,8 @@ QJsonArray GitHubClient::filterWicAssets(const QJsonArray &releases, const QStri
     return releaseGroups;
 }
 
-QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
-                                             const QString &owner, const QString &repo,
-                                             const QString &branch, const QString &runCreatedAt)
+QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray& artifacts, const QString& owner, const QString& repo, const QString& branch,
+                                            const QString& runCreatedAt)
 {
     QJsonArray wicFiles;
 
@@ -1371,7 +1521,8 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
 
     qDebug() << "GitHubClient: Filtering" << artifacts.size() << "artifacts for WIC files";
 
-    for (const auto &artifactValue : artifacts) {
+    for (const auto& artifactValue : artifacts)
+    {
         QJsonObject artifact = artifactValue.toObject();
         QString name = artifact["name"].toString();
         qint64 artifactId = artifact["id"].toVariant().toLongLong();
@@ -1383,7 +1534,8 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
 
         qDebug() << "GitHubClient: Checking artifact:" << name << "expired:" << expired << "size:" << size;
 
-        if (expired || (!branch.isEmpty() && artifactBranch != branch)) {
+        if (expired || (!branch.isEmpty() && artifactBranch != branch))
+        {
             continue;
         }
 
@@ -1392,24 +1544,30 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
         QString nameLower = name.toLower();
 
         // Check for WIC extensions in name
-        for (const QString &ext : fileExtensions) {
-            if (nameLower.contains(ext)) {
+        for (const QString& ext : fileExtensions)
+        {
+            if (nameLower.contains(ext))
+            {
                 isWicArtifact = true;
                 break;
             }
         }
 
         // Check for WIC-related patterns if not already matched
-        if (!isWicArtifact) {
-            for (const QString &pattern : wicPatterns) {
-                if (nameLower.contains(pattern)) {
+        if (!isWicArtifact)
+        {
+            for (const QString& pattern : wicPatterns)
+            {
+                if (nameLower.contains(pattern))
+                {
                     isWicArtifact = true;
                     break;
                 }
             }
         }
 
-        if (isWicArtifact) {
+        if (isWicArtifact)
+        {
             QJsonObject wicFile;
             wicFile["name"] = name;
             wicFile["artifact_id"] = artifactId;
@@ -1419,7 +1577,7 @@ QJsonArray GitHubClient::filterWicArtifacts(const QJsonArray &artifacts,
             wicFile["owner"] = owner;
             wicFile["repo"] = repo;
             wicFile["download_url"] = getArtifactDownloadUrl(owner, repo, artifactId);
-            wicFile["source"] = "artifact";  // Distinguish from release assets
+            wicFile["source"] = "artifact"; // Distinguish from release assets
 
             wicFiles.append(wicFile);
         }
@@ -1439,7 +1597,8 @@ bool GitHubClient::hasPartialArtifactDownload() const
 QVariantMap GitHubClient::getPartialArtifactDownloadInfo() const
 {
     QVariantMap info;
-    if (!_partialArtifactDownload.isValid) {
+    if (!_partialArtifactDownload.isValid)
+    {
         return info;
     }
 
@@ -1452,9 +1611,9 @@ QVariantMap GitHubClient::getPartialArtifactDownloadInfo() const
     info["branch"] = _partialArtifactDownload.branch;
 
     double percentComplete = 0;
-    if (_partialArtifactDownload.totalSize > 0) {
-        percentComplete = (double)_partialArtifactDownload.bytesDownloaded * 100.0 /
-                          (double)_partialArtifactDownload.totalSize;
+    if (_partialArtifactDownload.totalSize > 0)
+    {
+        percentComplete = (double)_partialArtifactDownload.bytesDownloaded * 100.0 / (double)_partialArtifactDownload.totalSize;
     }
     info["percentComplete"] = percentComplete;
 
@@ -1463,20 +1622,17 @@ QVariantMap GitHubClient::getPartialArtifactDownloadInfo() const
 
 void GitHubClient::resumeArtifactDownload()
 {
-    if (!_partialArtifactDownload.isValid) {
+    if (!_partialArtifactDownload.isValid)
+    {
         qDebug() << "GitHubClient: No partial artifact download to resume";
         return;
     }
 
-    qDebug() << "GitHubClient: Resuming artifact download from"
-             << _partialArtifactDownload.bytesDownloaded << "bytes";
+    qDebug() << "GitHubClient: Resuming artifact download from" << _partialArtifactDownload.bytesDownloaded << "bytes";
 
     // Re-trigger the download with resume support
-    inspectArtifactContents(_partialArtifactDownload.owner,
-                            _partialArtifactDownload.repo,
-                            _partialArtifactDownload.artifactId,
-                            _partialArtifactDownload.artifactName,
-                            _partialArtifactDownload.branch);
+    inspectArtifactContents(_partialArtifactDownload.owner, _partialArtifactDownload.repo, _partialArtifactDownload.artifactId,
+                            _partialArtifactDownload.artifactName, _partialArtifactDownload.branch);
 }
 
 void GitHubClient::discardPartialArtifactDownload()
@@ -1484,8 +1640,8 @@ void GitHubClient::discardPartialArtifactDownload()
     qDebug() << "GitHubClient: Discarding partial artifact download";
 
     // Delete the partial file
-    if (!_partialArtifactDownload.partialPath.isEmpty() &&
-        QFile::exists(_partialArtifactDownload.partialPath)) {
+    if (!_partialArtifactDownload.partialPath.isEmpty() && QFile::exists(_partialArtifactDownload.partialPath))
+    {
         QFile::remove(_partialArtifactDownload.partialPath);
     }
 
@@ -1527,9 +1683,11 @@ void GitHubClient::loadPartialArtifactDownload()
     settings.endGroup();
 
     // Validate the partial file exists and has expected size
-    if (!partialPath.isEmpty() && bytesDownloaded > 0) {
+    if (!partialPath.isEmpty() && bytesDownloaded > 0)
+    {
         QFileInfo fileInfo(partialPath);
-        if (fileInfo.exists() && fileInfo.size() == bytesDownloaded) {
+        if (fileInfo.exists() && fileInfo.size() == bytesDownloaded)
+        {
             settings.beginGroup("github");
             settings.beginGroup("partialArtifact");
 
@@ -1548,11 +1706,11 @@ void GitHubClient::loadPartialArtifactDownload()
             settings.endGroup();
             settings.endGroup();
 
-            qDebug() << "GitHubClient: Loaded partial artifact download:"
-                     << _partialArtifactDownload.artifactName
-                     << _partialArtifactDownload.bytesDownloaded << "/"
-                     << _partialArtifactDownload.totalSize << "bytes";
-        } else {
+            qDebug() << "GitHubClient: Loaded partial artifact download:" << _partialArtifactDownload.artifactName
+                     << _partialArtifactDownload.bytesDownloaded << "/" << _partialArtifactDownload.totalSize << "bytes";
+        }
+        else
+        {
             qDebug() << "GitHubClient: Partial artifact file missing or size mismatch, clearing";
             clearPartialArtifactDownload();
         }
@@ -1566,7 +1724,7 @@ void GitHubClient::clearPartialArtifactDownload()
     QSettings settings;
     settings.beginGroup("github");
     settings.beginGroup("partialArtifact");
-    settings.remove("");  // Remove all keys in this group
+    settings.remove(""); // Remove all keys in this group
     settings.endGroup();
     settings.endGroup();
     settings.sync();

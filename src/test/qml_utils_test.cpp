@@ -2,9 +2,11 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (C) 2026 Laerdal Medical
  */
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_session.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_session.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <memory>
+
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QGuiApplication>
@@ -15,9 +17,8 @@
 #include <QThread>
 #include <QVariant>
 #include <QWheelEvent>
-#include <memory>
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // Catch2 discovery runs outside CTest and must also work without a display.
     qputenv("QT_QPA_PLATFORM", "offscreen");
@@ -25,34 +26,35 @@ int main(int argc, char *argv[])
     return Catch::Session().run(argc, argv);
 }
 
-namespace {
-struct Utils {
-    QQmlEngine engine;
-    QQmlComponent component{&engine, QUrl::fromLocalFile(QStringLiteral(TEST_QML_SOURCE_DIR "/Utils.qml"))};
-    std::unique_ptr<QObject> object;
-
-    Utils()
+namespace
+{
+    struct Utils
     {
-        INFO(component.errorString().toStdString());
-        REQUIRE(component.isReady());
-        object.reset(component.create());
-        REQUIRE(object);
-    }
+        QQmlEngine engine;
+        QQmlComponent component {&engine, QUrl::fromLocalFile(QStringLiteral(TEST_QML_SOURCE_DIR "/Utils.qml"))};
+        std::unique_ptr<QObject> object;
 
-    template<typename... Args>
-    QVariant call(const char *method, const Args &...args)
-    {
-        QVariant result;
-        REQUIRE(QMetaObject::invokeMethod(object.get(), method, Qt::DirectConnection,
-                                         Q_RETURN_ARG(QVariant, result), Q_ARG(QVariant, QVariant(args))...));
-        if (result.metaType() == QMetaType::fromType<QJSValue>())
+        Utils()
         {
-            return result.value<QJSValue>().toVariant();
+            INFO(component.errorString().toStdString());
+            REQUIRE(component.isReady());
+            object.reset(component.create());
+            REQUIRE(object);
         }
-        return result;
-    }
-};
-}
+
+        template<typename... Args> QVariant call(const char* method, const Args&... args)
+        {
+            QVariant result;
+            REQUIRE(QMetaObject::invokeMethod(object.get(), method, Qt::DirectConnection, Q_RETURN_ARG(QVariant, result),
+                                              Q_ARG(QVariant, QVariant(args))...));
+            if (result.metaType() == QMetaType::fromType<QJSValue>())
+            {
+                return result.value<QJSValue>().toVariant();
+            }
+            return result;
+        }
+    };
+} // namespace
 
 TEST_CASE("QML throughput sampling converts units and applies smoothing only to network rates", "[qml-utils]")
 {
@@ -91,7 +93,8 @@ TEST_CASE("QML transfer estimates distinguish binary disk units from decimal net
     REQUIRE(utils.call("calculateTimeRemainingMbps", 0, 1000000, 8).toInt() == 1);
     REQUIRE(utils.call("calculateTimeRemainingKBps", 0, 1025, 1).toInt() == 2);
     REQUIRE(utils.call("calculateTimeRemainingMbps", 0, 125001, 1).toInt() == 2);
-    for (const char *method : {"calculateTimeRemainingKBps", "calculateTimeRemainingMbps"}) {
+    for (const char* method : {"calculateTimeRemainingKBps", "calculateTimeRemainingMbps"})
+    {
         REQUIRE(utils.call(method, 0, 1000, 0).toInt() == -1);
         REQUIRE(utils.call(method, 0, 0, 1).toInt() == -1);
         REQUIRE(utils.call(method, 1001, 1000, 1).toInt() == 0);
@@ -112,10 +115,8 @@ TEST_CASE("Expanded branch dropdown stays below its selector and fits available 
 {
     const QString directory = QStringLiteral(TEST_QML_SOURCE_DIR);
     qmlRegisterSingletonType(QUrl::fromLocalFile(directory + "/Style.qml"), "RpiImager", 1, 0, "Style");
-    qmlRegisterType(QUrl::fromLocalFile(directory + "/qmlcomponents/ImScrollBar.qml"),
-                    "RpiImager", 1, 0, "ImScrollBar");
-    qmlRegisterType(QUrl::fromLocalFile(directory + "/qmlcomponents/ImComboBox.qml"),
-                    "RpiImager", 1, 0, "ImComboBox");
+    qmlRegisterType(QUrl::fromLocalFile(directory + "/qmlcomponents/ImScrollBar.qml"), "RpiImager", 1, 0, "ImScrollBar");
+    qmlRegisterType(QUrl::fromLocalFile(directory + "/qmlcomponents/ImComboBox.qml"), "RpiImager", 1, 0, "ImComboBox");
     QQmlEngine engine;
     QQmlComponent component(&engine);
     component.setData(R"(
@@ -149,7 +150,8 @@ TEST_CASE("Expanded branch dropdown stays below its selector and fits available 
                 }
             }
         }
-    )", QUrl());
+    )",
+                      QUrl());
     INFO(component.errorString().toStdString());
     REQUIRE(component.isReady());
     std::unique_ptr<QObject> window(component.create());
@@ -161,18 +163,18 @@ TEST_CASE("Expanded branch dropdown stays below its selector and fits available 
     REQUIRE(window->property("dropdownHeight").toDouble() == Catch::Approx(720 - bottom - margin));
     REQUIRE(window->property("dropdownTop").toDouble() == Catch::Approx(bottom));
 
-    auto *quickWindow = qobject_cast<QQuickWindow *>(window.get());
+    auto* quickWindow = qobject_cast<QQuickWindow*>(window.get());
     REQUIRE(quickWindow);
     const QPointF wheelPosition(100, bottom + 100);
-    auto scroll = [&](QPoint pixels, QPoint angle, bool inverted, double expected) {
-        QWheelEvent event(wheelPosition, quickWindow->mapToGlobal(wheelPosition.toPoint()),
-                          pixels, angle, Qt::NoButton, Qt::NoModifier,
+    auto scroll = [&](QPoint pixels, QPoint angle, bool inverted, double expected)
+    {
+        QWheelEvent event(wheelPosition, quickWindow->mapToGlobal(wheelPosition.toPoint()), pixels, angle, Qt::NoButton, Qt::NoModifier,
                           Qt::NoScrollPhase, inverted);
         QCoreApplication::sendEvent(quickWindow, &event);
         QElapsedTimer timer;
         timer.start();
-        while (timer.elapsed() < 1000
-               && qAbs(window->property("scrollPosition").toDouble() - expected) > 0.1) {
+        while (timer.elapsed() < 1000 && qAbs(window->property("scrollPosition").toDouble() - expected) > 0.1)
+        {
             QCoreApplication::processEvents();
             QThread::msleep(5);
         }

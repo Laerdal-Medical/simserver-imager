@@ -6,12 +6,12 @@
 #ifndef REPOSITORYMANAGER_H
 #define REPOSITORYMANAGER_H
 
-#include <QObject>
-#include <QString>
-#include <QStringList>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QObject>
 #include <QSettings>
+#include <QString>
+#include <QStringList>
 #include <QVector>
 
 #ifndef CLI_ONLY_BUILD
@@ -42,7 +42,8 @@ public:
     /**
      * @brief Available Laerdal CDN environments
      */
-    enum Environment {
+    enum Environment
+    {
         Production,
         Test,
         Dev,
@@ -51,32 +52,56 @@ public:
     };
     Q_ENUM(Environment)
 
-    explicit RepositoryManager(QObject *parent = nullptr);
+    explicit RepositoryManager(QObject* parent = nullptr);
     virtual ~RepositoryManager();
 
     // Properties
-    Q_PROPERTY(Environment currentEnvironment READ currentEnvironment
-               WRITE setCurrentEnvironment NOTIFY environmentChanged)
+    Q_PROPERTY(Environment currentEnvironment READ currentEnvironment WRITE setCurrentEnvironment NOTIFY environmentChanged)
     Q_PROPERTY(QJsonArray githubRepos READ githubRepos NOTIFY reposChanged)
     Q_PROPERTY(bool isLoading READ isLoading NOTIFY loadingChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
-    Q_PROPERTY(QString artifactBranchFilter READ artifactBranchFilter
-               WRITE setArtifactBranchFilter NOTIFY artifactBranchFilterChanged)
-    Q_PROPERTY(QStringList availableBranches READ availableBranches
-               NOTIFY availableBranchesChanged)
+    Q_PROPERTY(QString artifactBranchFilter READ artifactBranchFilter WRITE setArtifactBranchFilter NOTIFY artifactBranchFilterChanged)
+    Q_PROPERTY(QStringList availableBranches READ availableBranches NOTIFY availableBranchesChanged)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
-    Q_PROPERTY(QString selectedSourceType READ selectedSourceType
-               WRITE setSelectedSourceType NOTIFY selectedSourceTypeChanged)
+    Q_PROPERTY(QString selectedSourceType READ selectedSourceType WRITE setSelectedSourceType NOTIFY selectedSourceTypeChanged)
 
     // Getters
-    Environment currentEnvironment() const { return _environment; }
+    Environment currentEnvironment() const
+    {
+        return _environment;
+    }
+
     QJsonArray githubRepos() const;
-    bool isLoading() const { return _isLoading; }
-    QString errorMessage() const { return _errorMessage; }
-    QString artifactBranchFilter() const { return _artifactBranchFilter; }
-    QStringList availableBranches() const { return _availableBranches; }
-    QString statusMessage() const { return _statusMessage; }
-    QString selectedSourceType() const { return _selectedSourceType; }
+
+    bool isLoading() const
+    {
+        return _isLoading;
+    }
+
+    QString errorMessage() const
+    {
+        return _errorMessage;
+    }
+
+    QString artifactBranchFilter() const
+    {
+        return _artifactBranchFilter;
+    }
+
+    QStringList availableBranches() const
+    {
+        return _availableBranches;
+    }
+
+    QString statusMessage() const
+    {
+        return _statusMessage;
+    }
+
+    QString selectedSourceType() const
+    {
+        return _selectedSourceType;
+    }
 
     /**
      * @brief Set the current CDN environment
@@ -109,53 +134,51 @@ public:
      * @param repo Repository name
      * @param defaultBranch Default branch to use (default: "main")
      */
-    Q_INVOKABLE void addGitHubRepo(const QString &owner, const QString &repo,
-                                    const QString &defaultBranch = "main");
+    Q_INVOKABLE void addGitHubRepo(const QString& owner, const QString& repo, const QString& defaultBranch = "main");
 
     /**
      * @brief Add a GitHub repository and fetch its default branch from GitHub
      * @param owner Repository owner (organization or user)
      * @param repo Repository name
      */
-    Q_INVOKABLE void addGitHubRepoWithAutoDetect(const QString &owner, const QString &repo);
+    Q_INVOKABLE void addGitHubRepoWithAutoDetect(const QString& owner, const QString& repo);
 
     /**
      * @brief Remove a GitHub repository
      */
-    Q_INVOKABLE void removeGitHubRepo(const QString &owner, const QString &repo);
+    Q_INVOKABLE void removeGitHubRepo(const QString& owner, const QString& repo);
 
     /**
      * @brief Enable or disable a GitHub repository
      */
-    Q_INVOKABLE void setRepoEnabled(const QString &owner, const QString &repo, bool enabled);
+    Q_INVOKABLE void setRepoEnabled(const QString& owner, const QString& repo, bool enabled);
 
     /**
      * @brief Check if a repository is enabled
      */
-    Q_INVOKABLE bool isRepoEnabled(const QString &owner, const QString &repo) const;
+    Q_INVOKABLE bool isRepoEnabled(const QString& owner, const QString& repo) const;
 
     /**
      * @brief Set the default branch for a repository
      */
-    Q_INVOKABLE void setDefaultBranch(const QString &owner, const QString &repo,
-                                       const QString &branch);
+    Q_INVOKABLE void setDefaultBranch(const QString& owner, const QString& repo, const QString& branch);
 
     /**
      * @brief Get the default branch for a repository
      */
-    Q_INVOKABLE QString getDefaultBranch(const QString &owner, const QString &repo) const;
+    Q_INVOKABLE QString getDefaultBranch(const QString& owner, const QString& repo) const;
 
     /**
      * @brief Set the artifact branch filter and re-fetch artifacts from that branch
      * @param branch The branch to filter/fetch artifacts from (empty = use default branches)
      */
-    Q_INVOKABLE void setArtifactBranchFilter(const QString &branch);
+    Q_INVOKABLE void setArtifactBranchFilter(const QString& branch);
 
     /**
      * @brief Set the selected source type
      * @param sourceType "cdn", "github-releases", or "github-ci"
      */
-    Q_INVOKABLE void setSelectedSourceType(const QString &sourceType);
+    Q_INVOKABLE void setSelectedSourceType(const QString& sourceType);
 
     /**
      * @brief Fetch available branches from all enabled repositories
@@ -196,7 +219,7 @@ public:
     /**
      * @brief Set the GitHub client for API access
      */
-    void setGitHubClient(GitHubClient *client);
+    void setGitHubClient(GitHubClient* client);
 
     /**
      * @brief Load settings from persistent storage
@@ -216,7 +239,7 @@ public:
     /**
      * @brief Load repository list from JSON
      */
-    void loadReposFromJson(const QString &json);
+    void loadReposFromJson(const QString& json);
 
     /**
      * @brief Request inspection of an artifact's contents to check for multiple WIC files
@@ -229,9 +252,8 @@ public:
      * This will download the artifact ZIP and scan for WIC files.
      * Emits artifactContentsReady when complete.
      */
-    Q_INVOKABLE void inspectArtifact(qint64 artifactId, const QString &artifactName,
-                                      const QString &owner, const QString &repo,
-                                      const QString &branch);
+    Q_INVOKABLE void inspectArtifact(qint64 artifactId, const QString& artifactName, const QString& owner, const QString& repo,
+                                     const QString& branch);
 
     /**
      * @brief Cancel any ongoing artifact inspection download
@@ -249,9 +271,8 @@ public:
      * This will download the artifact ZIP and scan for SPU files.
      * Emits artifactSpuContentsReady when complete.
      */
-    Q_INVOKABLE void inspectSpuArtifact(qint64 artifactId, const QString &artifactName,
-                                         const QString &owner, const QString &repo,
-                                         const QString &branch);
+    Q_INVOKABLE void inspectSpuArtifact(qint64 artifactId, const QString& artifactName, const QString& owner, const QString& repo,
+                                        const QString& branch);
 
     /**
      * @brief Check if a file is compatible with a selected device (for QML asset filtering)
@@ -259,8 +280,7 @@ public:
      * Delegates to DeviceDetection::isFileCompatibleWithDevice().
      * Generic files (no device pattern in name) are compatible with all devices.
      */
-    Q_INVOKABLE bool isFileCompatibleWithDevice(const QString &filename,
-                                                 const QString &deviceTag) const;
+    Q_INVOKABLE bool isFileCompatibleWithDevice(const QString& filename, const QString& deviceTag) const;
 
 signals:
     /**
@@ -276,9 +296,9 @@ signals:
     void statusMessageChanged();
     void selectedSourceTypeChanged();
     void osListReady();
-    void cdnListReady(const QJsonArray &list);
-    void githubListReady(const QJsonArray &list);
-    void refreshError(const QString &message);
+    void cdnListReady(const QJsonArray& list);
+    void githubListReady(const QJsonArray& list);
+    void refreshError(const QString& message);
 
     /**
      * @brief Emitted when artifact contents have been inspected
@@ -290,10 +310,8 @@ signals:
      * @param wicFiles Array of WIC file info objects found in the artifact
      * @param zipPath Path to the downloaded ZIP file (for extraction)
      */
-    void artifactContentsReady(qint64 artifactId, const QString &artifactName,
-                                const QString &owner, const QString &repo,
-                                const QString &branch, const QJsonArray &wicFiles,
-                                const QString &zipPath);
+    void artifactContentsReady(qint64 artifactId, const QString& artifactName, const QString& owner, const QString& repo,
+                               const QString& branch, const QJsonArray& wicFiles, const QString& zipPath);
 
     /**
      * @brief Emitted during artifact download with progress info
@@ -312,33 +330,31 @@ signals:
      * @param spuFiles Array of SPU file info objects found in the artifact
      * @param zipPath Path to the downloaded ZIP file (for extraction)
      */
-    void artifactSpuContentsReady(qint64 artifactId, const QString &artifactName,
-                                   const QString &owner, const QString &repo,
-                                   const QString &branch, const QJsonArray &spuFiles,
-                                   const QString &zipPath);
+    void artifactSpuContentsReady(qint64 artifactId, const QString& artifactName, const QString& owner, const QString& repo,
+                                  const QString& branch, const QJsonArray& spuFiles, const QString& zipPath);
 
 private slots:
-    void onCdnListReady(const QJsonArray &list);
-    void onGitHubWicFilesReady(const QJsonArray &wicFiles);
-    void onGitHubArtifactFilesBatchReady(const QJsonArray &wicFiles);
-    void onGitHubArtifactFilesReady(const QJsonArray &wicFiles);
-    void onBranchesReady(const QJsonArray &branches);
-    void onBranchFetchError(const QString &message);
-    void onSourceError(const QString &message);
+    void onCdnListReady(const QJsonArray& list);
+    void onGitHubWicFilesReady(const QJsonArray& wicFiles);
+    void onGitHubArtifactFilesBatchReady(const QJsonArray& wicFiles);
+    void onGitHubArtifactFilesReady(const QJsonArray& wicFiles);
+    void onBranchesReady(const QJsonArray& branches);
+    void onBranchFetchError(const QString& message);
+    void onSourceError(const QString& message);
 
 private:
     void setLoading(bool loading);
-    void setError(const QString &message);
-    void setStatusMessage(const QString &message);
+    void setError(const QString& message);
+    void setStatusMessage(const QString& message);
     void updateStatusMessage();
     void checkRefreshComplete();
-    static QString extractDeviceName(const QString &text);
-    static QString extractVersion(const QString &text);
-    static QString buildDisplayName(const QString &deviceName, const QString &version,
-                                    const QString &fallback);
-    bool appendGitHubArtifactEntries(const QJsonArray &wicFiles);
+    static QString extractDeviceName(const QString& text);
+    static QString extractVersion(const QString& text);
+    static QString buildDisplayName(const QString& deviceName, const QString& version, const QString& fallback);
+    bool appendGitHubArtifactEntries(const QJsonArray& wicFiles);
 
-    struct GitHubRepoInfo {
+    struct GitHubRepoInfo
+    {
         QString owner;
         QString repo;
         QString defaultBranch;
@@ -350,28 +366,28 @@ private:
     QJsonArray _cdnOsList;
     QJsonArray _githubOsList;
 
-    GitHubClient *_githubClient = nullptr;
-    LaerdalCdnSource *_cdnSource = nullptr;
+    GitHubClient* _githubClient = nullptr;
+    LaerdalCdnSource* _cdnSource = nullptr;
 
     QSettings _settings;
     bool _isLoading = false;
     QString _errorMessage;
     QString _statusMessage;
     QString _artifactBranchFilter;
-    QString _selectedSourceType = "cdn";  // "cdn", "github-releases", or "github-ci"
+    QString _selectedSourceType = "cdn"; // "cdn", "github-releases", or "github-ci"
     QStringList _availableBranches;
 
     int _pendingRefreshCount = 0;
     int _pendingBranchFetchCount = 0;
 
     // Settings keys
-    static constexpr const char* SETTINGS_ENVIRONMENT = "laerdal/environment";
-    static constexpr const char* SETTINGS_GITHUB_REPOS = "laerdal/github_repos";
-    static constexpr const char* SETTINGS_REPO_BRANCHES = "laerdal/repo_branches";
-    static constexpr const char* SETTINGS_REPO_ENABLED = "laerdal/repo_enabled";
-    static constexpr const char* SETTINGS_DEFAULT_REPOS_CONFIGURED = "laerdal/default_repos_configured";
-    static constexpr const char* SETTINGS_SOURCE_TYPE = "laerdal/source_type";
-    static constexpr const char* SETTINGS_ARTIFACT_BRANCH_FILTER = "laerdal/artifact_branch_filter";
+    static const constexpr char* SETTINGS_ENVIRONMENT = "laerdal/environment";
+    static const constexpr char* SETTINGS_GITHUB_REPOS = "laerdal/github_repos";
+    static const constexpr char* SETTINGS_REPO_BRANCHES = "laerdal/repo_branches";
+    static const constexpr char* SETTINGS_REPO_ENABLED = "laerdal/repo_enabled";
+    static const constexpr char* SETTINGS_DEFAULT_REPOS_CONFIGURED = "laerdal/default_repos_configured";
+    static const constexpr char* SETTINGS_SOURCE_TYPE = "laerdal/source_type";
+    static const constexpr char* SETTINGS_ARTIFACT_BRANCH_FILTER = "laerdal/artifact_branch_filter";
 };
 
 #endif // REPOSITORYMANAGER_H

@@ -2,34 +2,36 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (C) 2026 Laerdal Medical
  */
+#include "../hwlistmodel.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <QJsonArray>
 #include <QSet>
 
-#include "../hwlistmodel.h"
 #include "../drivelistitem.h"
 #include "model_fixtures.h"
 
-namespace {
-
-QString nameAt(QAbstractItemModel *m, int row)
+namespace
 {
-    return m->data(m->index(row, 0), HWListModel::NameRole).toString();
-}
 
-QVariant roleAt(QAbstractItemModel *m, int row, int role)
-{
-    return m->data(m->index(row, 0), role);
-}
+    QString nameAt(QAbstractItemModel* m, int row)
+    {
+        return m->data(m->index(row, 0), HWListModel::NameRole).toString();
+    }
+
+    QVariant roleAt(QAbstractItemModel* m, int row, int role)
+    {
+        return m->data(m->index(row, 0), role);
+    }
 
 } // namespace
 
 TEST_CASE("HWListModel lists Laerdal devices followed by Erase and Use custom", "[hwlistmodel]")
 {
     TestOwner writer;
-    HWListModel &hw = writer.hw;
-    QAbstractItemModel *m = &hw;
+    HWListModel& hw = writer.hw;
+    QAbstractItemModel* m = &hw;
     REQUIRE(m->rowCount({}) == 0);
     REQUIRE(hw.reload());
 
@@ -39,7 +41,8 @@ TEST_CASE("HWListModel lists Laerdal devices followed by Erase and Use custom", 
     REQUIRE(nameAt(m, rows - 1) == "Use custom");
 
     QSet<QString> seen;
-    for (int i = 0; i < rows - 2; ++i) {
+    for (int i = 0; i < rows - 2; ++i)
+    {
         INFO(nameAt(m, i).toStdString());
         REQUIRE_FALSE(seen.contains(nameAt(m, i)));
         seen.insert(nameAt(m, i));
@@ -49,7 +52,8 @@ TEST_CASE("HWListModel lists Laerdal devices followed by Erase and Use custom", 
         REQUIRE_FALSE(roleAt(m, i, HWListModel::ArchitectureRole).toString().isEmpty());
         REQUIRE_FALSE(roleAt(m, i, HWListModel::DisabledRole).toBool());
     }
-    for (int i = rows - 2; i < rows; ++i) {
+    for (int i = rows - 2; i < rows; ++i)
+    {
         // The two pseudo devices must never filter the OS list.
         REQUIRE(roleAt(m, i, HWListModel::TagsRole).toJsonArray().isEmpty());
         REQUIRE(roleAt(m, i, HWListModel::MatchingTypeRole).toString() == "inclusive");
@@ -60,8 +64,8 @@ TEST_CASE("HWListModel lists Laerdal devices followed by Erase and Use custom", 
 TEST_CASE("HWListModel reload is idempotent and preselects the default device", "[hwlistmodel]")
 {
     TestOwner writer;
-    HWListModel &hw = writer.hw;
-    QAbstractItemModel *m = &hw;
+    HWListModel& hw = writer.hw;
+    QAbstractItemModel* m = &hw;
 
     REQUIRE(hw.currentName() == "CHOOSE DEVICE");
     REQUIRE(hw.currentArchitecture().isEmpty());
@@ -80,8 +84,8 @@ TEST_CASE("HWListModel reload is idempotent and preselects the default device", 
 TEST_CASE("HWListModel only clears the image source when the device really changes", "[hwlistmodel]")
 {
     TestOwner writer;
-    HWListModel &hw = writer.hw;
-    QAbstractItemModel *m = &hw;
+    HWListModel& hw = writer.hw;
+    QAbstractItemModel* m = &hw;
     hw.reload();
     REQUIRE(writer.clearImageCalls == 1);
 
@@ -96,7 +100,11 @@ TEST_CASE("HWListModel only clears the image source when the device really chang
 
     // A different row carrying identical tags/name would not count; same row does not either.
     int emitted = 0;
-    QObject::connect(&hw, &HWListModel::currentIndexChanged, &hw, [&] { ++emitted; });
+    QObject::connect(&hw, &HWListModel::currentIndexChanged, &hw,
+                     [&]
+                     {
+                         ++emitted;
+                     });
     hw.setCurrentIndex(1);
     REQUIRE(emitted == 0);
 
@@ -112,9 +120,9 @@ TEST_CASE("HWListModel only clears the image source when the device really chang
 TEST_CASE("HWListModel rejects out-of-range indexes and clears the selection with -1", "[hwlistmodel]")
 {
     TestOwner writer;
-    HWListModel &hw = writer.hw;
+    HWListModel& hw = writer.hw;
     hw.reload();
-    const int count = static_cast<QAbstractItemModel &>(hw).rowCount({});
+    const int count = static_cast<QAbstractItemModel&>(hw).rowCount({});
 
     hw.setCurrentIndex(count);
     REQUIRE(hw.currentIndex() == 0);
@@ -122,8 +130,16 @@ TEST_CASE("HWListModel rejects out-of-range indexes and clears the selection wit
     REQUIRE(hw.currentIndex() == 0);
 
     int names = 0, archs = 0;
-    QObject::connect(&hw, &HWListModel::currentNameChanged, &hw, [&] { ++names; });
-    QObject::connect(&hw, &HWListModel::currentArchitectureChanged, &hw, [&] { ++archs; });
+    QObject::connect(&hw, &HWListModel::currentNameChanged, &hw,
+                     [&]
+                     {
+                         ++names;
+                     });
+    QObject::connect(&hw, &HWListModel::currentArchitectureChanged, &hw,
+                     [&]
+                     {
+                         ++archs;
+                     });
     hw.setCurrentIndex(-1);
     REQUIRE(hw.currentIndex() == -1);
     REQUIRE(hw.currentName() == "CHOOSE DEVICE");
@@ -138,8 +154,7 @@ TEST_CASE("HWListModel rejects out-of-range indexes and clears the selection wit
 
 TEST_CASE("DriveListItem converts large byte counts to truncated decimal gigabytes", "[drivelistitem]")
 {
-    DriveListItem item("/dev/sdb", "USB stick", 32000000000ULL, true, false, true, false,
-                       {"/media/a"}, {"/dev/sdb1"});
+    DriveListItem item("/dev/sdb", "USB stick", 32000000000ULL, true, false, true, false, {"/media/a"}, {"/dev/sdb1"});
     REQUIRE(item.sizeInGb() == 32);
     REQUIRE(DriveListItem("x", "y", 31999999999ULL).sizeInGb() == 31);
     REQUIRE(DriveListItem("x", "y", 999999999ULL).sizeInGb() == 0);

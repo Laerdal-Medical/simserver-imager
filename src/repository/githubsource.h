@@ -6,9 +6,9 @@
 #ifndef GITHUBSOURCE_H
 #define GITHUBSOURCE_H
 
+#include <QJsonArray>
 #include <QObject>
 #include <QString>
-#include <QJsonArray>
 
 class GitHubClient;
 
@@ -24,24 +24,48 @@ class GitHubSource : public QObject
     Q_OBJECT
 
 public:
-    explicit GitHubSource(const QString &owner, const QString &repo,
-                          QObject *parent = nullptr);
+    explicit GitHubSource(const QString& owner, const QString& repo, QObject* parent = nullptr);
     virtual ~GitHubSource();
 
-    QString owner() const { return _owner; }
-    QString repo() const { return _repo; }
-    QString fullName() const { return QString("%1/%2").arg(_owner, _repo); }
+    QString owner() const
+    {
+        return _owner;
+    }
 
-    QString defaultBranch() const { return _defaultBranch; }
-    void setDefaultBranch(const QString &branch) { _defaultBranch = branch; }
+    QString repo() const
+    {
+        return _repo;
+    }
 
-    bool isEnabled() const { return _enabled; }
-    void setEnabled(bool enabled) { _enabled = enabled; }
+    QString fullName() const
+    {
+        return QString("%1/%2").arg(_owner, _repo);
+    }
+
+    QString defaultBranch() const
+    {
+        return _defaultBranch;
+    }
+
+    void setDefaultBranch(const QString& branch)
+    {
+        _defaultBranch = branch;
+    }
+
+    bool isEnabled() const
+    {
+        return _enabled;
+    }
+
+    void setEnabled(bool enabled)
+    {
+        _enabled = enabled;
+    }
 
     /**
      * @brief Set the GitHub client for API access
      */
-    void setGitHubClient(GitHubClient *client);
+    void setGitHubClient(GitHubClient* client);
 
     /**
      * @brief Search for WIC files in releases
@@ -52,58 +76,61 @@ public:
      * @brief Search for WIC files in workflow artifacts
      * @param branch Optional branch filter
      */
-    void searchArtifactsForWicFiles(const QString &branch = QString());
+    void searchArtifactsForWicFiles(const QString& branch = QString());
 
     /**
      * @brief Get WIC file URL from a specific branch
      * @param branch Branch name
      * @param path Path to the WIC file in the repo
      */
-    void getFileFromBranch(const QString &branch, const QString &path);
+    void getFileFromBranch(const QString& branch, const QString& path);
 
     /**
      * @brief Get WIC file URL from a specific tag
      * @param tag Tag name
      * @param path Path to the WIC file in the repo
      */
-    void getFileFromTag(const QString &tag, const QString &path);
+    void getFileFromTag(const QString& tag, const QString& path);
 
     /**
      * @brief Get cached list of WIC files found
      */
-    QJsonArray getWicFiles() const { return _wicFiles; }
+    QJsonArray getWicFiles() const
+    {
+        return _wicFiles;
+    }
 
 signals:
     /**
      * @brief Emitted when WIC files are found in releases
      * @param wicFiles Array of WIC file entries
      */
-    void wicFilesReady(const QJsonArray &wicFiles);
+    void wicFilesReady(const QJsonArray& wicFiles);
 
     /**
      * @brief Emitted when WIC files are found in artifacts
      * @param wicFiles Array of WIC file entries from artifacts
      */
-    void artifactWicFilesReady(const QJsonArray &wicFiles);
+    void artifactWicFilesReady(const QJsonArray& wicFiles);
 
     /**
      * @brief Emitted when a file URL is ready
      * @param downloadUrl URL to download
      * @param fileName File name
      */
-    void fileReady(const QString &downloadUrl, const QString &fileName);
+    void fileReady(const QString& downloadUrl, const QString& fileName);
 
     /**
      * @brief Emitted on error
      * @param message Error message
      */
-    void error(const QString &message);
+    void error(const QString& message);
 
 private slots:
-    void onWicFilesReceived(const QJsonArray &wicFiles);
-    void onArtifactWicFilesReceived(const QJsonArray &wicFiles);
-    void onFileUrlReceived(const QString &downloadUrl, const QString &fileName);
-    void onError(const QString &message);
+    void onWicFilesReceived(const QJsonArray& wicFiles);
+    void onArtifactWicFilesReceived(const QJsonArray& wicFiles);
+    void onFileUrlReceived(const QString& downloadUrl, const QString& fileName);
+    void onError(const QString& message);
 
 private:
     QString _owner;
@@ -111,7 +138,7 @@ private:
     QString _defaultBranch = "main";
     bool _enabled = true;
 
-    GitHubClient *_githubClient = nullptr;
+    GitHubClient* _githubClient = nullptr;
     QJsonArray _wicFiles;
 };
 

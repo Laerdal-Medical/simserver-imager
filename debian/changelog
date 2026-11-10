@@ -1,5 +1,9 @@
 laerdal-simserver-imager (1.0.12.d) stable; urgency=medium
 
+  * Apply clang-format 19 to Laerdal-created C++ headers and sources, preserving
+    upstream formatting in inherited and mixed files
+  * Document formatting ownership rules and limit local parallel tasks to 75% of
+    available logical CPUs
   * Use Ninja with CPU-limited parallelism for macOS CI builds and avoid
     deploying Qt twice before packaging
   * Show shared SimPad sysinfo SPU assets for both i.MX6 and i.MX8 devices

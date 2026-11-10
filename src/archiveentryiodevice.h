@@ -10,9 +10,9 @@
 #ifndef ARCHIVEENTRYIODEVICE_H
 #define ARCHIVEENTRYIODEVICE_H
 
+#include <QFile>
 #include <QIODevice>
 #include <QString>
-#include <QFile>
 
 // Forward declarations for libarchive
 struct archive;
@@ -28,7 +28,7 @@ public:
      * @param entryName Name of the entry to read from the archive
      * @param parent Parent QObject
      */
-    explicit ArchiveEntryIODevice(const QString &archivePath, const QString &entryName, QObject *parent = nullptr);
+    explicit ArchiveEntryIODevice(const QString& archivePath, const QString& entryName, QObject* parent = nullptr);
     ~ArchiveEntryIODevice() override;
 
     /**
@@ -46,12 +46,18 @@ public:
     /**
      * @brief Check if the device is sequential (yes, archives are)
      */
-    bool isSequential() const override { return true; }
+    bool isSequential() const override
+    {
+        return true;
+    }
 
     /**
      * @brief Get the size of the entry (uncompressed)
      */
-    qint64 size() const override { return _entrySize; }
+    qint64 size() const override
+    {
+        return _entrySize;
+    }
 
     /**
      * @brief Get bytes available to read
@@ -66,29 +72,35 @@ public:
     /**
      * @brief Get the archive path
      */
-    QString archivePath() const { return _archivePath; }
+    QString archivePath() const
+    {
+        return _archivePath;
+    }
 
     /**
      * @brief Get the entry name
      */
-    QString entryName() const { return _entryName; }
+    QString entryName() const
+    {
+        return _entryName;
+    }
 
 protected:
-    qint64 readData(char *data, qint64 maxlen) override;
-    qint64 writeData(const char *data, qint64 len) override;
+    qint64 readData(char* data, qint64 maxlen) override;
+    qint64 writeData(const char* data, qint64 len) override;
 
 private:
     QString _archivePath;
     QString _entryName;
     QFile _file;
-    struct archive *_archive = nullptr;
+    struct archive* _archive = nullptr;
     qint64 _entrySize = 0;
     qint64 _bytesRead = 0;
     bool _entryFound = false;
     bool _atEnd = false;
 
     // Buffer for archive reading
-    char *_buffer = nullptr;
+    char* _buffer = nullptr;
     static constexpr size_t BUFFER_SIZE = 65536;
 };
 

@@ -6,13 +6,13 @@
 #ifndef GITHUBCLIENT_H
 #define GITHUBCLIENT_H
 
-#include <QObject>
-#include <QString>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QFile>
+#include <QObject>
+#include <QString>
 #include <QUrl>
 
 #ifndef CLI_ONLY_BUILD
@@ -36,26 +36,29 @@ class GitHubClient : public QObject
 #endif
 
 public:
-    explicit GitHubClient(QObject *parent = nullptr);
+    explicit GitHubClient(QObject* parent = nullptr);
     virtual ~GitHubClient();
 
     /**
      * @brief Set the authentication token
      * @param token GitHub personal access token or OAuth token
      */
-    Q_INVOKABLE void setAuthToken(const QString &token);
+    Q_INVOKABLE void setAuthToken(const QString& token);
 
     /**
      * @brief Check if authenticated
      */
-    Q_INVOKABLE bool isAuthenticated() const { return !_authToken.isEmpty(); }
+    Q_INVOKABLE bool isAuthenticated() const
+    {
+        return !_authToken.isEmpty();
+    }
 
     /**
      * @brief Fetch releases from a repository
      * @param owner Repository owner (organization or user)
      * @param repo Repository name
      */
-    Q_INVOKABLE void fetchReleases(const QString &owner, const QString &repo);
+    Q_INVOKABLE void fetchReleases(const QString& owner, const QString& repo);
 
     /**
      * @brief Fetch a file from a specific branch
@@ -64,8 +67,7 @@ public:
      * @param branch Branch name
      * @param path File path within the repository
      */
-    Q_INVOKABLE void fetchBranchFile(const QString &owner, const QString &repo,
-                                      const QString &branch, const QString &path);
+    Q_INVOKABLE void fetchBranchFile(const QString& owner, const QString& repo, const QString& branch, const QString& path);
 
     /**
      * @brief Fetch a file from a specific tag
@@ -74,36 +76,35 @@ public:
      * @param tag Tag name
      * @param path File path within the repository
      */
-    Q_INVOKABLE void fetchTagFile(const QString &owner, const QString &repo,
-                                   const QString &tag, const QString &path);
+    Q_INVOKABLE void fetchTagFile(const QString& owner, const QString& repo, const QString& tag, const QString& path);
 
     /**
      * @brief Fetch repository info (including default branch)
      * @param owner Repository owner
      * @param repo Repository name
      */
-    Q_INVOKABLE void fetchRepoInfo(const QString &owner, const QString &repo);
+    Q_INVOKABLE void fetchRepoInfo(const QString& owner, const QString& repo);
 
     /**
      * @brief List branches for a repository
      * @param owner Repository owner
      * @param repo Repository name
      */
-    Q_INVOKABLE void fetchBranches(const QString &owner, const QString &repo);
+    Q_INVOKABLE void fetchBranches(const QString& owner, const QString& repo);
 
     /**
      * @brief List tags for a repository
      * @param owner Repository owner
      * @param repo Repository name
      */
-    Q_INVOKABLE void fetchTags(const QString &owner, const QString &repo);
+    Q_INVOKABLE void fetchTags(const QString& owner, const QString& repo);
 
     /**
      * @brief Search for WIC files in a repository's releases
      * @param owner Repository owner
      * @param repo Repository name
      */
-    Q_INVOKABLE void searchWicFilesInReleases(const QString &owner, const QString &repo);
+    Q_INVOKABLE void searchWicFilesInReleases(const QString& owner, const QString& repo);
 
     /**
      * @brief Fetch workflow runs for a repository
@@ -112,9 +113,8 @@ public:
      * @param branch Optional branch filter
      * @param status Optional status filter (e.g., "success", "completed")
      */
-    Q_INVOKABLE void fetchWorkflowRuns(const QString &owner, const QString &repo,
-                                        const QString &branch = QString(),
-                                        const QString &status = "success");
+    Q_INVOKABLE void fetchWorkflowRuns(const QString& owner, const QString& repo, const QString& branch = QString(),
+                                       const QString& status = "success");
 
     /**
      * @brief Fetch artifacts for a specific workflow run
@@ -122,7 +122,7 @@ public:
      * @param repo Repository name
      * @param runId Workflow run ID
      */
-    Q_INVOKABLE void fetchWorkflowArtifacts(const QString &owner, const QString &repo, qint64 runId);
+    Q_INVOKABLE void fetchWorkflowArtifacts(const QString& owner, const QString& repo, qint64 runId);
 
     /**
      * @brief Search for WIC files in workflow artifacts
@@ -130,8 +130,7 @@ public:
      * @param repo Repository name
      * @param branch Optional branch filter
      */
-    Q_INVOKABLE void searchWicFilesInArtifacts(const QString &owner, const QString &repo,
-                                                const QString &branch = QString());
+    Q_INVOKABLE void searchWicFilesInArtifacts(const QString& owner, const QString& repo, const QString& branch = QString());
 
     /**
      * @brief Get the download URL for a release asset
@@ -140,7 +139,7 @@ public:
      * @param assetId Asset ID
      * @return Download URL with authentication
      */
-    Q_INVOKABLE QString getAssetDownloadUrl(const QString &owner, const QString &repo, qint64 assetId);
+    Q_INVOKABLE QString getAssetDownloadUrl(const QString& owner, const QString& repo, qint64 assetId);
 
     /**
      * @brief Get the download URL for a workflow artifact
@@ -149,7 +148,7 @@ public:
      * @param artifactId Artifact ID
      * @return Download URL with authentication
      */
-    Q_INVOKABLE QString getArtifactDownloadUrl(const QString &owner, const QString &repo, qint64 artifactId);
+    Q_INVOKABLE QString getArtifactDownloadUrl(const QString& owner, const QString& repo, qint64 artifactId);
 
     /**
      * @brief Get rate limit information
@@ -163,14 +162,16 @@ public:
      * @param artifactId Artifact ID
      * @param destinationPath Local path to save the ZIP file
      */
-    Q_INVOKABLE void downloadArtifact(const QString &owner, const QString &repo,
-                                       qint64 artifactId, const QString &destinationPath);
+    Q_INVOKABLE void downloadArtifact(const QString& owner, const QString& repo, qint64 artifactId, const QString& destinationPath);
 
     /**
      * @brief Get the authentication token for use by other components
      * @return The current auth token (empty if not authenticated)
      */
-    QString authToken() const { return _authToken; }
+    QString authToken() const
+    {
+        return _authToken;
+    }
 
     /**
      * @brief Download an artifact and inspect its contents for WIC files
@@ -183,9 +184,8 @@ public:
      * Downloads the artifact ZIP to a temporary location and emits
      * artifactContentsReady with the list of WIC files found.
      */
-    Q_INVOKABLE void inspectArtifactContents(const QString &owner, const QString &repo,
-                                              qint64 artifactId, const QString &artifactName,
-                                              const QString &branch);
+    Q_INVOKABLE void inspectArtifactContents(const QString& owner, const QString& repo, qint64 artifactId, const QString& artifactName,
+                                             const QString& branch);
 
     /**
      * @brief Cancel any ongoing artifact inspection download
@@ -224,9 +224,8 @@ public:
      * Downloads the artifact ZIP to a temporary location and emits
      * artifactSpuContentsReady with the list of SPU files found.
      */
-    Q_INVOKABLE void inspectArtifactSpuContents(const QString &owner, const QString &repo,
-                                                 qint64 artifactId, const QString &artifactName,
-                                                 const QString &branch);
+    Q_INVOKABLE void inspectArtifactSpuContents(const QString& owner, const QString& repo, qint64 artifactId, const QString& artifactName,
+                                                const QString& branch);
 
 signals:
     /**
@@ -237,7 +236,7 @@ signals:
      * @brief Emitted when artifact download is complete
      * @param localPath Path to the downloaded ZIP file
      */
-    void artifactDownloadComplete(const QString &localPath);
+    void artifactDownloadComplete(const QString& localPath);
 
     /**
      * @brief Emitted during artifact download with progress
@@ -249,14 +248,14 @@ signals:
      * @brief Emitted when releases are fetched successfully
      * @param releases Array of release objects
      */
-    void releasesReady(const QJsonArray &releases);
+    void releasesReady(const QJsonArray& releases);
 
     /**
      * @brief Emitted when a file URL is ready for download
      * @param downloadUrl URL to download the file
      * @param fileName Original file name
      */
-    void fileUrlReady(const QString &downloadUrl, const QString &fileName);
+    void fileUrlReady(const QString& downloadUrl, const QString& fileName);
 
     /**
      * @brief Emitted when repository info is fetched
@@ -264,44 +263,44 @@ signals:
      * @param repo Repository name
      * @param defaultBranch Default branch name
      */
-    void repoInfoReady(const QString &owner, const QString &repo, const QString &defaultBranch);
+    void repoInfoReady(const QString& owner, const QString& repo, const QString& defaultBranch);
 
     /**
      * @brief Emitted when branches are fetched
      * @param branches Array of branch names
      */
-    void branchesReady(const QJsonArray &branches);
+    void branchesReady(const QJsonArray& branches);
 
     /**
      * @brief Emitted when tags are fetched
      * @param tags Array of tag names
      */
-    void tagsReady(const QJsonArray &tags);
+    void tagsReady(const QJsonArray& tags);
 
     /**
      * @brief Emitted when WIC files are found in releases
      * @param wicFiles Array of WIC file information objects
      */
-    void wicFilesReady(const QJsonArray &wicFiles);
+    void wicFilesReady(const QJsonArray& wicFiles);
 
     /**
      * @brief Emitted when workflow runs are fetched
      * @param runs Array of workflow run objects
      */
-    void workflowRunsReady(const QJsonArray &runs);
+    void workflowRunsReady(const QJsonArray& runs);
 
     /**
      * @brief Emitted when workflow artifacts are fetched
      * @param artifacts Array of artifact objects
      */
-    void workflowArtifactsReady(const QJsonArray &artifacts);
+    void workflowArtifactsReady(const QJsonArray& artifacts);
 
     /**
      * @brief Emitted when WIC files are found in artifacts
      * @param wicFiles Array of WIC file information objects from artifacts
      */
-    void artifactWicFilesReady(const QJsonArray &wicFiles);
-    void artifactWicFilesBatchReady(const QJsonArray &wicFiles);
+    void artifactWicFilesReady(const QJsonArray& wicFiles);
+    void artifactWicFilesBatchReady(const QJsonArray& wicFiles);
 
     /**
      * @brief Emitted when artifact contents have been inspected
@@ -313,10 +312,8 @@ signals:
      * @param wicFiles Array of WIC file info objects found in the artifact
      * @param zipPath Path to the downloaded ZIP file (for later extraction)
      */
-    void artifactContentsReady(qint64 artifactId, const QString &artifactName,
-                                const QString &owner, const QString &repo,
-                                const QString &branch, const QJsonArray &wicFiles,
-                                const QString &zipPath);
+    void artifactContentsReady(qint64 artifactId, const QString& artifactName, const QString& owner, const QString& repo,
+                               const QString& branch, const QJsonArray& wicFiles, const QString& zipPath);
 
     /**
      * @brief Emitted when artifact SPU contents have been inspected
@@ -328,16 +325,14 @@ signals:
      * @param spuFiles Array of SPU file info objects found in the artifact
      * @param zipPath Path to the downloaded ZIP file (for later extraction)
      */
-    void artifactSpuContentsReady(qint64 artifactId, const QString &artifactName,
-                                   const QString &owner, const QString &repo,
-                                   const QString &branch, const QJsonArray &spuFiles,
-                                   const QString &zipPath);
+    void artifactSpuContentsReady(qint64 artifactId, const QString& artifactName, const QString& owner, const QString& repo,
+                                  const QString& branch, const QJsonArray& spuFiles, const QString& zipPath);
 
     /**
      * @brief Emitted on API error
      * @param message Error message
      */
-    void error(const QString &message);
+    void error(const QString& message);
 
     /**
      * @brief Emitted when rate limit is exceeded
@@ -354,37 +349,35 @@ signals:
     void rateLimitInfo(int remaining, int limit, qint64 resetTime);
 
 private slots:
-    void handleNetworkReply(QNetworkReply *reply);
+    void handleNetworkReply(QNetworkReply* reply);
 
 private:
-    QNetworkRequest createAuthenticatedRequest(const QUrl &url, int timeoutMs = API_TIMEOUT_MS);
-    void checkRateLimitHeaders(QNetworkReply *reply);
-    QJsonArray filterWicAssets(const QJsonArray &releases, const QString &owner, const QString &repo);
-    QJsonArray filterWicArtifacts(const QJsonArray &artifacts,
-                                   const QString &owner, const QString &repo,
-                                   const QString &branch, const QString &runCreatedAt);
-    void downloadArtifactFromUrl(const QUrl &url, const QString &destinationPath);
-    void inspectArtifactFromUrl(const QUrl &url, const QString &owner, const QString &repo,
-                                 qint64 artifactId, const QString &artifactName,
-                                 const QString &branch, const QString &zipPath);
-    QJsonArray listWicFilesInZip(const QString &zipPath);
-    QJsonArray listSpuFilesInZip(const QString &zipPath);
-    QJsonArray listImageFilesInZip(const QString &zipPath);  // Combined WIC + SPU
-    void inspectArtifactSpuFromUrl(const QUrl &url, const QString &owner, const QString &repo,
-                                    qint64 artifactId, const QString &artifactName,
-                                    const QString &branch, const QString &zipPath);
+    QNetworkRequest createAuthenticatedRequest(const QUrl& url, int timeoutMs = API_TIMEOUT_MS);
+    void checkRateLimitHeaders(QNetworkReply* reply);
+    QJsonArray filterWicAssets(const QJsonArray& releases, const QString& owner, const QString& repo);
+    QJsonArray filterWicArtifacts(const QJsonArray& artifacts, const QString& owner, const QString& repo, const QString& branch,
+                                  const QString& runCreatedAt);
+    void downloadArtifactFromUrl(const QUrl& url, const QString& destinationPath);
+    void inspectArtifactFromUrl(const QUrl& url, const QString& owner, const QString& repo, qint64 artifactId, const QString& artifactName,
+                                const QString& branch, const QString& zipPath);
+    QJsonArray listWicFilesInZip(const QString& zipPath);
+    QJsonArray listSpuFilesInZip(const QString& zipPath);
+    QJsonArray listImageFilesInZip(const QString& zipPath); // Combined WIC + SPU
+    void inspectArtifactSpuFromUrl(const QUrl& url, const QString& owner, const QString& repo, qint64 artifactId,
+                                   const QString& artifactName, const QString& branch, const QString& zipPath);
 
-    static constexpr const char* API_BASE_URL = "https://api.github.com";
-    static constexpr const char* RAW_BASE_URL = "https://raw.githubusercontent.com";
+    static const constexpr char* API_BASE_URL = "https://api.github.com";
+    static const constexpr char* RAW_BASE_URL = "https://raw.githubusercontent.com";
 
     // Timeouts in milliseconds
-    static constexpr int API_TIMEOUT_MS = 30000;  // 30 seconds for API calls
+    static constexpr int API_TIMEOUT_MS = 30000; // 30 seconds for API calls
 
     QNetworkAccessManager _networkManager;
     QString _authToken;
 
     // Track pending requests
-    enum RequestType {
+    enum RequestType
+    {
         RequestReleases,
         RequestRepoInfo,
         RequestBranches,
@@ -402,15 +395,18 @@ private:
     QHash<QNetworkReply*, QPair<QString, QString>> _requestMetadata; // owner/repo
     QHash<QNetworkReply*, QString> _artifactSearchKeyByReply;
 
-    struct ArtifactRunInfo {
+    struct ArtifactRunInfo
+    {
         QString branch;
         QString createdAt;
         qint64 runId = 0;
     };
+
     QHash<QNetworkReply*, ArtifactRunInfo> _artifactRunInfo;
 
     // State for artifact WIC search (requires multiple API calls)
-    struct ArtifactSearchState {
+    struct ArtifactSearchState
+    {
         QString owner;
         QString repo;
         QString branch;
@@ -420,24 +416,26 @@ private:
         int totalWorkflowPages = 0;
         QJsonArray collectedArtifacts;
     };
+
     QHash<QString, ArtifactSearchState> _artifactSearchStates;
     quint64 _artifactSearchSequence = 0;
 
-    void fetchArtifactWorkflowRunsPage(const QString &searchKey, int page);
-    void fetchArtifactRunFiles(const QString &searchKey, const QJsonObject &run);
-    void advanceArtifactSearch(const QString &key);
-    void failArtifactSearch(const QString &key);
+    void fetchArtifactWorkflowRunsPage(const QString& searchKey, int page);
+    void fetchArtifactRunFiles(const QString& searchKey, const QJsonObject& run);
+    void advanceArtifactSearch(const QString& key);
+    void failArtifactSearch(const QString& key);
 
     // Track ongoing artifact inspection download for cancellation and resume
-    bool _inspectionCancelled = false;  // Prevents starting redirect download after cancel
-    QNetworkReply *_activeInspectionReply = nullptr;
-    QString _activeInspectionZipPath;  // Final path for the completed download
-    QString _activeInspectionPartialPath;  // Partial file path during download
-    QFile *_activeInspectionFile = nullptr;  // File handle for incremental writes
-    qint64 _activeInspectionBytesWritten = 0;  // Bytes written to partial file
+    bool _inspectionCancelled = false; // Prevents starting redirect download after cancel
+    QNetworkReply* _activeInspectionReply = nullptr;
+    QString _activeInspectionZipPath;         // Final path for the completed download
+    QString _activeInspectionPartialPath;     // Partial file path during download
+    QFile* _activeInspectionFile = nullptr;   // File handle for incremental writes
+    qint64 _activeInspectionBytesWritten = 0; // Bytes written to partial file
 
     // Metadata for resumable artifact download
-    struct PartialArtifactDownload {
+    struct PartialArtifactDownload
+    {
         QString partialPath;
         QString finalPath;
         QString owner;
@@ -447,9 +445,10 @@ private:
         qint64 artifactId = 0;
         qint64 bytesDownloaded = 0;
         qint64 totalSize = 0;
-        QUrl downloadUrl;  // The actual download URL (after redirect)
+        QUrl downloadUrl; // The actual download URL (after redirect)
         bool isValid = false;
     };
+
     PartialArtifactDownload _partialArtifactDownload;
 
     void savePartialArtifactDownload();

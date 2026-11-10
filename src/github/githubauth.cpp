@@ -4,16 +4,17 @@
  */
 
 #include "githubauth.h"
+
+#include <QClipboard>
+#include <QDebug>
+#include <QDesktopServices>
+#include <QGuiApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QUrlQuery>
-#include <QDesktopServices>
-#include <QClipboard>
-#include <QGuiApplication>
-#include <QDebug>
 
-GitHubAuth::GitHubAuth(QObject *parent)
-    : QObject(parent)
+GitHubAuth::GitHubAuth(QObject* parent):
+    QObject(parent)
 {
     connect(&_pollTimer, &QTimer::timeout, this, &GitHubAuth::pollForToken);
 }
@@ -23,14 +24,15 @@ GitHubAuth::~GitHubAuth()
     _pollTimer.stop();
 }
 
-void GitHubAuth::setClientId(const QString &clientId)
+void GitHubAuth::setClientId(const QString& clientId)
 {
     _clientId = clientId;
 }
 
 void GitHubAuth::startDeviceFlow()
 {
-    if (_clientId.isEmpty()) {
+    if (_clientId.isEmpty())
+    {
         setError(tr("GitHub Client ID not configured"));
         return;
     }
@@ -55,19 +57,22 @@ void GitHubAuth::startDeviceFlow()
     postData.addQueryItem("client_id", _clientId);
     postData.addQueryItem("scope", SCOPE);
 
-    QNetworkReply *reply = _networkManager.post(request, postData.toString(QUrl::FullyEncoded).toUtf8());
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        onDeviceCodeResponse(reply);
-    });
+    QNetworkReply* reply = _networkManager.post(request, postData.toString(QUrl::FullyEncoded).toUtf8());
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                onDeviceCodeResponse(reply);
+            });
 
     qDebug() << "GitHubAuth: Starting device flow...";
 }
 
-void GitHubAuth::onDeviceCodeResponse(QNetworkReply *reply)
+void GitHubAuth::onDeviceCodeResponse(QNetworkReply* reply)
 {
     reply->deleteLater();
 
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         setError(tr("Network error: %1").arg(reply->errorString()));
         return;
     }
@@ -77,11 +82,13 @@ void GitHubAuth::onDeviceCodeResponse(QNetworkReply *reply)
     // GitHub returns form-encoded by default, but we requested JSON via Accept header
     QJsonDocument doc = QJsonDocument::fromJson(responseData);
 
-    if (doc.isNull()) {
+    if (doc.isNull())
+    {
         // Try parsing as form-encoded
         QUrlQuery query(QString::fromUtf8(responseData));
 
-        if (query.hasQueryItem("error")) {
+        if (query.hasQueryItem("error"))
+        {
             setError(query.queryItemValue("error_description"));
             return;
         }
@@ -91,10 +98,13 @@ void GitHubAuth::onDeviceCodeResponse(QNetworkReply *reply)
         _verificationUrl = query.queryItemValue("verification_uri");
         _pollInterval = query.queryItemValue("interval").toInt();
         _expiresIn = query.queryItemValue("expires_in").toInt();
-    } else {
+    }
+    else
+    {
         QJsonObject json = doc.object();
 
-        if (json.contains("error")) {
+        if (json.contains("error"))
+        {
             setError(json["error_description"].toString());
             return;
         }
@@ -106,13 +116,15 @@ void GitHubAuth::onDeviceCodeResponse(QNetworkReply *reply)
         _expiresIn = json["expires_in"].toInt();
     }
 
-    if (_deviceCode.isEmpty() || _userCode.isEmpty()) {
+    if (_deviceCode.isEmpty() || _userCode.isEmpty())
+    {
         setError(tr("Invalid response from GitHub"));
         return;
     }
 
     // Ensure minimum poll interval
-    if (_pollInterval < 5) {
+    if (_pollInterval < 5)
+    {
         _pollInterval = 5;
     }
 
@@ -133,7 +145,8 @@ void GitHubAuth::onDeviceCodeResponse(QNetworkReply *reply)
 
 void GitHubAuth::pollForToken()
 {
-    if (_state != WaitingForUserCode && _state != Polling) {
+    if (_state != WaitingForUserCode && _state != Polling)
+    {
         _pollTimer.stop();
         return;
     }
@@ -149,17 +162,20 @@ void GitHubAuth::pollForToken()
     postData.addQueryItem("device_code", _deviceCode);
     postData.addQueryItem("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
 
-    QNetworkReply *reply = _networkManager.post(request, postData.toString(QUrl::FullyEncoded).toUtf8());
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        onTokenPollResponse(reply);
-    });
+    QNetworkReply* reply = _networkManager.post(request, postData.toString(QUrl::FullyEncoded).toUtf8());
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply]()
+            {
+                onTokenPollResponse(reply);
+            });
 }
 
-void GitHubAuth::onTokenPollResponse(QNetworkReply *reply)
+void GitHubAuth::onTokenPollResponse(QNetworkReply* reply)
 {
     reply->deleteLater();
 
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         // Network error, keep polling
         qDebug() << "GitHubAuth: Network error while polling:" << reply->errorString();
         setState(WaitingForUserCode);
@@ -172,18 +188,22 @@ void GitHubAuth::onTokenPollResponse(QNetworkReply *reply)
     QString error;
     QString accessToken;
 
-    if (doc.isNull()) {
+    if (doc.isNull())
+    {
         // Try parsing as form-encoded
         QUrlQuery query(QString::fromUtf8(responseData));
         error = query.queryItemValue("error");
         accessToken = query.queryItemValue("access_token");
-    } else {
+    }
+    else
+    {
         QJsonObject json = doc.object();
         error = json["error"].toString();
         accessToken = json["access_token"].toString();
     }
 
-    if (!accessToken.isEmpty()) {
+    if (!accessToken.isEmpty())
+    {
         // Success!
         _pollTimer.stop();
         _accessToken = accessToken;
@@ -197,14 +217,16 @@ void GitHubAuth::onTokenPollResponse(QNetworkReply *reply)
         return;
     }
 
-    if (error == "authorization_pending") {
+    if (error == "authorization_pending")
+    {
         // User hasn't authorized yet, keep polling
         qDebug() << "GitHubAuth: Authorization pending...";
         setState(WaitingForUserCode);
         return;
     }
 
-    if (error == "slow_down") {
+    if (error == "slow_down")
+    {
         // We're polling too fast, increase interval
         _pollInterval += 5;
         _pollTimer.setInterval(_pollInterval * 1000);
@@ -213,13 +235,15 @@ void GitHubAuth::onTokenPollResponse(QNetworkReply *reply)
         return;
     }
 
-    if (error == "expired_token") {
+    if (error == "expired_token")
+    {
         _pollTimer.stop();
         setError(tr("The device code has expired. Please try again."));
         return;
     }
 
-    if (error == "access_denied") {
+    if (error == "access_denied")
+    {
         _pollTimer.stop();
         setError(tr("Access was denied. Please try again and authorize the application."));
         return;
@@ -264,7 +288,8 @@ bool GitHubAuth::loadStoredToken()
 {
     QString token = retrieveStoredToken();
 
-    if (token.isEmpty()) {
+    if (token.isEmpty())
+    {
         return false;
     }
 
@@ -278,9 +303,11 @@ bool GitHubAuth::loadStoredToken()
 
 void GitHubAuth::copyCodeToClipboard()
 {
-    if (!_userCode.isEmpty()) {
-        QClipboard *clipboard = QGuiApplication::clipboard();
-        if (clipboard) {
+    if (!_userCode.isEmpty())
+    {
+        QClipboard* clipboard = QGuiApplication::clipboard();
+        if (clipboard)
+        {
             clipboard->setText(_userCode);
             qDebug() << "GitHubAuth: User code copied to clipboard";
         }
@@ -289,7 +316,8 @@ void GitHubAuth::copyCodeToClipboard()
 
 void GitHubAuth::openVerificationUrl()
 {
-    if (!_verificationUrl.isEmpty()) {
+    if (!_verificationUrl.isEmpty())
+    {
         QDesktopServices::openUrl(QUrl(_verificationUrl));
         qDebug() << "GitHubAuth: Opening verification URL in browser";
     }
@@ -297,13 +325,14 @@ void GitHubAuth::openVerificationUrl()
 
 void GitHubAuth::setState(AuthState newState)
 {
-    if (_state != newState) {
+    if (_state != newState)
+    {
         _state = newState;
         emit stateChanged();
     }
 }
 
-void GitHubAuth::setError(const QString &message)
+void GitHubAuth::setError(const QString& message)
 {
     _errorMessage = message;
     setState(Error);
@@ -313,7 +342,7 @@ void GitHubAuth::setError(const QString &message)
     qWarning() << "GitHubAuth error:" << message;
 }
 
-void GitHubAuth::storeToken(const QString &token)
+void GitHubAuth::storeToken(const QString& token)
 {
     // Simple storage in QSettings
     // For production, consider using platform-specific secure storage:
@@ -335,7 +364,7 @@ void GitHubAuth::clearStoredToken()
     _settings.sync();
 }
 
-QNetworkRequest GitHubAuth::createRequest(const QUrl &url)
+QNetworkRequest GitHubAuth::createRequest(const QUrl& url)
 {
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Laerdal-SimServer-Imager");

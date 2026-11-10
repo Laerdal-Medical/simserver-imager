@@ -103,20 +103,34 @@ configuring; do not copy that machine-specific path into portable code.
 
 ```bash
 cmake -B build -S src -DCMAKE_PREFIX_PATH=<installed-Qt-gcc_64>
-cmake --build build --parallel
+jobs=$(( $(nproc) * 3 / 4 ))
+cmake --build build --parallel "$(( jobs > 0 ? jobs : 1 ))"
 ./build/test/repository_github_test '[repository][releases]'
 ctest --test-dir build -L unit --output-on-failure
 ```
 
-Format changed first-party C++ lines with the repository `.clang-format`
-before building, without reformatting untouched code:
+Limit local builds, tests, and other parallel tasks to 75% of available logical
+CPUs, rounded down, with a minimum of one worker. Determine availability at
+runtime (`nproc` on Linux); never use unrestricted parallelism on this shared
+machine. Apply the same worker limit to tools with internal parallelism.
+
+Only format Laerdal-created `.h` and `.cpp` files with the repository
+`.clang-format` and clang-format 19. Check file creation history, not just
+copyright notices, to distinguish original Laerdal code from inherited code.
+Preserve the existing upstream formatting in Raspberry Pi-origin and mixed
+files, including when modifying them, to reduce future merge conflicts.
+Do not format Objective-C/Objective-C++ files or bundled dependencies.
+
+For routine changes to eligible files, format only changed lines before
+building, without reformatting untouched code:
 
 ```bash
 git add <changed-cpp-files>
 git-clang-format-19 --binary clang-format-19 HEAD -- <changed-cpp-files>
 ```
 
-Do not format bundled code in `src/dependencies/`.
+Whole-file formatting is reserved for explicitly requested cleanup of
+Laerdal-created files. Preserve order-sensitive platform includes.
 
 Always build after code changes. Run the smallest relevant test selection
 first; targets and CTest registration are in `src/test/CMakeLists.txt`.

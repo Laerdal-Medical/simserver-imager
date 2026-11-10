@@ -6,12 +6,12 @@
 #ifndef GITHUBAUTH_H
 #define GITHUBAUTH_H
 
-#include <QObject>
-#include <QString>
-#include <QTimer>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QObject>
 #include <QSettings>
+#include <QString>
+#include <QTimer>
 
 #ifndef CLI_ONLY_BUILD
 #include <QQmlEngine>
@@ -35,7 +35,8 @@ class GitHubAuth : public QObject
 #endif
 
 public:
-    enum AuthState {
+    enum AuthState
+    {
         Idle,               ///< No authentication in progress
         WaitingForUserCode, ///< Device code received, waiting for user to enter code
         Polling,            ///< Polling GitHub for access token
@@ -44,7 +45,7 @@ public:
     };
     Q_ENUM(AuthState)
 
-    explicit GitHubAuth(QObject *parent = nullptr);
+    explicit GitHubAuth(QObject* parent = nullptr);
     virtual ~GitHubAuth();
 
     // Properties exposed to QML
@@ -56,13 +57,40 @@ public:
     Q_PROPERTY(int expiresIn READ expiresIn NOTIFY expiresInChanged)
 
     // Getters
-    AuthState state() const { return _state; }
-    QString userCode() const { return _userCode; }
-    QString verificationUrl() const { return _verificationUrl; }
-    bool isAuthenticated() const { return _state == Authenticated && !_accessToken.isEmpty(); }
-    QString errorMessage() const { return _errorMessage; }
-    int expiresIn() const { return _expiresIn; }
-    QString accessToken() const { return _accessToken; }
+    AuthState state() const
+    {
+        return _state;
+    }
+
+    QString userCode() const
+    {
+        return _userCode;
+    }
+
+    QString verificationUrl() const
+    {
+        return _verificationUrl;
+    }
+
+    bool isAuthenticated() const
+    {
+        return _state == Authenticated && !_accessToken.isEmpty();
+    }
+
+    QString errorMessage() const
+    {
+        return _errorMessage;
+    }
+
+    int expiresIn() const
+    {
+        return _expiresIn;
+    }
+
+    QString accessToken() const
+    {
+        return _accessToken;
+    }
 
     /**
      * @brief Start the OAuth Device Flow
@@ -102,7 +130,7 @@ public:
      * @brief Set the GitHub OAuth Client ID
      * @param clientId The client ID from GitHub OAuth App settings
      */
-    void setClientId(const QString &clientId);
+    void setClientId(const QString& clientId);
 
 signals:
     void stateChanged();
@@ -111,31 +139,31 @@ signals:
     void authenticationChanged();
     void errorMessageChanged();
     void expiresInChanged();
-    void authError(const QString &message);
+    void authError(const QString& message);
     void authSuccess();
 
 private slots:
-    void onDeviceCodeResponse(QNetworkReply *reply);
-    void onTokenPollResponse(QNetworkReply *reply);
+    void onDeviceCodeResponse(QNetworkReply* reply);
+    void onTokenPollResponse(QNetworkReply* reply);
     void pollForToken();
 
 private:
     void setState(AuthState newState);
-    void setError(const QString &message);
-    void storeToken(const QString &token);
+    void setError(const QString& message);
+    void storeToken(const QString& token);
     QString retrieveStoredToken();
     void clearStoredToken();
-    QNetworkRequest createRequest(const QUrl &url);
+    QNetworkRequest createRequest(const QUrl& url);
 
     // GitHub OAuth endpoints
-    static constexpr const char* DEVICE_CODE_URL = "https://github.com/login/device/code";
-    static constexpr const char* TOKEN_URL = "https://github.com/login/oauth/access_token";
+    static const constexpr char* DEVICE_CODE_URL = "https://github.com/login/device/code";
+    static const constexpr char* TOKEN_URL = "https://github.com/login/oauth/access_token";
 
     // Required scope for accessing private repos
-    static constexpr const char* SCOPE = "repo";
+    static const constexpr char* SCOPE = "repo";
 
     // Settings key for storing token
-    static constexpr const char* TOKEN_SETTINGS_KEY = "github/access_token";
+    static const constexpr char* TOKEN_SETTINGS_KEY = "github/access_token";
 
     QNetworkAccessManager _networkManager;
     QSettings _settings;
@@ -148,8 +176,8 @@ private:
     QString _verificationUrl;
     QString _accessToken;
     QString _errorMessage;
-    int _pollInterval = 5;  // seconds
-    int _expiresIn = 0;     // seconds until code expires
+    int _pollInterval = 5; // seconds
+    int _expiresIn = 0;    // seconds until code expires
 };
 
 #endif // GITHUBAUTH_H

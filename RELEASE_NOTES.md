@@ -4,6 +4,10 @@
 
 ### Improvements
 
+- Apply clang-format 19 to Laerdal-created C++ headers and sources, preserving
+  upstream formatting in inherited and mixed files
+- Document formatting ownership rules and limit local parallel tasks to 75% of
+  available logical CPUs
 - Use Ninja with CPU-limited parallelism for macOS CI builds and avoid
   deploying Qt twice before packaging
 - Consistently use braces for conditional bodies throughout first-party code

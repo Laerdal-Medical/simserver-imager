@@ -220,7 +220,7 @@ The CMakeLists.txt is located in the `src/` directory. When configuring, use `-S
 When running CMake, always use the following settings:
 
 - **Qt 6 Location**: Qt is installed at `/home/viktor/Qt/`. Look for available versions in `/home/viktor/Qt/6.*/gcc_64` and use the latest one. Currently using `/home/viktor/Qt/6.11.0/gcc_64`.
-- **Parallel Builds**: Always use `--parallel` flag with cmake build commands
+- **Parallel Builds**: Limit local builds, tests, and other parallel tasks to 75% of available logical CPUs, rounded down, with a minimum of one worker. Determine availability at runtime (`nproc` on Linux), including for tools with internal parallelism; never use unrestricted parallelism on this shared machine.
 
 Example commands:
 
@@ -231,8 +231,9 @@ ls -d /opt/Qt/6.*/gcc_64
 # Configure (use the latest available Qt version)
 cmake -B build -S src -DCMAKE_PREFIX_PATH=/home/viktor/Qt/6.11.0/gcc_64
 
-# Build (always use --parallel)
-cmake --build build --parallel
+# Build (75% of available logical CPUs, minimum one worker)
+jobs=$(( $(nproc) * 3 / 4 ))
+cmake --build build --parallel "$(( jobs > 0 ? jobs : 1 ))"
 ```
 
 ### Build Options
@@ -250,7 +251,8 @@ Tests use Catch2 framework with CTest integration.
 
 ```bash
 # Build and run all tests
-cmake --build build --parallel
+jobs=$(( $(nproc) * 3 / 4 ))
+cmake --build build --parallel "$(( jobs > 0 ? jobs : 1 ))"
 ctest --test-dir build
 
 # Run specific test executable
@@ -348,21 +350,24 @@ Before committing, update `RELEASE_NOTES.md` and `debian/changelog` with entries
 
 ### C++ Formatting
 
-Format changed first-party C++ lines with the repository `.clang-format` (clang-format 19), without reformatting untouched code. Stage the files first, because `git-clang-format` refuses files with unstaged changes:
+Only format Laerdal-created `.h` and `.cpp` files with the repository `.clang-format` and clang-format 19. Check file creation history, not just copyright notices, to establish ownership. Preserve existing upstream formatting in Raspberry Pi-origin and mixed files, including when modifying them, to reduce future merge conflicts. Do not format Objective-C/Objective-C++ files or bundled dependencies.
+
+For routine edits to eligible files, format only changed lines, without reformatting untouched code. Stage the files first, because `git-clang-format` refuses files with unstaged changes:
 
 ```bash
 git add <changed-cpp-files>
 git-clang-format-19 --binary clang-format-19 HEAD -- <changed-cpp-files>
 ```
 
-Do not format bundled code in `src/dependencies/`.
+Whole-file formatting is reserved for explicitly requested cleanup of Laerdal-created files. Preserve order-sensitive platform includes.
 
 ### Build
 
 After completing code changes, always build the project to verify there are no compilation errors:
 
 ```bash
-cmake --build build --parallel
+jobs=$(( $(nproc) * 3 / 4 ))
+cmake --build build --parallel "$(( jobs > 0 ? jobs : 1 ))"
 ```
 
 This ensures QML syntax errors and C++ compilation issues are caught before committing.

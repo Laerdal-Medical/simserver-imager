@@ -6,9 +6,9 @@
  * Copyright (C) 2024 Laerdal Medical AS
  */
 
-#include <QString>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
+#include <QString>
 
 /*
  * Builds the cache filename for a downloaded GitHub CI artifact ZIP.
@@ -26,17 +26,18 @@
  *
  * All read and write sites MUST use this helper so cache lookups match.
  */
-inline QString artifactCacheFileName(qint64 artifactId, const QString &name)
+inline QString artifactCacheFileName(qint64 artifactId, const QString& name)
 {
     static const QRegularExpression versionRegex(R"(v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?)");
     const QRegularExpressionMatch match = versionRegex.match(name);
-    if (match.hasMatch()) {
+    if (match.hasMatch())
+    {
         QString version = match.captured(1) + "." + match.captured(2) + "." + match.captured(3);
-        if (!match.captured(4).isEmpty()) {
+        if (!match.captured(4).isEmpty())
+        {
             version += "." + match.captured(4);
         }
-        return QStringLiteral("artifact_%1_v%2.zip")
-            .arg(QString::number(artifactId), version);
+        return QStringLiteral("artifact_%1_v%2.zip").arg(QString::number(artifactId), version);
     }
     return QStringLiteral("artifact_%1.zip").arg(artifactId);
 }

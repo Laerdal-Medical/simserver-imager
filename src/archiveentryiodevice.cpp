@@ -4,15 +4,17 @@
  */
 
 #include "archiveentryiodevice.h"
+
 #include <archive.h>
 #include <archive_entry.h>
+
 #include <QDebug>
 #include <QFileInfo>
 
-ArchiveEntryIODevice::ArchiveEntryIODevice(const QString &archivePath, const QString &entryName, QObject *parent)
-    : QIODevice(parent)
-    , _archivePath(archivePath)
-    , _entryName(entryName)
+ArchiveEntryIODevice::ArchiveEntryIODevice(const QString& archivePath, const QString& entryName, QObject* parent):
+    QIODevice(parent),
+    _archivePath(archivePath),
+    _entryName(entryName)
 {
     _buffer = new char[BUFFER_SIZE];
 }
@@ -25,12 +27,14 @@ ArchiveEntryIODevice::~ArchiveEntryIODevice()
 
 bool ArchiveEntryIODevice::open(OpenMode mode)
 {
-    if (mode != QIODevice::ReadOnly) {
+    if (mode != QIODevice::ReadOnly)
+    {
         qWarning() << "ArchiveEntryIODevice: Only ReadOnly mode is supported";
         return false;
     }
 
-    if (!QFile::exists(_archivePath)) {
+    if (!QFile::exists(_archivePath))
+    {
         qWarning() << "ArchiveEntryIODevice: Archive file not found:" << _archivePath;
         return false;
     }
@@ -41,7 +45,8 @@ bool ArchiveEntryIODevice::open(OpenMode mode)
     archive_read_support_format_all(_archive);
 
     // Open the archive
-    if (archive_read_open_filename(_archive, _archivePath.toUtf8().constData(), 10240) != ARCHIVE_OK) {
+    if (archive_read_open_filename(_archive, _archivePath.toUtf8().constData(), 10240) != ARCHIVE_OK)
+    {
         qWarning() << "ArchiveEntryIODevice: Failed to open archive:" << archive_error_string(_archive);
         archive_read_free(_archive);
         _archive = nullptr;
@@ -49,13 +54,15 @@ bool ArchiveEntryIODevice::open(OpenMode mode)
     }
 
     // Find the target entry
-    struct archive_entry *entry;
-    while (archive_read_next_header(_archive, &entry) == ARCHIVE_OK) {
+    struct archive_entry* entry;
+    while (archive_read_next_header(_archive, &entry) == ARCHIVE_OK)
+    {
         QString currentEntry = QString::fromUtf8(archive_entry_pathname(entry));
 
         // Match by full path or just filename
         QString baseName = QFileInfo(currentEntry).fileName();
-        if (currentEntry == _entryName || baseName == _entryName) {
+        if (currentEntry == _entryName || baseName == _entryName)
+        {
             _entrySize = archive_entry_size(entry);
             _entryFound = true;
             _bytesRead = 0;
@@ -78,7 +85,8 @@ bool ArchiveEntryIODevice::open(OpenMode mode)
 
 void ArchiveEntryIODevice::close()
 {
-    if (_archive) {
+    if (_archive)
+    {
         archive_read_free(_archive);
         _archive = nullptr;
     }
@@ -91,7 +99,8 @@ void ArchiveEntryIODevice::close()
 
 qint64 ArchiveEntryIODevice::bytesAvailable() const
 {
-    if (!_entryFound || _atEnd) {
+    if (!_entryFound || _atEnd)
+    {
         return 0;
     }
     // For sequential devices, return a reasonable buffer size
@@ -103,20 +112,23 @@ bool ArchiveEntryIODevice::atEnd() const
     return _atEnd || !_entryFound;
 }
 
-qint64 ArchiveEntryIODevice::readData(char *data, qint64 maxlen)
+qint64 ArchiveEntryIODevice::readData(char* data, qint64 maxlen)
 {
-    if (!_archive || !_entryFound || _atEnd) {
+    if (!_archive || !_entryFound || _atEnd)
+    {
         return -1;
     }
 
     ssize_t bytesRead = archive_read_data(_archive, data, static_cast<size_t>(maxlen));
 
-    if (bytesRead < 0) {
+    if (bytesRead < 0)
+    {
         qWarning() << "ArchiveEntryIODevice: Read error:" << archive_error_string(_archive);
         return -1;
     }
 
-    if (bytesRead == 0) {
+    if (bytesRead == 0)
+    {
         _atEnd = true;
     }
 
@@ -124,7 +136,7 @@ qint64 ArchiveEntryIODevice::readData(char *data, qint64 maxlen)
     return bytesRead;
 }
 
-qint64 ArchiveEntryIODevice::writeData(const char *data, qint64 len)
+qint64 ArchiveEntryIODevice::writeData(const char* data, qint64 len)
 {
     Q_UNUSED(data);
     Q_UNUSED(len);

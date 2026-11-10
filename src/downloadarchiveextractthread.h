@@ -26,10 +26,10 @@ class DownloadArchiveExtractThread : public DownloadExtractThread
 {
     Q_OBJECT
 public:
-    explicit DownloadArchiveExtractThread(const QByteArray &url, const QByteArray &localfilename = "",
-                                          const QByteArray &expectedHash = "", QObject *parent = nullptr);
+    explicit DownloadArchiveExtractThread(const QByteArray& url, const QByteArray& localfilename = "", const QByteArray& expectedHash = "",
+                                          QObject* parent = nullptr);
 
-    void setTargetEntry(const QString &entryName);
+    void setTargetEntry(const QString& entryName);
 
     virtual void extractImageRun() override;
 
@@ -40,18 +40,19 @@ private:
     QString _targetEntry;
 
     // Context for feeding outer archive entry data to inner decompression archive
-    struct InnerReadContext {
-        struct archive *outerArchive;
-        char *buffer;
+    struct InnerReadContext
+    {
+        struct archive* outerArchive;
+        char* buffer;
         size_t bufferCapacity;
     };
 
-    static ssize_t _inner_archive_read(struct archive *a, void *client_data, const void **buff);
-    static int _inner_archive_close(struct archive *a, void *client_data);
+    static ssize_t _inner_archive_read(struct archive* a, void* client_data, const void** buff);
+    static int _inner_archive_close(struct archive* a, void* client_data);
 
-    bool _isCompressedEntry(const QString &entryName);
-    void _extractCompressedEntry(struct archive *outerArchive);
-    void _extractUncompressedEntry(struct archive *outerArchive);
+    bool _isCompressedEntry(const QString& entryName);
+    void _extractCompressedEntry(struct archive* outerArchive);
+    void _extractUncompressedEntry(struct archive* outerArchive);
 };
 
 #endif // DOWNLOADARCHIVEEXTRACTTHREAD_H

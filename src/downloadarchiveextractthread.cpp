@@ -4,16 +4,18 @@
  */
 
 #include "downloadarchiveextractthread.h"
+
 #include <archive.h>
 #include <archive_entry.h>
+#include <cstring>
+#include <stdexcept>
+
 #include <QDebug>
 #include <QElapsedTimer>
-#include <stdexcept>
-#include <cstring>
 
 using namespace std;
 
-static inline void _checkArchiveResult(int r, struct archive *a)
+inline static void _checkArchiveResult(int r, struct archive* a)
 {
     if (r == ARCHIVE_FATAL)
     {
@@ -25,27 +27,26 @@ static inline void _checkArchiveResult(int r, struct archive *a)
     }
 }
 
-DownloadArchiveExtractThread::DownloadArchiveExtractThread(const QByteArray &url, const QByteArray &localfilename,
-                                                           const QByteArray &expectedHash, QObject *parent)
-    : DownloadExtractThread(url, localfilename, expectedHash, parent)
+DownloadArchiveExtractThread::DownloadArchiveExtractThread(const QByteArray& url, const QByteArray& localfilename,
+                                                           const QByteArray& expectedHash, QObject* parent):
+    DownloadExtractThread(url, localfilename, expectedHash, parent)
 {
 }
 
-void DownloadArchiveExtractThread::setTargetEntry(const QString &entryName)
+void DownloadArchiveExtractThread::setTargetEntry(const QString& entryName)
 {
     _targetEntry = entryName;
 }
 
-bool DownloadArchiveExtractThread::_isCompressedEntry(const QString &entryName)
+bool DownloadArchiveExtractThread::_isCompressedEntry(const QString& entryName)
 {
     QString lower = entryName.toLower();
-    return lower.endsWith(".xz") || lower.endsWith(".gz") || lower.endsWith(".zst")
-           || lower.endsWith(".bz2") || lower.endsWith(".lz4");
+    return lower.endsWith(".xz") || lower.endsWith(".gz") || lower.endsWith(".zst") || lower.endsWith(".bz2") || lower.endsWith(".lz4");
 }
 
-ssize_t DownloadArchiveExtractThread::_inner_archive_read(struct archive *, void *client_data, const void **buff)
+ssize_t DownloadArchiveExtractThread::_inner_archive_read(struct archive*, void* client_data, const void** buff)
 {
-    auto *ctx = static_cast<InnerReadContext *>(client_data);
+    auto* ctx = static_cast<InnerReadContext*>(client_data);
 
     ssize_t bytesRead = archive_read_data(ctx->outerArchive, ctx->buffer, ctx->bufferCapacity);
     if (bytesRead < 0)
@@ -57,7 +58,7 @@ ssize_t DownloadArchiveExtractThread::_inner_archive_read(struct archive *, void
     return bytesRead;
 }
 
-int DownloadArchiveExtractThread::_inner_archive_close(struct archive *, void *)
+int DownloadArchiveExtractThread::_inner_archive_close(struct archive*, void*)
 {
     return ARCHIVE_OK;
 }
@@ -68,15 +69,13 @@ void DownloadArchiveExtractThread::extractImageRun()
     extractionTimer.start();
 
     // Outer archive: reads ZIP from input ring buffer
-    struct archive *outerArchive = archive_read_new();
-    struct archive_entry *entry;
+    struct archive* outerArchive = archive_read_new();
+    struct archive_entry* entry;
 
     archive_read_support_filter_all(outerArchive);
     archive_read_support_format_all(outerArchive);
 
-    archive_read_open(outerArchive, this, NULL,
-                      &DownloadExtractThread::_archive_read,
-                      &DownloadExtractThread::_archive_close);
+    archive_read_open(outerArchive, this, NULL, &DownloadExtractThread::_archive_read, &DownloadExtractThread::_archive_close);
 
     try
     {
@@ -98,8 +97,7 @@ void DownloadArchiveExtractThread::extractImageRun()
             bool matches = false;
             if (!_targetEntry.isEmpty())
             {
-                matches = (entryName == _targetEntry) ||
-                          entryName.endsWith("/" + _targetEntry) ||
+                matches = (entryName == _targetEntry) || entryName.endsWith("/" + _targetEntry) ||
                           (entryName.section('/', -1) == _targetEntry);
             }
             else
@@ -135,14 +133,13 @@ void DownloadArchiveExtractThread::extractImageRun()
 
         if (!found && !_cancelled)
         {
-            QString msg = _targetEntry.isEmpty()
-                              ? tr("No WIC image found in archive")
-                              : tr("Entry '%1' not found in archive").arg(_targetEntry);
+            QString msg = _targetEntry.isEmpty() ? tr("No WIC image found in archive") :
+                                                   tr("Entry '%1' not found in archive").arg(_targetEntry);
             DownloadThread::cancelDownload();
             emit error(msg);
         }
     }
-    catch (exception &e)
+    catch (exception& e)
     {
         if (_file && _file->IsAsyncIOSupported())
         {
@@ -159,12 +156,8 @@ void DownloadArchiveExtractThread::extractImageRun()
     archive_read_free(outerArchive);
 
     // Emit pipeline timing summary
-    emit eventPipelineDecompressionTime(
-        static_cast<quint32>(_totalDecompressionMs.load()),
-        _bytesDecompressed.load());
-    emit eventPipelineRingBufferWaitTime(
-        static_cast<quint32>(_totalRingBufferWaitMs.load()),
-        _bytesReadFromRingBuffer.load());
+    emit eventPipelineDecompressionTime(static_cast<quint32>(_totalDecompressionMs.load()), _bytesDecompressed.load());
+    emit eventPipelineRingBufferWaitTime(static_cast<quint32>(_totalRingBufferWaitMs.load()), _bytesReadFromRingBuffer.load());
 
     qDebug() << "DownloadArchiveExtractThread: Pipeline timing:"
              << "decompress=" << _totalDecompressionMs.load() << "ms"
@@ -184,11 +177,11 @@ void DownloadArchiveExtractThread::extractImageRun()
     }
 }
 
-void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outerArchive)
+void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive* outerArchive)
 {
     // Allocate intermediate buffer for outer → inner data transfer
     const size_t innerBufSize = 256 * 1024; // 256KB chunks
-    char *innerBuf = new char[innerBufSize];
+    char* innerBuf = new char[innerBufSize];
 
     InnerReadContext ctx;
     ctx.outerArchive = outerArchive;
@@ -196,16 +189,15 @@ void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outer
     ctx.bufferCapacity = innerBufSize;
 
     // Inner archive: decompresses entry data (xz/gz/zst/bz2)
-    struct archive *innerArchive = archive_read_new();
-    struct archive_entry *innerEntry;
+    struct archive* innerArchive = archive_read_new();
+    struct archive_entry* innerEntry;
 
     archive_read_support_filter_all(innerArchive);
     archive_read_support_format_raw(innerArchive);
 
     _configureArchiveOptions(innerArchive);
 
-    int r = archive_read_open(innerArchive, &ctx, NULL,
-                              &DownloadArchiveExtractThread::_inner_archive_read,
+    int r = archive_read_open(innerArchive, &ctx, NULL, &DownloadArchiveExtractThread::_inner_archive_read,
                               &DownloadArchiveExtractThread::_inner_archive_close);
     if (r != ARCHIVE_OK)
     {
@@ -224,7 +216,7 @@ void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outer
     // Read decompressed data into write ring buffer slots
     while (!_cancelled)
     {
-        RingBuffer::Slot *slot = _writeRingBuffer->acquireWriteSlot(100);
+        RingBuffer::Slot* slot = _writeRingBuffer->acquireWriteSlot(100);
         while (!slot && !_cancelled && !_writeRingBuffer->isCancelled())
         {
             slot = _writeRingBuffer->acquireWriteSlot(100);
@@ -244,7 +236,7 @@ void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outer
 
         if (size < 0)
         {
-            const char *errorStr = archive_error_string(innerArchive);
+            const char* errorStr = archive_error_string(innerArchive);
             _writeRingBuffer->releaseReadSlot(slot);
 
             if (size == ARCHIVE_FATAL && errorStr && strstr(errorStr, "No progress is possible"))
@@ -270,9 +262,10 @@ void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outer
         _bytesDecompressed.fetch_add(static_cast<quint64>(size));
         _emitProgressUpdate();
 
-        RingBuffer *ringBuf = _writeRingBuffer.get();
-        RingBuffer::Slot *slotToRelease = slot;
-        DownloadThread::WriteCompleteCallback releaseCallback = [ringBuf, slotToRelease]() {
+        RingBuffer* ringBuf = _writeRingBuffer.get();
+        RingBuffer::Slot* slotToRelease = slot;
+        DownloadThread::WriteCompleteCallback releaseCallback = [ringBuf, slotToRelease]()
+        {
             ringBuf->releaseReadSlot(slotToRelease);
         };
 
@@ -296,14 +289,14 @@ void DownloadArchiveExtractThread::_extractCompressedEntry(struct archive *outer
     delete[] innerBuf;
 }
 
-void DownloadArchiveExtractThread::_extractUncompressedEntry(struct archive *outerArchive)
+void DownloadArchiveExtractThread::_extractUncompressedEntry(struct archive* outerArchive)
 {
     QElapsedTimer decompressTimer;
 
     // Read directly from outer archive into write ring buffer slots
     while (!_cancelled)
     {
-        RingBuffer::Slot *slot = _writeRingBuffer->acquireWriteSlot(100);
+        RingBuffer::Slot* slot = _writeRingBuffer->acquireWriteSlot(100);
         while (!slot && !_cancelled && !_writeRingBuffer->isCancelled())
         {
             slot = _writeRingBuffer->acquireWriteSlot(100);
@@ -323,7 +316,7 @@ void DownloadArchiveExtractThread::_extractUncompressedEntry(struct archive *out
 
         if (size < 0)
         {
-            const char *errorStr = archive_error_string(outerArchive);
+            const char* errorStr = archive_error_string(outerArchive);
             _writeRingBuffer->releaseReadSlot(slot);
 
             if (size == ARCHIVE_FATAL && errorStr && strstr(errorStr, "No progress is possible"))
@@ -349,9 +342,10 @@ void DownloadArchiveExtractThread::_extractUncompressedEntry(struct archive *out
         _bytesDecompressed.fetch_add(static_cast<quint64>(size));
         _emitProgressUpdate();
 
-        RingBuffer *ringBuf = _writeRingBuffer.get();
-        RingBuffer::Slot *slotToRelease = slot;
-        DownloadThread::WriteCompleteCallback releaseCallback = [ringBuf, slotToRelease]() {
+        RingBuffer* ringBuf = _writeRingBuffer.get();
+        RingBuffer::Slot* slotToRelease = slot;
+        DownloadThread::WriteCompleteCallback releaseCallback = [ringBuf, slotToRelease]()
+        {
             ringBuf->releaseReadSlot(slotToRelease);
         };
 

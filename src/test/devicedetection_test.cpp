@@ -2,27 +2,36 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (C) 2026 Laerdal Medical
  */
+#include "../devicedetection.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <QStringList>
 
-#include "../devicedetection.h"
-
 using namespace DeviceDetection;
 
-namespace {
-QStringList tags(DeviceType t, bool vsi = false)
+namespace
 {
-    QStringList out;
-    for (const auto &v : getDeviceTags(t, vsi)) out << v.toString();
-    out.sort();
-    return out;
-}
+    QStringList tags(DeviceType t, bool vsi = false)
+    {
+        QStringList out;
+        for (const auto& v : getDeviceTags(t, vsi))
+        {
+            out << v.toString();
+        }
+        out.sort();
+        return out;
+    }
 } // namespace
 
 TEST_CASE("detectFromFilename resolves the most specific device first", "[devicedetection]")
 {
-    struct Row { const char *name; DeviceType type; };
+    struct Row
+    {
+        const char* name;
+        DeviceType type;
+    };
+
     const Row rows[] = {
         {"simman3g-64-image.wic", DeviceType::SimMan3G64},
         {"SimMan-64.wic.xz", DeviceType::SimMan3G64},
@@ -49,7 +58,8 @@ TEST_CASE("detectFromFilename resolves the most specific device first", "[device
         {"rootfs.wic", DeviceType::Unknown},
         {"", DeviceType::Unknown},
     };
-    for (const Row &r : rows) {
+    for (const Row& r : rows)
+    {
         INFO(r.name);
         REQUIRE(detectFromFilename(QString::fromLatin1(r.name)) == r.type);
     }
@@ -80,25 +90,27 @@ TEST_CASE("detectFromCdnType uses canonical CDN identifiers", "[devicedetection]
 
 TEST_CASE("getDeviceTags adds cross-device tags only for non-VSI SimPad images", "[devicedetection]")
 {
-    REQUIRE(tags(DeviceType::SimPadPlus) == QStringList{"cancpu", "imx6", "linkbox"});
-    REQUIRE(tags(DeviceType::SimPadPlus, true) == QStringList{"imx6"});
-    REQUIRE(tags(DeviceType::SimPadPlus2) == QStringList{"cancpu2", "imx8", "linkbox2"});
-    REQUIRE(tags(DeviceType::SimPadPlus2, true) == QStringList{"imx8"});
-    REQUIRE(tags(DeviceType::SimMan3G32) == QStringList{"simman3g-32"});
-    REQUIRE(tags(DeviceType::SimMan3G64) == QStringList{"simman3g-64"});
-    REQUIRE(tags(DeviceType::SimMan3G) == QStringList{"simman3g"});
-    REQUIRE(tags(DeviceType::LinkBox) == QStringList{"linkbox"});
-    REQUIRE(tags(DeviceType::LinkBox2, true) == QStringList{"linkbox2"});
-    REQUIRE(tags(DeviceType::CANCPU) == QStringList{"cancpu"});
-    REQUIRE(tags(DeviceType::CANCPU2) == QStringList{"cancpu2"});
+    REQUIRE(tags(DeviceType::SimPadPlus) == QStringList {"cancpu", "imx6", "linkbox"});
+    REQUIRE(tags(DeviceType::SimPadPlus, true) == QStringList {"imx6"});
+    REQUIRE(tags(DeviceType::SimPadPlus2) == QStringList {"cancpu2", "imx8", "linkbox2"});
+    REQUIRE(tags(DeviceType::SimPadPlus2, true) == QStringList {"imx8"});
+    REQUIRE(tags(DeviceType::SimMan3G32) == QStringList {"simman3g-32"});
+    REQUIRE(tags(DeviceType::SimMan3G64) == QStringList {"simman3g-64"});
+    REQUIRE(tags(DeviceType::SimMan3G) == QStringList {"simman3g"});
+    REQUIRE(tags(DeviceType::LinkBox) == QStringList {"linkbox"});
+    REQUIRE(tags(DeviceType::LinkBox2, true) == QStringList {"linkbox2"});
+    REQUIRE(tags(DeviceType::CANCPU) == QStringList {"cancpu"});
+    REQUIRE(tags(DeviceType::CANCPU2) == QStringList {"cancpu2"});
     REQUIRE(tags(DeviceType::Unknown).isEmpty());
 }
 
 TEST_CASE("isFileCompatibleWithDevice gates builds by device tag", "[devicedetection][compat]")
 {
     // Generic files are shown for every device.
-    for (const char *tag : {"imx6", "imx8", "linkbox", "simman3g-64", "", "unknown"})
+    for (const char* tag : {"imx6", "imx8", "linkbox", "simman3g-64", "", "unknown"})
+    {
         REQUIRE(isFileCompatibleWithDevice("rootfs.wic", tag));
+    }
 
     REQUIRE(isFileCompatibleWithDevice("simpad-sysinfo.spu", "imx6"));
     REQUIRE(isFileCompatibleWithDevice("simpad-sysinfo.spu", "imx8"));
